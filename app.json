@@ -4,9 +4,10 @@
     "slug": "PharmacyServiceDonations",
     "ios": {
       "bundleIdentifier": "com.anonymous.PharmacyServiceDonations",
-      "icon": "./assets/icon/ios-icon.png"
+      "icon": "./assets/icon/ios-icon.png",
+      "buildNumber": "3.0.0"
     },
-    "version": "1.0.0",
+    "version": "3.0.0",
     "android": {
       "package": "com.anonymous.PharmacyServiceDonations"
     },
