@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "PharmacyServiceDonations",
-    "slug": "PharmacyServiceDonations",
+    "name": "MedLeb PS",
+    "slug": "MedLeb PS",
     "ios": {
       "bundleIdentifier": "com.anonymous.PharmacyServiceDonations",
       "icon": "./assets/icon/ios-icon.png",
       "buildNumber": "3.0.0"
     },
-    "version": "3.0.0",
+    "version": "3.0.1",
     "android": {
       "package": "com.anonymous.PharmacyServiceDonations"
     },
@@ -17,5 +17,5 @@
       }
     }
   },
-  "name": "PharmacyServiceDonations"
+  "name": "MedLeb PS"
 }

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button, View, Text, TextInput, Image, Keyboard, StyleSheet, TouchableOpacity } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import axios from 'axios';
+import DropDownPicker from 'react-native-dropdown-picker';
 
 const AddDonor = ({ navigation }) => {
   const [donors, setDonors] = useState([]);
@@ -10,7 +10,8 @@ const AddDonor = ({ navigation }) => {
   const [selectedRecipient, setSelectedRecipient] = useState(null);
   const [donationPurpose, setDonationPurpose] = useState('');
   const [isInputFocused, setIsInputFocused] = useState(false);
-  const [DonationDate, setDonationDate] = useState(new Date().toISOString());
+  const [donorOpen, setDonorOpen] = useState(false);
+  const [recipientOpen, setRecipientOpen] = useState(false);
 
   useEffect(() => {
     fetchDonors();
@@ -28,11 +29,11 @@ const AddDonor = ({ navigation }) => {
     try {
       const response = await axios.get("https://apiv2.medleb.org/donor/all");
       const donorsData = response.data.map(donor => ({
-        DonorId: donor.DonorId,
-        DonorName: donor.DonorName
+        label: donor.DonorName,
+        value: donor.DonorId
       }));
       setDonors(donorsData);
-      setSelectedDonor(donorsData[0]?.DonorId);
+      setSelectedDonor(donorsData[0]?.value);
     } catch (error) {
       console.error("Error fetching donors:", error);
     }
@@ -42,11 +43,11 @@ const AddDonor = ({ navigation }) => {
     try {
       const response = await axios.get("https://apiv2.medleb.org/recipient/all");
       const recipientsData = response.data.map(recipient => ({
-        RecipientId: recipient.RecipientId,
-        RecipientName: recipient.RecipientName
+        label: recipient.RecipientName,
+        value: recipient.RecipientId
       }));
       setRecipients(recipientsData);
-      setSelectedRecipient(recipientsData[0]?.RecipientId);
+      setSelectedRecipient(recipientsData[0]?.value);
     } catch (error) {
       console.error("Error fetching recipients:", error);
     }
@@ -58,10 +59,10 @@ const AddDonor = ({ navigation }) => {
         DonorId: selectedDonor,
         RecipientId: selectedRecipient,
         DonationPurpose: donationPurpose,
-        DonationDate : new Date().toISOString(),
+        DonationDate: new Date().toISOString(),
       });
       const donationId = response.data.DonationId;
-      console.log("Donation created successfully with ID:", donationId, DonationDate);
+      console.log("Donation created successfully with ID:", donationId);
       navigation.navigate('Donate', {
         donorId: selectedDonor,
         recipientId: selectedRecipient,
@@ -76,38 +77,46 @@ const AddDonor = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Select Donor</Text>
-      <View style={styles.dropdown}>
-        <Picker
-          selectedValue={selectedDonor}
-          onValueChange={(itemValue) => setSelectedDonor(itemValue)}
-          itemStyle={styles.pickerItem}
-        >
-          {donors.map(donor => <Picker.Item key={donor.DonorId} label={donor.DonorName} value={donor.DonorId} />)}
-        </Picker>
-      </View>
+      <DropDownPicker
+  open={donorOpen}
+  value={selectedDonor}
+  items={donors}
+  setOpen={setDonorOpen}
+  setValue={setSelectedDonor}
+  setItems={setDonors}
+  placeholder="Select a donor"
+  containerStyle={styles.dropdown}
+  onOpen={() => setIsInputFocused(true)}
+  onClose={() => setIsInputFocused(false)}
+  style={styles.picker}
+  dropDownContainerStyle={styles.dropDownContainer}
+/>
 
-      <Text style={styles.label}>Select Recipient</Text>
-      <View style={styles.dropdown}>
-        <Picker
-          selectedValue={selectedRecipient}
-          onValueChange={(itemValue) => setSelectedRecipient(itemValue)}
-          itemStyle={styles.pickerItem}
-        >
-          {recipients.map(recipient => <Picker.Item key={recipient.RecipientId} label={recipient.RecipientName} value={recipient.RecipientId} />)}
-        </Picker>
-      </View>
+<DropDownPicker
+  open={recipientOpen}
+  value={selectedRecipient}
+  items={recipients}
+  setOpen={setRecipientOpen}
+  setValue={setSelectedRecipient}
+  setItems={setRecipients}
+  placeholder="Select a recipient"
+  containerStyle={styles.dropdown}
+  onOpen={() => setIsInputFocused(true)}
+  onClose={() => setIsInputFocused(false)}
+  style={styles.picker}
+  dropDownContainerStyle={styles.dropDownContainer}
+/>
+
+
       <Text style={styles.label}>Donation Purpose</Text>
-
-      <View>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter Donation Purpose"
-          value={donationPurpose}
-          onChangeText={setDonationPurpose}
-          onFocus={() => setIsInputFocused(true)}
-          onBlur={() => setIsInputFocused(false)}
-        />
-      </View>
+      <TextInput
+        style={styles.input}
+        placeholder="Enter Donation Purpose"
+        value={donationPurpose}
+        onChangeText={setDonationPurpose}
+        onFocus={() => setIsInputFocused(true)}
+        onBlur={() => setIsInputFocused(false)}
+      />
 
       <TouchableOpacity style={styles.button} onPress={handleContinue}>
         <Text style={styles.buttonText}>Continue</Text>
@@ -142,28 +151,31 @@ const AddDonor = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
+  picker: {
+    borderColor: '#00a651', // Green border
+    borderWidth: 1,
+    borderRadius: 20,
+  },
+  dropDownContainer: {
+    borderColor: '#00a651', // Green border for dropdown container
+    borderWidth: 1,
+    borderRadius: 20,
+  },
   container: {
     flex: 1,
     paddingTop: '20%',
     paddingHorizontal: '10%',
   },
   dropdown: {
-    borderWidth: 1,
-    borderColor: "#00a651",
-    borderRadius: 20,
-    padding: 10,
     marginBottom: 20,
-    height: 50,
-    justifyContent: 'center',
+    
   },
   label: {
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 10,
     color: "#A9A9A9",
-  },
-  pickerItem: {
-    fontSize: 16,
+    
   },
   button: {
     width: 130,
