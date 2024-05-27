@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "MedLeb PS",
-    "slug": "MedLeb PS",
+    "slug": "PharmacyServiceDonations",
     "ios": {
       "bundleIdentifier": "com.anonymous.PharmacyServiceDonations",
       "icon": "./assets/icon/ios-icon.png",
@@ -15,6 +15,10 @@
       "eas": {
         "projectId": "58244e3c-69dd-4e9d-ac67-cffb4a705d19"
       }
+    },
+    "runtimeVersion": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/58244e3c-69dd-4e9d-ac67-cffb4a705d19"
     }
   },
   "name": "MedLeb PS"

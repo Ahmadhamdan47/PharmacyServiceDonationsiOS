@@ -23,6 +23,7 @@
     "expo-module-scripts": "^3.5.1",
     "expo-sharing": "^12.0.1",
     "expo-status-bar": "~1.12.1",
+    "expo-updates": "^0.25.14",
     "json2csv": "^6.0.0-alpha.2",
     "react": "18.2.0",
     "react-data-export": "^0.6.0",
