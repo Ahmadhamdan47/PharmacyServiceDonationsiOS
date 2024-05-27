@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "PharmacyServiceDonations",
+    "slug": "PharmacyServiceDonations",
+    "ios": {
+      "bundleIdentifier": "com.anonymous.PharmacyServiceDonations",
+      "icon": "./assets/icon/ios-icon.png"
+    },
+    "version": "1.0.0",
+    "android": {
+      "package": "com.anonymous.PharmacyServiceDonations"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "58244e3c-69dd-4e9d-ac67-cffb4a705d19"
+      }
+    }
+  },
+  "name": "PharmacyServiceDonations"
+}
