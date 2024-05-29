@@ -7,7 +7,7 @@ import XLSX from 'xlsx';
 import axios from 'axios';
 
 const ListDonations = () => {
-    const [tableHead, setTableHead] = useState(['Drug Name','Owner', 'Country', 'GTIN', 'LOT', 'Serial Number', 'Expiry Date', 'Form', 'Presentation','Quantity']);
+    const [tableHead, setTableHead] = useState(['Drug Name','GTIN', 'LOT', 'Serial Number', 'Expiry Date', 'Form', 'Presentation','Owner', 'Country', 'Quantity']);
     const [tableData, setTableData] = useState([]);
 
     useEffect(() => {
@@ -18,17 +18,18 @@ const fetchDonations = async () => {
   try {
     const response = await axios.get("https://apiv2.medleb.org/donation/all");
     const data = response.data.map(item => [
-      item.DrugName,
-      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].Laboratory : 'N/A', // This is now the 'Owner'
-      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].LaboratoryCountry : 'N/A',
+      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].DrugName : 'N/A',
       item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].GTIN : 'N/A',
-      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].LOT : 'N/A', // Added LOT
-      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].Serial : 'N/A', // Added Serial Number
+      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].BatchNumber : 'N/A', // Added LOT
+      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].SerialNumber : 'N/A', // Added Serial Number
       item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].ExpiryDate : 'N/A', // Added Expiry Date
       item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].Form : 'N/A', // Added Form
       item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].Presentation : 'N/A', // Added Presentation
+      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].Laboratory : 'N/A', // This is now the 'Owner'
+      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].LaboratoryCountry : 'N/A',
       item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].Quantity : 'N/A',
-    ]);
+    ]).filter(row => !row.includes('N/A')); // Filter out rows with 'N/A' fields
+
     setTableData(data);
   } catch (error) {
     console.error("Error fetching donations:", error);
@@ -37,9 +38,31 @@ const fetchDonations = async () => {
 
     const exportToExcel = async () => {
         try {
-            const ws = XLSX.utils.aoa_to_sheet([tableHead, ...tableData]);
+            const filteredData = tableData.filter(row => !row.includes('N/A')); // Filter out rows with 'N/A' fields
+            const ws = XLSX.utils.aoa_to_sheet([tableHead, ...filteredData]);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Donations");
+
+            // Set column widths for better readability
+            const wscols = [
+                { wch: 20 }, // Drug Name
+                { wch: 20 }, // GTIN
+                { wch: 15 }, // LOT
+                { wch: 20 }, // Serial Number
+                { wch: 15 }, // Expiry Date
+                { wch: 15 }, // Form
+                { wch: 20 }, // Presentation
+                { wch: 15 }, // Owner
+                { wch: 15 }, // Country
+                { wch: 10 }, // Quantity
+            ];
+            ws['!cols'] = wscols;
+
+            // Apply number format to GTIN column (second column)
+            ws['!ref'] = XLSX.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: tableHead.length - 1, r: filteredData.length } });
+            for (let R = 1; R <= filteredData.length; ++R) {
+                ws[XLSX.utils.encode_cell({ c: 1, r: R })].z = '0';
+            }
 
             const wbout = XLSX.write(wb, { type: 'base64', bookType: "xlsx" });
 
@@ -67,16 +90,17 @@ const fetchDonations = async () => {
 
     return (
         <View style={styles.fullContainer}>
-            <ScrollView style={styles.container}>
-                <Table borderStyle={{ borderWidth: 2, borderColor: '#c8e1ff' }}>
-                    <Row data={tableHead} style={styles.head} textStyle={styles.text} />
-                    <Rows data={tableData} textStyle={styles.text} />
-                </Table>
+            <ScrollView horizontal style={styles.container}>
+                <ScrollView>
+                    <Table borderStyle={{ borderWidth: 2, borderColor: '#c8e1ff' }}>
+                        <Row data={tableHead} style={styles.head} widthArr={[120, 120, 120, 120, 120, 120, 120, 120, 120, 120]} textStyle={styles.text} />
+                        <Rows data={tableData} widthArr={[120, 120, 120, 120, 120, 120, 120, 120, 120, 120]} textStyle={styles.text} />
+                    </Table>
+                </ScrollView>
             </ScrollView>
             <TouchableOpacity onPress={exportToExcel} style={styles.button}>
                 <Text style={styles.buttonText}>Export to Excel</Text>
             </TouchableOpacity>
-            {/* Custom Taskbar omitted for brevity */}
         </View>
     );
 };
