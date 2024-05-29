@@ -145,15 +145,7 @@ const BatchLotForm = ({ form, index, handleFieldChange, drugItems, checkDrugName
       onFocus={() => setIsInputFocused(true)} 
       onBlur={() => setIsInputFocused(false)}
     />
-    <FieldLabel label="Quantity" />
-    <TextInput 
-      style={styles.input} 
-      placeholder="Quantity" 
-      value={form.quantity} 
-      onChangeText={text => handleFieldChange(index, 'quantity', text)} 
-      onFocus={() => setIsInputFocused(true)} 
-      onBlur={() => setIsInputFocused(false)}
-    />
+
     <FieldLabel label="Owner" />
     <TextInput 
       style={styles.input} 
@@ -169,6 +161,16 @@ const BatchLotForm = ({ form, index, handleFieldChange, drugItems, checkDrugName
       placeholder="Country" 
       value={form.country} 
       onChangeText={text => handleFieldChange(index, 'country', text)} 
+      onFocus={() => setIsInputFocused(true)} 
+      onBlur={() => setIsInputFocused(false)}
+    />
+    
+    <FieldLabel label="Quantity" />
+    <TextInput 
+      style={styles.input} 
+      placeholder="Quantity" 
+      value={form.quantity} 
+      onChangeText={text => handleFieldChange(index, 'quantity', text)} 
       onFocus={() => setIsInputFocused(true)} 
       onBlur={() => setIsInputFocused(false)}
     />
@@ -531,16 +533,6 @@ const Donate = ({ route }) => {
                 onFocus={() => setIsInputFocused(true)} 
                 onBlur={() => setIsInputFocused(false)}
               />
-              
-              <FieldLabel label="Quantity" />
-              <TextInput 
-                style={styles.input} 
-                placeholder="Quantity" 
-                value={batchLots[0].quantity} 
-                onChangeText={text => handleFieldChange(0, 'quantity', text)} 
-                onFocus={() => setIsInputFocused(true)} 
-                onBlur={() => setIsInputFocused(false)}
-              />
 
               <FieldLabel label="Owner" />
               <TextInput 
@@ -561,6 +553,18 @@ const Donate = ({ route }) => {
                 onFocus={() => setIsInputFocused(true)} 
                 onBlur={() => setIsInputFocused(false)}
               />
+
+                            
+            <FieldLabel label="Quantity" />
+              <TextInput 
+                style={styles.input} 
+                placeholder="Quantity" 
+                value={batchLots[0].quantity} 
+                onChangeText={text => handleFieldChange(0, 'quantity', text)} 
+                onFocus={() => setIsInputFocused(true)} 
+                onBlur={() => setIsInputFocused(false)}
+              />
+
             </View>
           </View>
 
