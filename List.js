@@ -7,30 +7,33 @@ import XLSX from 'xlsx';
 import axios from 'axios';
 
 const ListDonations = () => {
-    const [tableHead, setTableHead] = useState(['Donor', 'Recipient', 'Date', 'Quantity', 'Laboratory', 'Country', 'GTIN']);
+    const [tableHead, setTableHead] = useState(['Drug Name','Owner', 'Country', 'GTIN', 'LOT', 'Serial Number', 'Expiry Date', 'Form', 'Presentation','Quantity']);
     const [tableData, setTableData] = useState([]);
 
     useEffect(() => {
         fetchDonations();
     }, []);
 
-    const fetchDonations = async () => {
-        try {
-            const response = await axios.get("https://apiv2.medleb.org/donation/all");
-            const data = response.data.map(item => [
-                item.DonorName,
-                item.RecipientName,
-                item.DonationDate ? new Date(item.DonationDate).toLocaleDateString() : new Date().toLocaleDateString(),
-                item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].Quantity : 'N/A',
-                item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].Laboratory : 'N/A',
-                item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].LaboratoryCountry : 'N/A',
-                item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].GTIN : 'N/A'
-            ]);
-            setTableData(data);
-        } catch (error) {
-            console.error("Error fetching donations:", error);
-        }
-    };
+const fetchDonations = async () => {
+  try {
+    const response = await axios.get("https://apiv2.medleb.org/donation/all");
+    const data = response.data.map(item => [
+      item.DrugName,
+      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].Laboratory : 'N/A', // This is now the 'Owner'
+      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].LaboratoryCountry : 'N/A',
+      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].GTIN : 'N/A',
+      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].LOT : 'N/A', // Added LOT
+      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].Serial : 'N/A', // Added Serial Number
+      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].ExpiryDate : 'N/A', // Added Expiry Date
+      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].Form : 'N/A', // Added Form
+      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].Presentation : 'N/A', // Added Presentation
+      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].Quantity : 'N/A',
+    ]);
+    setTableData(data);
+  } catch (error) {
+    console.error("Error fetching donations:", error);
+  }
+};
 
     const exportToExcel = async () => {
         try {
