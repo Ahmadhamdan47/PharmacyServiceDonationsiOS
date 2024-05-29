@@ -77,36 +77,40 @@ const AddDonor = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Select Donor</Text>
-      <DropDownPicker
-  open={donorOpen}
-  value={selectedDonor}
-  items={donors}
-  setOpen={setDonorOpen}
-  setValue={setSelectedDonor}
-  setItems={setDonors}
-  placeholder="Select a donor"
-  containerStyle={styles.dropdown}
-  onOpen={() => setIsInputFocused(true)}
-  onClose={() => setIsInputFocused(false)}
-  style={styles.picker}
-  dropDownContainerStyle={styles.dropDownContainer}
-/>
+      <View style={{ zIndex: 10 }}>
+        <DropDownPicker
+          open={donorOpen}
+          value={selectedDonor}
+          items={donors}
+          setOpen={setDonorOpen}
+          setValue={setSelectedDonor}
+          setItems={setDonors}
+          placeholder="Select a donor"
+          containerStyle={styles.dropdown}
+          onOpen={() => setIsInputFocused(true)}
+          onClose={() => setIsInputFocused(false)}
+          style={styles.picker}
+          dropDownContainerStyle={styles.dropDownContainer}
+        />
+      </View>
 
-<DropDownPicker
-  open={recipientOpen}
-  value={selectedRecipient}
-  items={recipients}
-  setOpen={setRecipientOpen}
-  setValue={setSelectedRecipient}
-  setItems={setRecipients}
-  placeholder="Select a recipient"
-  containerStyle={styles.dropdown}
-  onOpen={() => setIsInputFocused(true)}
-  onClose={() => setIsInputFocused(false)}
-  style={styles.picker}
-  dropDownContainerStyle={styles.dropDownContainer}
-/>
-
+      <Text style={styles.label}>Select Recipient</Text>
+      <View style={{ zIndex: 9 }}>
+        <DropDownPicker
+          open={recipientOpen}
+          value={selectedRecipient}
+          items={recipients}
+          setOpen={setRecipientOpen}
+          setValue={setSelectedRecipient}
+          setItems={setRecipients}
+          placeholder="Select a recipient"
+          containerStyle={styles.dropdown}
+          onOpen={() => setIsInputFocused(true)}
+          onClose={() => setIsInputFocused(false)}
+          style={styles.picker}
+          dropDownContainerStyle={styles.dropDownContainer}
+        />
+      </View>
 
       <Text style={styles.label}>Donation Purpose</Text>
       <TextInput
@@ -151,6 +155,20 @@ const AddDonor = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    paddingTop: '20%',
+    paddingHorizontal: '10%',
+  },
+  dropdown: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: "#A9A9A9",
+  },
   picker: {
     borderColor: '#00a651', // Green border
     borderWidth: 1,
@@ -160,22 +178,6 @@ const styles = StyleSheet.create({
     borderColor: '#00a651', // Green border for dropdown container
     borderWidth: 1,
     borderRadius: 20,
-  },
-  container: {
-    flex: 1,
-    paddingTop: '20%',
-    paddingHorizontal: '10%',
-  },
-  dropdown: {
-    marginBottom: 20,
-    
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: "#A9A9A9",
-    
   },
   button: {
     width: 130,

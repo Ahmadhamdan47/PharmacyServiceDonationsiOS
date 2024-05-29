@@ -391,11 +391,11 @@ const Donate = ({ route }) => {
         Alert.alert('Success', 'Donations Added Successfully');
         navigation.navigate('List');
       } else {
-        Alert.alert('Error', 'Failed to create Donations check the medicine information');
+        Alert.alert('Warning', 'Make sure you entered all of the required fields correctly');
       }
     } catch (error) {
       console.error('Error creating batch lot:', error);
-      Alert.alert('Error', 'Failed to create batch lot');
+      Alert.alert('Warning', 'Make sure you scanned the barcode and entered all of the fields correctly');
     }
   };
 
