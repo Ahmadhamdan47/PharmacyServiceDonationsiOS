@@ -7,7 +7,7 @@
       "icon": "./assets/icon/ios-icon.png",
       "buildNumber": "3.0.0"
     },
-    "version": "3.0.1",
+    "version": "3.0.2",
     "android": {
       "package": "com.anonymous.PharmacyServiceDonations"
     },
