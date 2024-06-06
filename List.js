@@ -13,22 +13,23 @@ const ListDonations = () => {
     useEffect(() => {
         fetchDonations();
     }, []);
-
 const fetchDonations = async () => {
   try {
     const response = await axios.get("https://apiv2.medleb.org/donation/all");
-    const data = response.data.map(item => [
-      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].DrugName : 'N/A',
-      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].GTIN : 'N/A',
-      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].BatchNumber : 'N/A', // Added LOT
-      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].SerialNumber : 'N/A', // Added Serial Number
-      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].ExpiryDate : 'N/A', // Added Expiry Date
-      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].Form : 'N/A', // Added Form
-      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].Presentation : 'N/A', // Added Presentation
-      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].Laboratory : 'N/A', // This is now the 'Owner'
-      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].LaboratoryCountry : 'N/A',
-      item.BatchLotTrackings[0] ? item.BatchLotTrackings[0].Quantity : 'N/A',
-    ]).filter(row => !row.includes('N/A')); // Filter out rows with 'N/A' fields
+    const data = response.data.flatMap(item => 
+      item.BatchLotTrackings.map(batchLot => [
+        batchLot.DrugName || 'N/A',
+        batchLot.GTIN || 'N/A',
+        batchLot.BatchNumber || 'N/A',
+        batchLot.SerialNumber || 'N/A',
+        batchLot.ExpiryDate || 'N/A',
+        batchLot.Form || 'N/A',
+        batchLot.Presentation || 'N/A',
+        batchLot.Laboratory || 'N/A',
+        batchLot.LaboratoryCountry || 'N/A',
+        batchLot.Quantity || 'N/A',
+      ])
+    ).filter(row => !row.includes('N/A')); // Filter out rows with 'N/A' fields
 
     setTableData(data);
   } catch (error) {
