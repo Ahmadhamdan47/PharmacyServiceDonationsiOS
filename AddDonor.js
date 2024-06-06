@@ -55,24 +55,31 @@ const AddDonor = ({ navigation }) => {
 
   const handleContinue = async () => {
     try {
-      const response = await axios.post("https://apiv2.medleb.org/donation/add", {
-        DonorId: selectedDonor,
-        RecipientId: selectedRecipient,
-        DonationPurpose: donationPurpose,
-        DonationDate: new Date().toISOString(),
-      });
-      const donationId = response.data.DonationId;
-      console.log("Donation created successfully with ID:", donationId);
-      navigation.navigate('Donate', {
-        donorId: selectedDonor,
-        recipientId: selectedRecipient,
-        donationPurpose: donationPurpose,
-        donationId: donationId,
-      });
+        const response = await axios.post("https://apiv2.medleb.org/donation/add", {
+            DonorId: selectedDonor,
+            RecipientId: selectedRecipient,
+            DonationPurpose: donationPurpose,
+            DonationDate: new Date().toISOString(),
+        });
+        const donationId = response.data.DonationId;
+        const selectedDonorName = donors.find(donor => donor.value === selectedDonor).label;
+        const selectedRecipientName = recipients.find(recipient => recipient.value === selectedRecipient).label;
+        const donationDate = new Date().toISOString().replace(/:/g, '-');  // Include time and format for file name
+        console.log("Donation created successfully with ID:", donationId);
+        navigation.navigate('Donate', {
+            donorId: selectedDonor,
+            recipientId: selectedRecipient,
+            donorName: selectedDonorName,
+            recipientName: selectedRecipientName,
+            donationPurpose: donationPurpose,
+            donationDate: donationDate,
+            donationId: donationId,
+        });
     } catch (error) {
-      console.error("Error creating donation:", error);
+        console.error("Error creating donation:", error);
     }
-  };
+};
+
 
   return (
     <View style={styles.container}>
