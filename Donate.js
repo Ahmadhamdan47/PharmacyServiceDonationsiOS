@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Dimensions, Keyboard } from 'react-native';
+import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Dimensions, Keyboard, BackHandler } from 'react-native';
 import { Camera } from 'expo-camera';
 import { BarCodeScanner } from 'expo-barcode-scanner';
 import { CameraType } from 'expo-camera/build/legacy/Camera.types';
@@ -32,153 +32,194 @@ const FieldLabel = ({ label }) => (
   <Text style={styles.fieldLabel}>{label}</Text>
 );
 
-const BatchLotForm = React.forwardRef(({ form, index, handleFieldChange, drugItems, checkDrugNameInAPI, openCamera, fetchDrugNames, setIsInputFocused, setIsDropDownOpen }, ref) => (
-  <View ref={ref} key={index} style={styles.detailsContainer}>
-    {index > 0 && (
-      <View style={styles.newDrugSeparator}>
-        <Text style={styles.newDrugTitle}>New Drug</Text>
+const BatchLotForm = React.forwardRef(({ form, index, handleFieldChange, drugItems, checkDrugNameInAPI, openCamera, fetchDrugNames, setIsInputFocused, setIsDropDownOpen, validationErrors }, ref) => {
+  const inputRefs = {
+    gtin: useRef(null),
+    lotNumber: useRef(null),
+    expiryDate: useRef(null),
+    serialNumber: useRef(null),
+    drugName: useRef(null),
+    presentation: useRef(null),
+    form: useRef(null),
+    owner: useRef(null),
+    country: useRef(null),
+    quantity: useRef(null),
+  };
+
+  return (
+    <View ref={ref} key={index} style={styles.detailsContainer}>
+      {index > 0 && (
+        <View style={styles.newDrugSeparator}>
+          <Text style={styles.newDrugTitle}>New Drug</Text>
+        </View>
+      )}
+      <FieldLabel label="GTIN" />
+      <View style={styles.barcodeInputContainer}>
+        <TextInput
+          ref={inputRefs.gtin}
+          style={[styles.input, validationErrors[index]?.gtin ? styles.inputError : null]}
+          placeholder="GTIN"
+          value={form.gtin}
+          onChangeText={text => handleFieldChange(index, 'gtin', text)}
+          onFocus={() => setIsInputFocused(true)}
+          onBlur={() => setIsInputFocused(false)}
+        />
+        <TouchableOpacity onPress={() => openCamera(index)} style={styles.barcodeIcon}>
+          <Image source={require("./assets/2d.png")} style={styles.barcodeImage} />
+        </TouchableOpacity>
       </View>
-    )}
-    <FieldLabel label="GTIN" />
-    <View style={styles.barcodeInputContainer}>
-      <TextInput 
-        style={styles.input} 
-        placeholder="GTIN" 
-        value={form.gtin} 
-        onChangeText={text => handleFieldChange(index, 'gtin', text)} 
-        onFocus={() => setIsInputFocused(true)} 
+      {validationErrors[index]?.gtin && <Text style={styles.errorMessage}>{validationErrors[index].gtin}</Text>}
+
+      <FieldLabel label="LOT Number" />
+      <TextInput
+        ref={inputRefs.lotNumber}
+        style={[styles.input, validationErrors[index]?.lotNumber ? styles.inputError : null]}
+        placeholder="LOT number"
+        value={form.lotNumber}
+        onChangeText={text => handleFieldChange(index, 'lotNumber', text)}
+        onFocus={() => setIsInputFocused(true)}
         onBlur={() => setIsInputFocused(false)}
       />
-      <TouchableOpacity onPress={() => openCamera(index)} style={styles.barcodeIcon}>
-        <Image source={require("./assets/2d.png")} style={styles.barcodeImage} />
-      </TouchableOpacity>
-    </View>
-    <FieldLabel label="LOT Number" />
-    <TextInput 
-      style={[styles.input, { marginRight: 30 }]} 
-      placeholder="LOT number" 
-      value={form.lotNumber} 
-      onChangeText={text => handleFieldChange(index, 'lotNumber', text)} 
-      onFocus={() => setIsInputFocused(true)} 
-      onBlur={() => setIsInputFocused(false)}
-    />
-    <FieldLabel label="Expiry Date" />
-    <TextInput 
-      style={[styles.input, { marginRight: 30 }]} 
-      placeholder="Expiry Date" 
-      value={form.expiryDate} 
-      onChangeText={text => handleFieldChange(index, 'expiryDate', text)} 
-      onFocus={() => setIsInputFocused(true)} 
-      onBlur={() => setIsInputFocused(false)}
-    />
-    <FieldLabel label="Serial Number" />
-    <TextInput 
-      style={[styles.input, { marginRight: 30 }]} 
-      placeholder="Serial Number" 
-      value={form.serialNumber} 
-      onChangeText={text => handleFieldChange(index, 'serialNumber', text)} 
-      onFocus={() => setIsInputFocused(true)} 
-      onBlur={() => setIsInputFocused(false)}
-    />
-    <View style={styles.separator} />
-    <View style={styles.detailsContainer}>
-      <Text style={styles.header}>Medication Details</Text>
-    </View>
-    <FieldLabel label="Drug Name" />
-    <DropDownPicker
-      open={form.open}
-      value={form.drugName}
-      items={drugItems}
-      setOpen={(open) => {
-        handleFieldChange(index, 'open', open);
-        setIsDropDownOpen(open);
-      }}
-      setValue={(callback) => {
-        const originalValue = callback(form.drugName);
-        handleFieldChange(index, 'drugName', originalValue);
-        handleFieldChange(index, 'drugValid', null);
+      {validationErrors[index]?.lotNumber && <Text style={styles.errorMessage}>{validationErrors[index].lotNumber}</Text>}
 
-        const selectedDrug = drugItems.find(item => item.value === originalValue);
-        if (selectedDrug) {
-          handleFieldChange(index, 'form', selectedDrug.drug.pharmaceuticalForm);
-          handleFieldChange(index, 'presentation', selectedDrug.drug.presentationLabel);
+      <FieldLabel label="Expiry Date" />
+      <TextInput
+        ref={inputRefs.expiryDate}
+        style={[styles.input, validationErrors[index]?.expiryDate ? styles.inputError : null]}
+        placeholder="Expiry Date"
+        value={form.expiryDate}
+        onChangeText={text => handleFieldChange(index, 'expiryDate', text)}
+        onFocus={() => setIsInputFocused(true)}
+        onBlur={() => setIsInputFocused(false)}
+      />
+         {validationErrors[index]?.expiryDate && <Text style={styles.errorMessage}>{validationErrors[index].expiryDate}</Text>}
 
-          const owner = selectedDrug.drug.owner;
-          const countryMatch = owner.match(/\(([^)]+)\)/);
-          if (countryMatch) {
-            handleFieldChange(index, 'owner', owner.replace(countryMatch[0], '').trim());
-            handleFieldChange(index, 'country', countryMatch[1]);
-          } else {
-            handleFieldChange(index, 'owner', owner.trim());
-            handleFieldChange(index, 'country', 'France');
+      <FieldLabel label="Serial Number" />
+      <TextInput
+        ref={inputRefs.serialNumber}
+        style={[styles.input, validationErrors[index]?.serialNumber ? styles.inputError : null]}
+        placeholder="Serial Number"
+        value={form.serialNumber}
+        onChangeText={text => handleFieldChange(index, 'serialNumber', text)}
+        onFocus={() => setIsInputFocused(true)}
+        onBlur={() => setIsInputFocused(false)}
+      />
+      {validationErrors[index]?.serialNumber && <Text style={styles.errorMessage}>{validationErrors[index].serialNumber}</Text>}
+
+      <View style={styles.separator} />
+      <View style={styles.detailsContainer}>
+        <Text style={styles.header}>Medication Details</Text>
+      </View>
+
+      <FieldLabel label="Drug Name" />
+      <DropDownPicker
+        ref={inputRefs.drugName}
+        open={form.open}
+        value={form.drugName}
+        items={drugItems}
+        setOpen={(open) => {
+          handleFieldChange(index, 'open', open);
+          setIsDropDownOpen(open);
+        }}
+        setValue={(callback) => {
+          const originalValue = callback(form.drugName);
+          handleFieldChange(index, 'drugName', originalValue);
+          handleFieldChange(index, 'drugValid', null);
+
+          const selectedDrug = drugItems.find(item => item.value === originalValue);
+          if (selectedDrug) {
+            handleFieldChange(index, 'form', selectedDrug.drug.pharmaceuticalForm);
+            handleFieldChange(index, 'presentation', selectedDrug.drug.presentationLabel);
+
+            const owner = selectedDrug.drug.owner;
+            const countryMatch = owner.match(/\(([^)]+)\)/);
+            if (countryMatch) {
+              handleFieldChange(index, 'owner', owner.replace(countryMatch[0], '').trim());
+              handleFieldChange(index, 'country', countryMatch[1]);
+            } else {
+              handleFieldChange(index, 'owner', owner.trim());
+              handleFieldChange(index, 'country', 'France');
+            }
           }
-        }
-      }}
-      onChangeSearchText={(text) => {
-        fetchDrugNames(text);
-      }}
-      setItems={() => {}}
-      searchable={true}
-      placeholder="Select a drug"
-      searchPlaceholder="Search..."
-      style={[styles.input, form.drugValid === false ? { borderColor: 'red' } : {}]}
-      dropDownContainerStyle={{
-        backgroundColor: "#fff"
-      }}
-    />
+        }}
+        onChangeSearchText={(text) => {
+          fetchDrugNames(text);
+        }}
+        setItems={() => {}}
+        searchable={true}
+        placeholder="Select a drug"
+        searchPlaceholder="Search..."
+        style={[styles.input, validationErrors[index]?.drugName ? styles.inputError : {}, form.drugValid === false ? { borderColor: 'red' } : {}]}
+        dropDownContainerStyle={{
+          backgroundColor: "#fff"
+        }}
+      />
+      {validationErrors[index]?.drugName && <Text style={styles.errorMessage}>{validationErrors[index].drugName}</Text>}
+      {form.drugValid && <Icon name="check" size={30} color="green" style={{ marginLeft: 270 }} />}
+      {form.drugValid === false && <Text style={{ color: 'red' }}>{form.drugValidationMessage}</Text>}
 
-    {form.drugValid && <Icon name="check" size={30} color="green" style={{ marginLeft: 270 }} />}
-    {form.drugValid === false && <Text style={{ color: 'red' }}>{form.drugValidationMessage}</Text>}
+      <FieldLabel label="Presentation" />
+      <TextInput
+        ref={inputRefs.presentation}
+        style={[styles.input, validationErrors[index]?.presentation ? styles.inputError : null]}
+        placeholder="Presentation"
+        value={form.presentation}
+        onChangeText={text => handleFieldChange(index, 'presentation', text)}
+        onFocus={() => setIsInputFocused(true)}
+        onBlur={() => setIsInputFocused(false)}
+      />
+      {validationErrors[index]?.presentation && <Text style={styles.errorMessage}>{validationErrors[index].presentation}</Text>}
 
-    <FieldLabel label="Presentation" />
-    <TextInput 
-      style={styles.input} 
-      placeholder="Presentation" 
-      value={form.presentation} 
-      onChangeText={text => handleFieldChange(index, 'presentation', text)} 
-      onFocus={() => setIsInputFocused(true)} 
-      onBlur={() => setIsInputFocused(false)}
-    />
-    <FieldLabel label="Form" />
-    <TextInput 
-      style={styles.input} 
-      placeholder="Form" 
-      value={form.form} 
-      onChangeText={text => handleFieldChange(index, 'form', text)} 
-      onFocus={() => setIsInputFocused(true)} 
-      onBlur={() => setIsInputFocused(false)}
-    />
+      <FieldLabel label="Form" />
+      <TextInput
+        ref={inputRefs.form}
+        style={[styles.input, validationErrors[index]?.form ? styles.inputError : null]}
+        placeholder="Form"
+        value={form.form}
+        onChangeText={text => handleFieldChange(index, 'form', text)}
+        onFocus={() => setIsInputFocused(true)}
+        onBlur={() => setIsInputFocused(false)}
+      />
+      {validationErrors[index]?.form && <Text style={styles.errorMessage}>{validationErrors[index].form}</Text>}
 
-    <FieldLabel label="Owner" />
-    <TextInput 
-      style={styles.input} 
-      placeholder="Owner" 
-      value={form.owner} 
-      onChangeText={text => handleFieldChange(index, 'owner', text)} 
-      onFocus={() => setIsInputFocused(true)} 
-      onBlur={() => setIsInputFocused(false)}
-    />
-    <FieldLabel label="Country" />
-    <TextInput 
-      style={styles.input} 
-      placeholder="Country" 
-      value={form.country} 
-      onChangeText={text => handleFieldChange(index, 'country', text)} 
-      onFocus={() => setIsInputFocused(true)} 
-      onBlur={() => setIsInputFocused(false)}
-    />
-    
-    <FieldLabel label="Quantity" />
-    <TextInput 
-      style={styles.input} 
-      placeholder="Quantity" 
-      value={form.quantity} 
-      onChangeText={text => handleFieldChange(index, 'quantity', text)} 
-      onFocus={() => setIsInputFocused(true)} 
-      onBlur={() => setIsInputFocused(false)}
-    />
-  </View>
-));
+      <FieldLabel label="Owner" />
+      <TextInput
+        ref={inputRefs.owner}
+        style={[styles.input, validationErrors[index]?.owner ? styles.inputError : null]}
+        placeholder="Owner"
+        value={form.owner}
+        onChangeText={text => handleFieldChange(index, 'owner', text)}
+        onFocus={() => setIsInputFocused(true)}
+        onBlur={() => setIsInputFocused(false)}
+      />
+      {validationErrors[index]?.owner && <Text style={styles.errorMessage}>{validationErrors[index].owner}</Text>}
+
+      <FieldLabel label="Country" />
+      <TextInput
+        ref={inputRefs.country}
+        style={[styles.input, validationErrors[index]?.country ? styles.inputError : null]}
+        placeholder="Country"
+        value={form.country}
+        onChangeText={text => handleFieldChange(index, 'country', text)}
+        onFocus={() => setIsInputFocused(true)}
+        onBlur={() => setIsInputFocused(false)}
+      />
+      {validationErrors[index]?.country && <Text style={styles.errorMessage}>{validationErrors[index].country}</Text>}
+
+      <FieldLabel label="Quantity" />
+      <TextInput
+        ref={inputRefs.quantity}
+        style={[styles.input, validationErrors[index]?.quantity ? styles.inputError : null]}
+        placeholder="Quantity"
+        value={form.quantity}
+        onChangeText={text => handleFieldChange(index, 'quantity', text)}
+        onFocus={() => setIsInputFocused(true)}
+        onBlur={() => setIsInputFocused(false)}
+      />
+      {validationErrors[index]?.quantity && <Text style={styles.errorMessage}>{validationErrors[index].quantity}</Text>}
+    </View>
+  );
+});
 
 const Donate = ({ route }) => {
   const { donorId, recipientId, donationPurpose, donationId } = route.params || {};
@@ -195,6 +236,7 @@ const Donate = ({ route }) => {
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isDropDownOpen, setIsDropDownOpen] = useState(false);
   const [scrollPosition, setScrollPosition] = useState(0);
+  const [validationErrors, setValidationErrors] = useState([]);
 
   useEffect(() => {
     (async () => {
@@ -213,10 +255,36 @@ const Donate = ({ route }) => {
       () => setIsInputFocused(false)
     );
 
+    const backAction = () => {
+      showExitConfirmation();
+      return true;
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+
     return () => {
       keyboardDidHideListener.remove();
+      backHandler.remove();
     };
   }, []);
+
+  const showExitConfirmation = () => {
+    Alert.alert(
+      'Confirm Exit',
+      'Are you sure you want to go back?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Yes',
+          onPress: () => navigation.goBack(),
+        },
+      ],
+      { cancelable: false }
+    );
+  };
 
   const fetchDrugNames = async (query = '') => {
     try {
@@ -379,10 +447,18 @@ const Donate = ({ route }) => {
     setBatchLots(prevBatchLots => {
       const updatedBatchLots = [...prevBatchLots];
       updatedBatchLots[index][field] = value;
+  
+      // Clear validation error for the field being changed
+      const updatedValidationErrors = [...validationErrors];
+      if (updatedValidationErrors[index]) {
+        delete updatedValidationErrors[index][field];
+      }
+      setValidationErrors(updatedValidationErrors);
+  
       return updatedBatchLots;
     });
   };
-
+  
   const addBatchLotForm = () => {
     setBatchLots([...batchLots, createEmptyBatchLot()]);
   };
@@ -425,8 +501,16 @@ const Donate = ({ route }) => {
 
         const wbout = XLSX.write(wb, { type: 'base64', bookType: "xlsx" });
 
-        const fileName = `${donorName}_${recipientName}_${donationDate}.xlsx`;
+        const fileName = `${donorName.replace(/[^a-zA-Z0-9]/g, '_')}_${recipientName.replace(/[^a-zA-Z0-9]/g, '_')}_${donationDate.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
         const uri = FileSystem.documentDirectory + fileName;
+
+        console.log(`Writing to file: ${uri}`);
+
+        // Check if the document directory is writable
+        const info = await FileSystem.getInfoAsync(FileSystem.documentDirectory);
+        console.log(`Document directory info: ${JSON.stringify(info)}`);
+
+        // Attempt to write the file
         await FileSystem.writeAsStringAsync(uri, wbout, {
             encoding: FileSystem.EncodingType.Base64
         });
@@ -438,266 +522,331 @@ const Donate = ({ route }) => {
         };
 
         if (await Sharing.isAvailableAsync()) {
+            console.log('Sharing is available');
             await Sharing.shareAsync(uri, shareOptions);
         } else {
             Alert.alert("Success", "Excel file has been saved to your device's storage.", [{ text: "OK" }]);
         }
     } catch (error) {
         console.error("Error exporting to Excel:", error);
-        Alert.alert("Error", "Failed to export to Excel. Please try again.", [{ text: "OK" }]);
+        Alert.alert("Error", `Failed to export to Excel. Please try again. ${error.message}`, [{ text: "OK" }]);
     }
 };
-
-const submitBatchLot = async () => {
-    try {
-        const responses = await Promise.all(batchLots.map(batchLot =>
-            axios.post('https://apiv2.medleb.org/donation/batchlot', {
-                DonationId: donationId,
-                DrugName: batchLot.drugName,
-                GTIN: batchLot.gtin,
-                LOT: batchLot.lotNumber,
-                ProductionDate: new Date().toISOString(),
-                ExpiryDate: batchLot.expiryDate,
-                Quantity: batchLot.quantity,
-                Presentation: batchLot.presentation,
-                Form: batchLot.form,
-                Laboratory: batchLot.owner,
-                LaboratoryCountry: batchLot.country,
-                SerialNumber: batchLot.serialNumber,
-                DonationDate: batchLot.donationDate
-            })
-        ));
-
-        if (responses.every(response => response.status === 200)) {
-            Alert.alert('Success', 'Donations Added Successfully');
-            const { donorName, recipientName, donationDate } = route.params;
-            await exportToExcel(batchLots, donorName, recipientName, donationDate);
-            navigation.navigate('List');
-        } else {
-            Alert.alert('Warning', 'Make sure you entered all of the required fields correctly');
-        }
-    } catch (error) {
-        console.error('Error creating batch lot:', error);
-        Alert.alert('Warning', 'Make sure you scanned the barcode and entered all of the fields correctly');
+const validateFields = () => {
+  const updatedValidationErrors = batchLots.map(batchLot => {
+    const errors = {};
+    for (const field in batchLot) {
+      if (batchLot[field] === '' && field !== 'drugValidationMessage' && field !== 'open' && field !== 'drugValid' && field !== 'donationDate') {
+        errors[field] = 'This field is required';
+      }
     }
+    return errors;
+  });
+
+  setValidationErrors(updatedValidationErrors);
+
+  const firstInvalidIndex = updatedValidationErrors.findIndex(errors => Object.keys(errors).length > 0);
+  if (firstInvalidIndex !== -1) {
+    scrollToField(firstInvalidIndex);
+    return false;
+  }
+
+  return true;
+};
+
+const scrollToField = (index, field) => {
+  const currentRef = batchLotRefs.current[index];
+  if (currentRef && currentRef[field]) {
+    currentRef[field].current.measureLayout(scrollViewRef.current, (x, y) => {
+      scrollViewRef.current.scrollTo({ y, animated: true });
+    });
+  }
+};
+
+
+
+  
+const submitBatchLot = async () => {
+  if (!validateFields()) {
+    return;
+  }
+  try {
+    const responses = await Promise.all(batchLots.map(batchLot =>
+      axios.post('https://apiv2.medleb.org/donation/batchlot', {
+        DonationId: donationId,
+        DrugName: batchLot.drugName,
+        GTIN: batchLot.gtin,
+        LOT: batchLot.lotNumber,
+        ProductionDate: new Date().toISOString(),
+        ExpiryDate: batchLot.expiryDate,
+        Quantity: batchLot.quantity,
+        Presentation: batchLot.presentation,
+        Form: batchLot.form,
+        Laboratory: batchLot.owner,
+        LaboratoryCountry: batchLot.country,
+        SerialNumber: batchLot.serialNumber,
+        DonationDate: batchLot.donationDate
+      })
+    ));
+
+    if (responses.every(response => response.status === 200)) {
+      Alert.alert('Success', 'Donations Added Successfully');
+      const { donorName, recipientName, donationDate } = route.params;
+      await exportToExcel(batchLots, donorName, recipientName, donationDate);
+      navigation.navigate('List');
+    } else {
+      Alert.alert('Warning', 'Make sure you entered all of the required fields correctly');
+    }
+  } catch (error) {
+    console.error('Error creating batch lot:', error);
+    Alert.alert('Warning', 'Make sure you scanned the barcode and entered all of the fields correctly');
+  }
+};
+
+const handleNavigation = (routeName) => {
+  Alert.alert(
+    'Confirm Navigation',
+    'Are you sure you want to leave this page?',
+    [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Yes',
+        onPress: () => navigation.navigate(routeName),
+      },
+    ],
+    { cancelable: false }
+  );
 };
 
 return (
-    <View style={styles.container}>
-      {isCameraOpen ? (
-        <BarCodeScanner
-          style={{ ...StyleSheet.absoluteFillObject, height: '100%' }}
-          type={type}
-          onBarCodeScanned={handleBarcodeDetected}
-        />
-      ) : (
-        <ScrollView
-          ref={scrollViewRef}
-          onScroll={event => setScrollPosition(event.nativeEvent.contentOffset.y)}
-          scrollEventThrottle={16} // This prop ensures the onScroll event is fired about every 16ms to ScrollView
-          contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between' }}
-          scrollEnabled={scrollEnabled}
-        >
-          <View style={styles.originalFormContainer}>
-            <TouchableOpacity onPress={() => handleOpenCamera(0)} activeOpacity={0.6} style={styles.cameraContainer} ref={el => batchLotRefs.current[0] = el}>
-              {batchLots[0].gtin === '' && (
-                <Image
-                  source={require("./assets/2d.png")}
-                  style={styles.cameraImage}
-                />
-              )}
-            </TouchableOpacity>
-
-            <View style={styles.barcodeContainer}>
-              <FieldLabel label="GTIN" />
-              <TextInput
-                style={styles.input}
-                placeholder="GTIN"
-                value={batchLots[0].gtin}
-                onChangeText={text => handleFieldChange(0, 'gtin', text)}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => setIsInputFocused(false)}
+  <View style={styles.container}>
+    {isCameraOpen ? (
+      <BarCodeScanner
+        style={{ ...StyleSheet.absoluteFillObject, height: '100%' }}
+        type={type}
+        onBarCodeScanned={handleBarcodeDetected}
+      />
+    ) : (
+      <ScrollView
+        ref={scrollViewRef}
+        onScroll={event => setScrollPosition(event.nativeEvent.contentOffset.y)}
+        scrollEventThrottle={16} // This prop ensures the onScroll event is fired about every 16ms to ScrollView
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between' }}
+        scrollEnabled={scrollEnabled}
+      >
+        <View style={styles.originalFormContainer}>
+          <TouchableOpacity onPress={() => handleOpenCamera(0)} activeOpacity={0.6} style={styles.cameraContainer} ref={el => batchLotRefs.current[0] = el}>
+            {batchLots[0].gtin === '' && (
+              <Image
+                source={require("./assets/2d.png")}
+                style={styles.cameraImage}
               />
-              <FieldLabel label="LOT" />
-              <TextInput
-                style={styles.input}
-                placeholder="LOT number"
-                value={batchLots[0].lotNumber}
-                onChangeText={text => handleFieldChange(0, 'lotNumber', text)}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => setIsInputFocused(false)}
-              />
-              <FieldLabel label="Expiry Date" />
-              <TextInput
-                style={styles.input}
-                placeholder="Expiry Date"
-                value={batchLots[0].expiryDate}
-                onChangeText={text => handleFieldChange(0, 'expiryDate', text)}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => setIsInputFocused(false)}
-              />
-              <FieldLabel label="Serial Number" />
-              <TextInput
-                style={styles.input}
-                placeholder="Serial Number"
-                value={batchLots[0].serialNumber}
-                onChangeText={text => handleFieldChange(0, 'serialNumber', text)}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => setIsInputFocused(false)}
-              />
-            </View>
+            )}
+          </TouchableOpacity>
 
-            <View style={styles.separator} />
+          <View style={styles.barcodeContainer}>
+            <FieldLabel label="GTIN" />
+            <TextInput
+              style={[styles.input, validationErrors[0]?.gtin ? styles.inputError : null]}
+              placeholder="GTIN"
+              value={batchLots[0].gtin}
+              onChangeText={text => handleFieldChange(0, 'gtin', text)}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
+            />
+            {validationErrors[0]?.gtin && <Text style={styles.errorMessage}>{validationErrors[0].gtin}</Text>}
+            <FieldLabel label="LOT" />
+            <TextInput
+              style={[styles.input, validationErrors[0]?.lotNumber ? styles.inputError : null]}
+              placeholder="LOT number"
+              value={batchLots[0].lotNumber}
+              onChangeText={text => handleFieldChange(0, 'lotNumber', text)}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
+            />
+            {validationErrors[0]?.lotNumber && <Text style={styles.errorMessage}>{validationErrors[0].lotNumber}</Text>}
+            <FieldLabel label="Expiry Date" />
+            <TextInput
+              style={[styles.input, validationErrors[0]?.expiryDate ? styles.inputError : null]}
+              placeholder="Expiry Date"
+              value={batchLots[0].expiryDate}
+              onChangeText={text => handleFieldChange(0, 'expiryDate', text)}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
+            />
+            {validationErrors[0]?.expiryDate && <Text style={styles.errorMessage}>{validationErrors[0].expiryDate}</Text>}
+            <FieldLabel label="Serial Number" />
+            <TextInput
+              style={[styles.input, validationErrors[0]?.serialNumber ? styles.inputError : null]}
+              placeholder="Serial Number"
+              value={batchLots[0].serialNumber}
+              onChangeText={text => handleFieldChange(0, 'serialNumber', text)}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
+            />
+            {validationErrors[0]?.serialNumber && <Text style={styles.errorMessage}>{validationErrors[0].serialNumber}</Text>}
+          </View>
 
-            <View style={styles.detailsContainer}>
-              <Text style={styles.header}>Medication Details</Text>
-              <DropDownPicker
-                open={batchLots[0].open}
-                value={batchLots[0].drugName}
-                items={drugItems}
-                setOpen={(open) => {
-                  handleFieldChange(0, 'open', open);
-                  setIsDropDownOpen(open);
-                }}
-                setValue={(callback) => {
-                  const originalValue = callback(batchLots[0].drugName);
-                  handleFieldChange(0, 'drugName', originalValue);
-                  handleFieldChange(0, 'drugValid', null);
+          <View style={styles.separator} />
 
-                  const selectedDrug = drugItems.find(item => item.value === originalValue);
-                  if (selectedDrug) {
-                    handleFieldChange(0, 'form', selectedDrug.drug.pharmaceuticalForm);
-                    handleFieldChange(0, 'presentation', selectedDrug.drug.presentationLabel);
+          <View style={styles.detailsContainer}>
+            <Text style={styles.header}>Medication Details</Text>
+            <DropDownPicker
+              open={batchLots[0].open}
+              value={batchLots[0].drugName}
+              items={drugItems}
+              setOpen={(open) => {
+                handleFieldChange(0, 'open', open);
+                setIsDropDownOpen(open);
+              }}
+              setValue={(callback) => {
+                const originalValue = callback(batchLots[0].drugName);
+                handleFieldChange(0, 'drugName', originalValue);
+                handleFieldChange(0, 'drugValid', null);
 
-                    const owner = selectedDrug.drug.owner;
-                    const countryMatch = owner.match(/\(([^)]+)\)/);
-                    if (countryMatch) {
-                      handleFieldChange(0, 'owner', owner.replace(countryMatch[0], '').trim());
-                      handleFieldChange(0, 'country', countryMatch[1]);
-                    } else {
-                      handleFieldChange(0, 'owner', owner.trim());
-                      handleFieldChange(0, 'country', 'France');
-                    }
+                const selectedDrug = drugItems.find(item => item.value === originalValue);
+                if (selectedDrug) {
+                  handleFieldChange(0, 'form', selectedDrug.drug.pharmaceuticalForm);
+                  handleFieldChange(0, 'presentation', selectedDrug.drug.presentationLabel);
+
+                  const owner = selectedDrug.drug.owner;
+                  const countryMatch = owner.match(/\(([^)]+)\)/);
+                  if (countryMatch) {
+                    handleFieldChange(0, 'owner', owner.replace(countryMatch[0], '').trim());
+                    handleFieldChange(0, 'country', countryMatch[1]);
+                  } else {
+                    handleFieldChange(0, 'owner', owner.trim());
+                    handleFieldChange(0, 'country', 'France');
                   }
-                }}
-                onChangeSearchText={(text) => {
-                  fetchDrugNames(text);
-                }}
-                setItems={() => {}}
-                searchable={true}
-                placeholder="Select a drug"
-                searchPlaceholder="Search..."
-                style={[styles.input, batchLots[0].drugValid === false ? { borderColor: 'red' } : {}]}
-                dropDownContainerStyle={{
-                  backgroundColor: "#fff"
-                }}
-              />
+                }
+              }}
+              onChangeSearchText={(text) => {
+                fetchDrugNames(text);
+              }}
+              setItems={() => {}}
+              searchable={true}
+              placeholder="Select a drug"
+              searchPlaceholder="Search..."
+              style={[styles.input, batchLots[0].drugValid === false ? { borderColor: 'red' } : {}]}
+              dropDownContainerStyle={{
+                backgroundColor: "#fff"
+              }}
+            />
 
-              {batchLots[0].drugValid && <Icon name="check" size={30} color="green" style={{ marginLeft: 270 }} />}
-              {batchLots[0].drugValid === false && <Text style={{ color: 'red' }}>{batchLots[0].drugValidationMessage}</Text>}
+            {batchLots[0].drugValid && <Icon name="check" size={30} color="green" style={{ marginLeft: 270 }} />}
+            {batchLots[0].drugValid === false && <Text style={{ color: 'red' }}>{batchLots[0].drugValidationMessage}</Text>}
 
-              <FieldLabel label="Presentation" />
-              <TextInput
-                style={styles.input}
-                placeholder="Presentation"
-                value={batchLots[0].presentation}
-                onChangeText={text => handleFieldChange(0, 'presentation', text)}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => setIsInputFocused(false)}
-              />
+            <FieldLabel label="Presentation" />
+            <TextInput
+              style={[styles.input, validationErrors[0]?.presentation ? styles.inputError : null]}
+              placeholder="Presentation"
+              value={batchLots[0].presentation}
+              onChangeText={text => handleFieldChange(0, 'presentation', text)}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
+            />
+            {validationErrors[0]?.presentation && <Text style={styles.errorMessage}>{validationErrors[0].presentation}</Text>}
 
-              <FieldLabel label="Form" />
-              <TextInput
-                style={styles.input}
-                placeholder="Form"
-                value={batchLots[0].form}
-                onChangeText={text => handleFieldChange(0, 'form', text)}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => setIsInputFocused(false)}
-              />
+            <FieldLabel label="Form" />
+            <TextInput
+              style={[styles.input, validationErrors[0]?.form ? styles.inputError : null]}
+              placeholder="Form"
+              value={batchLots[0].form}
+              onChangeText={text => handleFieldChange(0, 'form', text)}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
+            />
+            {validationErrors[0]?.form && <Text style={styles.errorMessage}>{validationErrors[0].form}</Text>}
 
-              <FieldLabel label="Owner" />
-              <TextInput
-                style={styles.input}
-                placeholder="Owner"
-                value={batchLots[0].owner}
-                onChangeText={text => handleFieldChange(0, 'owner', text)}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => setIsInputFocused(false)}
-              />
+            <FieldLabel label="Owner" />
+            <TextInput
+              style={[styles.input, validationErrors[0]?.owner ? styles.inputError : null]}
+              placeholder="Owner"
+              value={batchLots[0].owner}
+              onChangeText={text => handleFieldChange(0, 'owner', text)}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
+            />
+            {validationErrors[0]?.owner && <Text style={styles.errorMessage}>{validationErrors[0].owner}</Text>}
 
-              <FieldLabel label="Country" />
-              <TextInput
-                style={styles.input}
-                placeholder="Country"
-                value={batchLots[0].country}
-                onChangeText={text => handleFieldChange(0, 'country', text)}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => setIsInputFocused(false)}
-              />
+            <FieldLabel label="Country" />
+            <TextInput
+              style={[styles.input, validationErrors[0]?.country ? styles.inputError : null]}
+              placeholder="Country"
+              value={batchLots[0].country}
+              onChangeText={text => handleFieldChange(0, 'country', text)}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
+            />
+            {validationErrors[0]?.country && <Text style={styles.errorMessage}>{validationErrors[0].country}</Text>}
 
-              <FieldLabel label="Quantity" />
-              <TextInput
-                style={styles.input}
-                placeholder="Quantity"
-                value={batchLots[0].quantity}
-                onChangeText={text => handleFieldChange(0, 'quantity', text)}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => setIsInputFocused(false)}
-              />
-            </View>
+            <FieldLabel label="Quantity" />
+            <TextInput
+              style={[styles.input, validationErrors[0]?.quantity ? styles.inputError : null]}
+              placeholder="Quantity"
+              value={batchLots[0].quantity}
+              onChangeText={text => handleFieldChange(0, 'quantity', text)}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
+            />
+            {validationErrors[0]?.quantity && <Text style={styles.errorMessage}>{validationErrors[0].quantity}</Text>}
           </View>
+        </View>
 
-          {batchLots.slice(1).map((form, index) => (
-            <BatchLotForm
-              key={index + 1}
-              form={form}
-              index={index + 1}
-              handleFieldChange={handleFieldChange}
-              drugItems={drugItems}
-              checkDrugNameInAPI={checkDrugNameInAPI}
-              openCamera={handleOpenCamera}
-              fetchDrugNames={fetchDrugNames}
-              setIsInputFocused={setIsInputFocused}
-              setIsDropDownOpen={setIsDropDownOpen}
-              ref={el => batchLotRefs.current[index + 1] = el}
-            />
-          ))}
+        {batchLots.slice(1).map((form, index) => (
+          <BatchLotForm
+            key={index + 1}
+            form={form}
+            index={index + 1}
+            handleFieldChange={handleFieldChange}
+            drugItems={drugItems}
+            checkDrugNameInAPI={checkDrugNameInAPI}
+            openCamera={handleOpenCamera}
+            fetchDrugNames={fetchDrugNames}
+            setIsInputFocused={setIsInputFocused}
+            setIsDropDownOpen={setIsDropDownOpen}
+            validationErrors={validationErrors}
+            ref={el => batchLotRefs.current[index + 1] = el}
+          />
+        ))}
 
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.button} onPress={addBatchLotForm}>
-              <Text style={styles.buttonText}>Add more</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.button} onPress={submitBatchLot}>
-              <Text style={styles.buttonText}>Submit</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      )}
-      {!isCameraOpen && !isInputFocused && !isDropDownOpen && (
-        <View style={styles.taskBar}>
-          <TouchableOpacity onPress={() => navigation.navigate('Home')}>
-            <Image
-              source={require("./assets/home.png")}
-              style={styles.taskBarButton}
-            />
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.button} onPress={addBatchLotForm}>
+            <Text style={styles.buttonText}>Add more</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('AddDonor')}>
-            <Image
-              source={require("./assets/donate.png")}
-              style={styles.taskBarButton}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('List')}>
-            <Image
-              source={require("./assets/list.png")}
-              style={styles.taskBarButton}
-            />
+          <TouchableOpacity style={styles.button} onPress={submitBatchLot}>
+            <Text style={styles.buttonText}>Submit</Text>
           </TouchableOpacity>
         </View>
-      )}
-    </View>
-  );
+      </ScrollView>
+    )}
+    {!isCameraOpen && !isInputFocused && !isDropDownOpen && (
+      <View style={styles.taskBar}>
+        <TouchableOpacity onPress={() => handleNavigation('Home')}>
+          <Image
+            source={require("./assets/home.png")}
+            style={styles.taskBarButton}
+          />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => handleNavigation('AddDonor')}>
+          <Image
+            source={require("./assets/donate.png")}
+            style={styles.taskBarButton}
+          />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => handleNavigation('List')}>
+          <Image
+            source={require("./assets/list.png")}
+            style={styles.taskBarButton}
+          />
+        </TouchableOpacity>
+      </View>
+    )}
+  </View>
+);
 };
 
 const styles = StyleSheet.create({
@@ -755,6 +904,14 @@ const styles = StyleSheet.create({
     width: '90%',
     alignSelf: 'center',
     backgroundColor: '#fff',
+  },
+  inputError: {
+    borderColor: 'red',
+  },
+  errorMessage: {
+    color: 'red',
+    marginLeft: 20,
+    marginBottom: 10,
   },
   separator: {
     height: 2,
