@@ -5,37 +5,52 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import XLSX from 'xlsx';
 import axios from 'axios';
+import { useNavigation } from '@react-navigation/native';
+import { BackHandler } from 'react-native';
 
 const ListDonations = () => {
-    const [tableHead, setTableHead] = useState(['Drug Name','GTIN', 'LOT', 'Serial Number', 'Expiry Date', 'Form', 'Presentation','Owner', 'Country', 'Quantity']);
+    const [tableHead, setTableHead] = useState(['Drug Name', 'GTIN', 'LOT', 'Serial Number', 'Expiry Date', 'Form', 'Presentation', 'Owner', 'Country', 'Quantity']);
     const [tableData, setTableData] = useState([]);
+    const navigation = useNavigation();
+
+    useEffect(() => {
+        const backAction = () => {
+            navigation.navigate('AddDonor');
+            return true; // This will prevent the app from exiting
+        };
+
+        const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+
+        return () => backHandler.remove(); // Clean up the event listener on component unmount
+    }, [navigation]);
 
     useEffect(() => {
         fetchDonations();
     }, []);
-const fetchDonations = async () => {
-  try {
-    const response = await axios.get("https://apiv2.medleb.org/donation/all");
-    const data = response.data.flatMap(item => 
-      item.BatchLotTrackings.map(batchLot => [
-        batchLot.DrugName || 'N/A',
-        batchLot.GTIN || 'N/A',
-        batchLot.BatchNumber || 'N/A',
-        batchLot.SerialNumber || 'N/A',
-        batchLot.ExpiryDate || 'N/A',
-        batchLot.Form || 'N/A',
-        batchLot.Presentation || 'N/A',
-        batchLot.Laboratory || 'N/A',
-        batchLot.LaboratoryCountry || 'N/A',
-        batchLot.Quantity || 'N/A',
-      ])
-    ).filter(row => !row.includes('N/A')); // Filter out rows with 'N/A' fields
 
-    setTableData(data);
-  } catch (error) {
-    console.error("Error fetching donations:", error);
-  }
-};
+    const fetchDonations = async () => {
+        try {
+            const response = await axios.get("https://apiv2.medleb.org/donation/all");
+            const data = response.data.flatMap(item =>
+                item.BatchLotTrackings.map(batchLot => [
+                    batchLot.DrugName || 'N/A',
+                    batchLot.GTIN || 'N/A',
+                    batchLot.BatchNumber || 'N/A',
+                    batchLot.SerialNumber || 'N/A',
+                    batchLot.ExpiryDate || 'N/A',
+                    batchLot.Form || 'N/A',
+                    batchLot.Presentation || 'N/A',
+                    batchLot.Laboratory || 'N/A',
+                    batchLot.LaboratoryCountry || 'N/A',
+                    batchLot.Quantity || 'N/A',
+                ])
+            ).filter(row => !row.includes('N/A')); // Filter out rows with 'N/A' fields
+
+            setTableData(data);
+        } catch (error) {
+            console.error("Error fetching donations:", error);
+        }
+    };
 
     const exportToExcel = async () => {
         try {
