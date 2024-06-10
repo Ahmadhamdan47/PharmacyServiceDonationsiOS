@@ -237,6 +237,7 @@ const Donate = ({ route }) => {
   const [isDropDownOpen, setIsDropDownOpen] = useState(false);
   const [scrollPosition, setScrollPosition] = useState(0);
   const [validationErrors, setValidationErrors] = useState([]);
+  const [isFormValid, setIsFormValid] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -442,13 +443,21 @@ const Donate = ({ route }) => {
       setBatchLots(updatedBatchLots);
     }
   };
-
+  const checkFormValidity = () => {
+    const allFilled = batchLots.every(batchLot => {
+      // Check every field, except those that are allowed to be empty or are not user input fields
+      const requiredFields = ['gtin', 'lotNumber', 'expiryDate', 'serialNumber', 'drugName', 'presentation', 'form', 'owner', 'country', 'quantity'];
+      return requiredFields.every(field => batchLot[field] && batchLot[field].trim() !== '');
+    });
+  
+    setIsFormValid(allFilled);
+  };
   const handleFieldChange = (index, field, value) => {
     setBatchLots(prevBatchLots => {
       const updatedBatchLots = [...prevBatchLots];
       updatedBatchLots[index][field] = value;
-  
-      // Clear validation error for the field being changed
+      
+      // Update validation errors here if needed
       const updatedValidationErrors = [...validationErrors];
       if (updatedValidationErrors[index]) {
         delete updatedValidationErrors[index][field];
@@ -456,8 +465,12 @@ const Donate = ({ route }) => {
       setValidationErrors(updatedValidationErrors);
   
       return updatedBatchLots;
-    });
+    }, () => checkFormValidity()); // Check validity after state is confirmed to be updated
   };
+
+  useEffect(() => {
+    checkFormValidity();
+  }, [batchLots]);
   
   const addBatchLotForm = () => {
     setBatchLots([...batchLots, createEmptyBatchLot()]);
@@ -533,26 +546,24 @@ const Donate = ({ route }) => {
     }
 };
 const validateFields = () => {
-  const updatedValidationErrors = batchLots.map(batchLot => {
+  let isAllFieldsValid = true;
+  const updatedValidationErrors = batchLots.map((batchLot, index) => {
     const errors = {};
-    for (const field in batchLot) {
-      if (batchLot[field] === '' && field !== 'drugValidationMessage' && field !== 'open' && field !== 'drugValid' && field !== 'donationDate') {
+    // Define required fields
+    const requiredFields = ['gtin', 'lotNumber', 'expiryDate', 'serialNumber', 'drugName', 'presentation', 'form', 'owner', 'country', 'quantity'];
+    requiredFields.forEach(field => {
+      if (!batchLot[field] || batchLot[field].trim() === '') {
         errors[field] = 'This field is required';
+        isAllFieldsValid = false;
       }
-    }
+    });
     return errors;
   });
 
   setValidationErrors(updatedValidationErrors);
-
-  const firstInvalidIndex = updatedValidationErrors.findIndex(errors => Object.keys(errors).length > 0);
-  if (firstInvalidIndex !== -1) {
-    scrollToField(firstInvalidIndex);
-    return false;
-  }
-
-  return true;
+  return isAllFieldsValid;
 };
+
 
 const scrollToField = (index, field) => {
   const currentRef = batchLotRefs.current[index];
@@ -648,16 +659,21 @@ return (
           </TouchableOpacity>
 
           <View style={styles.barcodeContainer}>
-            <FieldLabel label="GTIN" />
-            <TextInput
-              style={[styles.input, validationErrors[0]?.gtin ? styles.inputError : null]}
-              placeholder="GTIN"
-              value={batchLots[0].gtin}
-              onChangeText={text => handleFieldChange(0, 'gtin', text)}
-              onFocus={() => setIsInputFocused(true)}
-              onBlur={() => setIsInputFocused(false)}
-            />
-            {validationErrors[0]?.gtin && <Text style={styles.errorMessage}>{validationErrors[0].gtin}</Text>}
+          <TextInput
+  style={[styles.input, validationErrors[0] && validationErrors[0].gtin ? styles.inputError : null]}
+  placeholder="GTIN"
+  value={batchLots[0].gtin}  // Reference the first batch lot's GTIN
+  onChangeText={text => handleFieldChange(0, 'gtin', text)}
+  onFocus={() => setIsInputFocused(true)}
+  onBlur={() => {
+    setIsInputFocused(false);
+    validateFields();  // Optionally validate fields on blur to update the UI immediately
+  }}
+/>
+{validationErrors[0] && validationErrors[0].gtin && (
+  <Text style={styles.errorMessage}>{validationErrors[0].gtin}</Text>
+)}
+
             <FieldLabel label="LOT" />
             <TextInput
               style={[styles.input, validationErrors[0]?.lotNumber ? styles.inputError : null]}
@@ -813,13 +829,20 @@ return (
           />
         ))}
 
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.button} onPress={addBatchLotForm}>
-            <Text style={styles.buttonText}>Add more</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.button} onPress={submitBatchLot}>
-            <Text style={styles.buttonText}>Submit</Text>
-          </TouchableOpacity>
+<View style={styles.buttonContainer}>
+<TouchableOpacity 
+  style={[styles.button, !isFormValid ? { backgroundColor: 'grey' } : {}]} 
+  onPress={() => isFormValid ? addBatchLotForm() : validateFields()}
+>
+  <Text style={styles.buttonText}>Add more</Text>
+</TouchableOpacity>
+<TouchableOpacity 
+  style={[styles.button, !isFormValid ? { backgroundColor: 'grey' } : {}]} 
+  onPress={() => isFormValid ? submitBatchLot() : validateFields()}
+>
+  <Text style={styles.buttonText}>Submit</Text>
+</TouchableOpacity>
+
         </View>
       </ScrollView>
     )}
