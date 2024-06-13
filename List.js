@@ -9,7 +9,7 @@ import * as Sharing from 'expo-sharing';
 import XLSX from 'xlsx';
 
 const ListDonations = () => {
-    const [tableHead] = useState(['Drug Name', 'GTIN', 'LOT', 'Serial Number', 'Expiry Date', 'Form', 'Presentation', 'Owner', 'Country']);
+    const [tableHead] = useState(['Donation Code','Drug Name', 'GTIN', 'LOT', 'Serial Number', 'Expiry Date', 'Form', 'Presentation', 'Owner', 'Country']);
     const [tableData, setTableData] = useState([]);
     const [allData, setAllData] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
@@ -38,6 +38,7 @@ return () => backHandler.remove(); // Clean up the event listener on component u
             const response = await axios.get("https://apiv2.medleb.org/donation/all");
             const formattedData = response.data.flatMap(item =>
                 item.BatchLotTrackings.map(batchLot => [
+                    batchLot.DonationId || 'N/A',
                     batchLot.DrugName || 'N/A',
                     batchLot.GTIN || 'N/A',
                     batchLot.BatchNumber || 'N/A',
@@ -87,6 +88,7 @@ return () => backHandler.remove(); // Clean up the event listener on component u
     
             // Set column widths for better readability
             const wscols = [
+                { wch: 15 }, // Donation ID
                 { wch: 20 }, // Drug Name
                 { wch: 20 }, // GTIN
                 { wch: 15 }, // LOT
@@ -137,8 +139,8 @@ return () => backHandler.remove(); // Clean up the event listener on component u
             <ScrollView horizontal style={styles.container}>
                 <ScrollView>
                     <Table borderStyle={{ borderWidth: 2, borderColor: '#c8e1ff' }}>
-                        <Row data={tableHead} style={styles.head} textStyle={styles.text} widthArr={[120, 120, 120, 120, 120, 120, 120, 120, 120, 120]} />
-                        <Rows data={tableData} textStyle={styles.text} widthArr={[120, 120, 120, 120, 120, 120, 120, 120, 120, 120]} />
+                      <Row data={tableHead} style={styles.head} textStyle={styles.text} widthArr={[120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120]} />
+                        <Rows data={tableData} textStyle={styles.text} widthArr={[120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120]} />
                     </Table>
                 </ScrollView>
             </ScrollView>
