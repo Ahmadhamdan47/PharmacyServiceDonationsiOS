@@ -9,7 +9,7 @@ import * as Sharing from 'expo-sharing';
 import XLSX from 'xlsx';
 
 const ListDonations = () => {
-    const [tableHead] = useState(['Drug Name', 'GTIN', 'LOT', 'Serial Number', 'Expiry Date', 'Form', 'Presentation', 'Owner', 'Country', 'Quantity']);
+    const [tableHead] = useState(['Drug Name', 'GTIN', 'LOT', 'Serial Number', 'Expiry Date', 'Form', 'Presentation', 'Owner', 'Country']);
     const [tableData, setTableData] = useState([]);
     const [allData, setAllData] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
@@ -47,7 +47,6 @@ return () => backHandler.remove(); // Clean up the event listener on component u
                     batchLot.Presentation || 'N/A',
                     batchLot.Laboratory || 'N/A',
                     batchLot.LaboratoryCountry || 'N/A',
-                    batchLot.Quantity || 'N/A',
                 ])
             ).filter(row => !row.includes('N/A'));
             setAllData(formattedData);
@@ -97,7 +96,7 @@ return () => backHandler.remove(); // Clean up the event listener on component u
                 { wch: 20 }, // Presentation
                 { wch: 15 }, // Owner
                 { wch: 15 }, // Country
-                { wch: 10 }  // Quantity
+            
             ];
             ws['!cols'] = wscols;
     

@@ -21,7 +21,6 @@ const createEmptyBatchLot = () => ({
   form: '',
   owner: '',
   country: '',
-  quantity: '',
   open: false,
   drugValid: null,
   drugValidationMessage: '',
@@ -43,7 +42,6 @@ const BatchLotForm = React.forwardRef(({ form, index, handleFieldChange, drugIte
     form: useRef(null),
     owner: useRef(null),
     country: useRef(null),
-    quantity: useRef(null),
   };
 
   return (
@@ -206,17 +204,7 @@ const BatchLotForm = React.forwardRef(({ form, index, handleFieldChange, drugIte
       />
       {validationErrors[index]?.country && <Text style={styles.errorMessage}>{validationErrors[index].country}</Text>}
 
-      <FieldLabel label="Quantity" />
-      <TextInput
-        ref={inputRefs.quantity}
-        style={[styles.input, validationErrors[index]?.quantity ? styles.inputError : null]}
-        placeholder="Quantity"
-        value={form.quantity}
-        onChangeText={text => handleFieldChange(index, 'quantity', text)}
-        onFocus={() => setIsInputFocused(true)}
-        onBlur={() => setIsInputFocused(false)}
-      />
-      {validationErrors[index]?.quantity && <Text style={styles.errorMessage}>{validationErrors[index].quantity}</Text>}
+    
     </View>
   );
 });
@@ -286,12 +274,21 @@ const Donate = ({ route }) => {
       { cancelable: false }
     );
   };
-
-  const fetchDrugNames = async (query = '') => {
+  const excludedOwners = [
+    "TEVA SANTE",
+    "TEVA (PAYS-BAS)",
+    "TEVA PHARMA (PAYS-BAS)",
+    "TEVA (ALLEMAGNE)",
+    "TEVA PHARMA (FRANCE)",
+    "TEVA PHARMA (ALLEMAGNE)",
+    "TEVA"
+  ];
+const fetchDrugNames = async (query = '') => {
     try {
       const response = await axios.get(`https://data.instamed.fr/api/drugs?name=${query}`);
       const drugsData = response.data["hydra:member"];
-      const dropdownItems = drugsData.map((drug, index) => ({
+      const filteredDrugsData = drugsData.filter(drug => !excludedOwners.includes(drug.owner));
+      const dropdownItems = filteredDrugsData.map((drug, index) => ({
         label: drug.name,
         value: `${drug.name}-${index}`, // Ensure unique value
         drug // Include the full drug object to access all its properties
@@ -301,7 +298,6 @@ const Donate = ({ route }) => {
       console.error("Error fetching drug names:", error);
     }
   };
-
   const handleBarcodeDetected = ({ type, data }) => {
     try {
         const response = extractDataMatrix(data);
@@ -446,7 +442,7 @@ const Donate = ({ route }) => {
   const checkFormValidity = () => {
     const allFilled = batchLots.every(batchLot => {
       // Check every field, except those that are allowed to be empty or are not user input fields
-      const requiredFields = ['gtin', 'lotNumber', 'expiryDate', 'serialNumber', 'drugName', 'presentation', 'form', 'owner', 'country', 'quantity'];
+      const requiredFields = ['gtin', 'lotNumber', 'expiryDate', 'serialNumber', 'drugName', 'presentation', 'form', 'owner', 'country'];
       return requiredFields.every(field => batchLot[field] && batchLot[field].trim() !== '');
     });
   
@@ -478,7 +474,7 @@ const Donate = ({ route }) => {
 
   const exportToExcel = async (donationData, donorName, recipientName, donationDate) => {
     try {
-        const tableHead = ['Drug Name', 'GTIN', 'LOT', 'Serial Number', 'Expiry Date', 'Form', 'Presentation', 'Owner', 'Country', 'Quantity', 'Donation Date'];
+        const tableHead = ['Drug Name', 'GTIN', 'LOT', 'Serial Number', 'Expiry Date', 'Form', 'Presentation', 'Owner', 'Country','Donation Date'];
         const filteredData = donationData.map(batchLot => [
             batchLot.drugName,
             batchLot.gtin,
@@ -489,7 +485,6 @@ const Donate = ({ route }) => {
             batchLot.presentation,
             batchLot.owner,
             batchLot.country,
-            batchLot.quantity,
             batchLot.donationDate
         ]);
 
@@ -507,7 +502,6 @@ const Donate = ({ route }) => {
             { wch: 20 }, // Presentation
             { wch: 15 }, // Owner
             { wch: 15 }, // Country
-            { wch: 10 }, // Quantity
             { wch: 20 }, // Donation Date
         ];
         ws['!cols'] = wscols;
@@ -550,7 +544,7 @@ const validateFields = () => {
   const updatedValidationErrors = batchLots.map((batchLot, index) => {
     const errors = {};
     // Define required fields
-    const requiredFields = ['gtin', 'lotNumber', 'expiryDate', 'serialNumber', 'drugName', 'presentation', 'form', 'owner', 'country', 'quantity'];
+    const requiredFields = ['gtin', 'lotNumber', 'expiryDate', 'serialNumber', 'drugName', 'presentation', 'form', 'owner', 'country'];
     requiredFields.forEach(field => {
       if (!batchLot[field] || batchLot[field].trim() === '') {
         errors[field] = 'This field is required';
@@ -590,7 +584,6 @@ const submitBatchLot = async () => {
         LOT: batchLot.lotNumber,
         ProductionDate: new Date().toISOString(),
         ExpiryDate: batchLot.expiryDate,
-        Quantity: batchLot.quantity,
         Presentation: batchLot.presentation,
         Form: batchLot.form,
         Laboratory: batchLot.owner,
@@ -798,17 +791,6 @@ return (
               onBlur={() => setIsInputFocused(false)}
             />
             {validationErrors[0]?.country && <Text style={styles.errorMessage}>{validationErrors[0].country}</Text>}
-
-            <FieldLabel label="Quantity" />
-            <TextInput
-              style={[styles.input, validationErrors[0]?.quantity ? styles.inputError : null]}
-              placeholder="Quantity"
-              value={batchLots[0].quantity}
-              onChangeText={text => handleFieldChange(0, 'quantity', text)}
-              onFocus={() => setIsInputFocused(true)}
-              onBlur={() => setIsInputFocused(false)}
-            />
-            {validationErrors[0]?.quantity && <Text style={styles.errorMessage}>{validationErrors[0].quantity}</Text>}
           </View>
         </View>
 
