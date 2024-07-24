@@ -1,20 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import { Button, View, Text, TextInput, Image, Keyboard, StyleSheet, TouchableOpacity } from 'react-native';
+import { Button, View, Text, TextInput, Image, Keyboard, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import axios from 'axios';
 import DropDownPicker from 'react-native-dropdown-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 
-const AddDonor = ({ navigation }) => {
-  const [donors, setDonors] = useState([]);
+const AddDonor = () => {
   const [recipients, setRecipients] = useState([]);
-  const [selectedDonor, setSelectedDonor] = useState(null);
   const [selectedRecipient, setSelectedRecipient] = useState(null);
   const [donationPurpose, setDonationPurpose] = useState('');
   const [isInputFocused, setIsInputFocused] = useState(false);
-  const [donorOpen, setDonorOpen] = useState(false);
   const [recipientOpen, setRecipientOpen] = useState(false);
+  const [donorName, setDonorName] = useState('');
+  const [donorId, setDonorId] = useState(null);
+  const navigation = useNavigation();
 
   useEffect(() => {
-    fetchDonors();
+    fetchDonorNameAndId();
     fetchRecipients();
   }, []);
 
@@ -25,17 +27,18 @@ const AddDonor = ({ navigation }) => {
     };
   }, []);
 
-  const fetchDonors = async () => {
+  const fetchDonorNameAndId = async () => {
     try {
-      const response = await axios.get("https://apiv2.medleb.org/donor/all");
-      const donorsData = response.data.map(donor => ({
-        label: donor.DonorName,
-        value: donor.DonorId
-      }));
-      setDonors(donorsData);
-      setSelectedDonor(donorsData[0]?.value);
+      const storedUsername = await AsyncStorage.getItem('username');
+      if (storedUsername) {
+        setDonorName(storedUsername);
+        const response = await axios.get(`https://apiv2.medleb.org/donor/byUsername/${storedUsername}`);
+        if (response.data && response.data.DonorId) {
+          setDonorId(response.data.DonorId);
+        }
+      }
     } catch (error) {
-      console.error("Error fetching donors:", error);
+      console.error('Failed to load username or donor info:', error);
     }
   };
 
@@ -54,55 +57,48 @@ const AddDonor = ({ navigation }) => {
   };
 
   const handleContinue = async () => {
-    try {
-        const response = await axios.post("https://apiv2.medleb.org/donation/add", {
-            DonorId: selectedDonor,
-            RecipientId: selectedRecipient,
-            DonationPurpose: donationPurpose,
-            DonationDate: new Date().toISOString(),
-        });
-        const donationId = response.data.DonationId;
-        const selectedDonorName = donors.find(donor => donor.value === selectedDonor).label;
-        const selectedRecipientName = recipients.find(recipient => recipient.value === selectedRecipient).label;
-        const donationDate = new Date().toISOString().replace(/:/g, '-');  // Include time and format for file name
-        console.log("Donation created successfully with ID:", donationId);
-        navigation.navigate('Donate', {
-            donorId: selectedDonor,
-            recipientId: selectedRecipient,
-            donorName: selectedDonorName,
-            recipientName: selectedRecipientName,
-            donationPurpose: donationPurpose,
-            donationDate: donationDate,
-            donationId: donationId,
-        });
-    } catch (error) {
-        console.error("Error creating donation:", error);
+    if (!donorId) {
+      Alert.alert('Error', 'Failed to load donor information.');
+      return;
     }
-};
-
+    try {
+      const response = await axios.post("https://apiv2.medleb.org/donation/add", {
+        DonorId: donorId,
+        RecipientId: selectedRecipient,
+        DonationPurpose: donationPurpose,
+        DonationDate: new Date().toISOString(),
+      });
+      const donationId = response.data.DonationId;
+      const selectedRecipientName = recipients.find(recipient => recipient.value === selectedRecipient).label;
+      const donationDate = new Date().toISOString().replace(/:/g, '-');
+      console.log("Donation created successfully with ID:", donationId);
+      navigation.navigate('Donate', {
+        donorId: donorId,
+        recipientId: selectedRecipient,
+        donorName: donorName,
+        recipientName: selectedRecipientName,
+        donationPurpose: donationPurpose,
+        donationDate: donationDate,
+        donationId: donationId,
+      });
+    } catch (error) {
+      console.error("Error creating donation:", error);
+    }
+  };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Select Donor</Text>
-      <View style={{ zIndex: 10 }}>
-        <DropDownPicker
-          open={donorOpen}
-          value={selectedDonor}
-          items={donors}
-          setOpen={setDonorOpen}
-          setValue={setSelectedDonor}
-          setItems={setDonors}
-          placeholder="Select a donor"
-          containerStyle={styles.dropdown}
-          onOpen={() => setIsInputFocused(true)}
-          onClose={() => setIsInputFocused(false)}
-          style={styles.picker}
-          dropDownContainerStyle={styles.dropDownContainer}
-        />
-      </View>
+      <Image source={require('./assets/medleblogo.png')} style={styles.logo} />
+
+      <Text style={styles.label}>Donor Name</Text>
+      <TextInput
+        style={styles.inputDonor}
+        value={donorName}
+        editable={false}
+      />
 
       <Text style={styles.label}>Select Recipient</Text>
-      <View style={{ zIndex: 9 }}>
+      <View style={{ zIndex: 10 }}>
         <DropDownPicker
           open={recipientOpen}
           value={selectedRecipient}
@@ -135,25 +131,14 @@ const AddDonor = ({ navigation }) => {
 
       {!isInputFocused && (
         <View style={styles.taskBar}>
-          <TouchableOpacity onPress={() => navigation.navigate('Home')}>
-            <Image
-              source={require("./assets/home.png")}
-              style={styles.taskBarButton}
-            />
+          <TouchableOpacity onPress={() => navigation.navigate('DonorLanding')}>
+            <Image source={require("./assets/home.png")} style={styles.taskBarButton} />
           </TouchableOpacity>
-
           <TouchableOpacity onPress={() => navigation.navigate('AddDonor')}>
-            <Image
-              source={require("./assets/donate.png")}
-              style={styles.taskBarButton}
-            />
+            <Image source={require("./assets/donate.png")} style={styles.taskBarButton} />
           </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => navigation.navigate('List')}>
-            <Image
-              source={require("./assets/list.png")}
-              style={styles.taskBarButton}
-            />
+          <TouchableOpacity onPress={() => navigation.navigate('DonorList')}>
+            <Image source={require("./assets/list.png")} style={styles.taskBarButton} />
           </TouchableOpacity>
         </View>
       )}
@@ -164,10 +149,14 @@ const AddDonor = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: '20%',
-    paddingHorizontal: '10%',
+    backgroundColor: "#fff",
+    padding: 10,
   },
-  dropdown: {
+  logo: {
+    width: 200,
+    height: 80,
+    resizeMode: 'contain',
+    alignSelf: 'center',
     marginBottom: 20,
   },
   label: {
@@ -176,54 +165,58 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     color: "#A9A9A9",
   },
+  inputDonor: {
+    borderWidth: 1,
+    borderColor: '#00a651',
+    borderRadius: 20,
+    padding: 10,
+    marginBottom: 20,
+    backgroundColor: '#f0f0f0',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#00a651',
+    borderRadius: 20,
+    padding: 10,
+    marginBottom: 20,
+  },
+  dropdown: {
+    marginBottom: 20,
+  },
   picker: {
-    borderColor: '#00a651', // Green border
+    borderColor: '#00a651',
     borderWidth: 1,
     borderRadius: 20,
   },
   dropDownContainer: {
-    borderColor: '#00a651', // Green border for dropdown container
+    borderColor: '#00a651',
     borderWidth: 1,
     borderRadius: 20,
   },
   button: {
-    width: 130,
-    alignSelf: "center",
-    paddingHorizontal: 23,
-    paddingVertical: 10,
-    borderWidth: 2,
-    borderRadius: 60,
-    borderColor: "#00a651",
-    marginTop: 10,
+    backgroundColor: '#00a651',
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    alignItems: 'center',
+    marginTop: 20,
   },
   buttonText: {
-    color: "#00a651",
-    fontSize: 16,
-    textAlign: "center",
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#00a651",
-    borderRadius: 20,
-    padding: 10,
-    marginBottom: 20,
-    height: 150,
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 18,
   },
   taskBar: {
-    marginTop: 10,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     width: '100%',
     position: 'absolute',
     bottom: '2%',
-    backgroundColor: '#f0f0f0',
-    paddingLeft: 60,
   },
   taskBarButton: {
     width: 25,
     height: 25,
     resizeMode: "contain",
-    marginTop: 6,
   },
 });
 
