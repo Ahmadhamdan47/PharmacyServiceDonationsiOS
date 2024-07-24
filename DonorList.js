@@ -2,38 +2,51 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, View, TouchableOpacity, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Table, Row, Rows } from 'react-native-table-component';
 import axios from 'axios';
-import { useNavigation } from '@react-navigation/native';
-import { BackHandler } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import XLSX from 'xlsx';
 
-const ListDonations = () => {
+const DonorList = () => {
     const [tableHead] = useState(['Donation Code', 'Donor Name', 'Recipient Name', 'Drug Name', 'GTIN', 'LOT', 'Serial Number', 'Expiry Date', 'Form', 'Presentation', 'Owner', 'Country']);
     const [tableData, setTableData] = useState([]);
     const [allData, setAllData] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage] = useState(25);
     const [loading, setLoading] = useState(false);
-    const navigation = useNavigation();
+    const [donorId, setDonorId] = useState(null);
+
+    
 
     useEffect(() => {
-        const backAction = () => {
-            navigation.navigate('AdminLanding');
-            return true; // This will prevent the app from exiting
-        };
-
-        const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
-
-        fetchAllDonations();
-
-        return () => backHandler.remove(); // Clean up the event listener on component unmount
+        fetchDonorId();
     }, []);
 
-    const fetchAllDonations = async () => {
+    useEffect(() => {
+        if (donorId) {
+            fetchDonations();
+        }
+    }, [donorId]);
+
+    const fetchDonorId = async () => {
+        try {
+            const storedUsername = await AsyncStorage.getItem('username');
+            if (storedUsername) {
+                const response = await axios.get(`https://apiv2.medleb.org/donor/byUsername/${storedUsername}`);
+                if (response.data && response.data.DonorId) {
+                    setDonorId(response.data.DonorId);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load donor info:', error);
+            Alert.alert('Error', 'Failed to load donor information.');
+        }
+    };
+
+    const fetchDonations = async () => {
         setLoading(true);
         try {
-            const response = await axios.get("https://apiv2.medleb.org/donation/all");
+            const response = await axios.get(`https://apiv2.medleb.org/donation/byDonor/${donorId}`);
             const formattedData = response.data.flatMap(item =>
                 item.BatchLotTrackings.map(batchLot => [
                     item.DonationId || 'N/A',
@@ -200,4 +213,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default ListDonations;
+export default DonorList;
