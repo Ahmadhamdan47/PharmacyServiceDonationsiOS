@@ -597,7 +597,7 @@ const submitBatchLot = async () => {
       Alert.alert('Success', 'Donations Added Successfully');
       const { donorName, recipientName, donationDate } = route.params;
       await exportToExcel(batchLots, donorName, recipientName, donationDate);
-      navigation.navigate('List');
+      navigation.navigate('DonorList');
     } else {
       Alert.alert('Warning', 'Make sure you entered all of the required fields correctly');
     }
@@ -830,7 +830,7 @@ return (
     )}
     {!isCameraOpen && !isInputFocused && !isDropDownOpen && (
       <View style={styles.taskBar}>
-        <TouchableOpacity onPress={() => handleNavigation('Home')}>
+        <TouchableOpacity onPress={() => handleNavigation('DonorLanding')}>
           <Image
             source={require("./assets/home.png")}
             style={styles.taskBarButton}
@@ -842,7 +842,7 @@ return (
             style={styles.taskBarButton}
           />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => handleNavigation('List')}>
+        <TouchableOpacity onPress={() => handleNavigation('DonorList')}>
           <Image
             source={require("./assets/list.png")}
             style={styles.taskBarButton}

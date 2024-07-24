@@ -9,7 +9,7 @@ import * as Sharing from 'expo-sharing';
 import XLSX from 'xlsx';
 
 const ListDonations = () => {
-    const [tableHead] = useState(['Donation Code','Drug Name', 'GTIN', 'LOT', 'Serial Number', 'Expiry Date', 'Form', 'Presentation', 'Owner', 'Country']);
+    const [tableHead] = useState(['Donation Code', 'Donor Name', 'Recipient Name', 'Drug Name', 'GTIN', 'LOT', 'Serial Number', 'Expiry Date', 'Form', 'Presentation', 'Owner', 'Country']);
     const [tableData, setTableData] = useState([]);
     const [allData, setAllData] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
@@ -19,26 +19,26 @@ const ListDonations = () => {
 
     useEffect(() => {
         const backAction = () => {
-            navigation.navigate('AddDonor');
+            navigation.navigate('AdminLanding');
             return true; // This will prevent the app from exiting
         };
 
-const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-    navigation.navigate('AddDonor'); // Replace 'AddDonor' with the name of your screen
-    return true; // This will prevent the app from exiting
-});
+        const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
 
-fetchAllDonations();
+        fetchAllDonations();
 
-return () => backHandler.remove(); // Clean up the event listener on component unmount
-}, []);
+        return () => backHandler.remove(); // Clean up the event listener on component unmount
+    }, []);
+
     const fetchAllDonations = async () => {
         setLoading(true);
         try {
             const response = await axios.get("https://apiv2.medleb.org/donation/all");
             const formattedData = response.data.flatMap(item =>
                 item.BatchLotTrackings.map(batchLot => [
-                    batchLot.DonationId || 'N/A',
+                    item.DonationId || 'N/A',
+                    item.DonorName || 'N/A',
+                    item.RecipientName || 'N/A',
                     batchLot.DrugName || 'N/A',
                     batchLot.GTIN || 'N/A',
                     batchLot.BatchNumber || 'N/A',
@@ -85,10 +85,12 @@ return () => backHandler.remove(); // Clean up the event listener on component u
             const ws = XLSX.utils.aoa_to_sheet([tableHead, ...filteredData]);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Donations");
-    
+
             // Set column widths for better readability
             const wscols = [
                 { wch: 15 }, // Donation ID
+                { wch: 20 }, // Donor Name
+                { wch: 20 }, // Recipient Name
                 { wch: 20 }, // Drug Name
                 { wch: 20 }, // GTIN
                 { wch: 15 }, // LOT
@@ -98,29 +100,29 @@ return () => backHandler.remove(); // Clean up the event listener on component u
                 { wch: 20 }, // Presentation
                 { wch: 15 }, // Owner
                 { wch: 15 }, // Country
-            
             ];
             ws['!cols'] = wscols;
-    
-            // Apply number formatting for the GTIN column (second column)
+
+            // Apply number formatting for the GTIN and Serial Number columns
             ws['!ref'] = XLSX.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: tableHead.length - 1, r: filteredData.length } });
             for (let R = 1; R <= filteredData.length; ++R) {
-                ws[XLSX.utils.encode_cell({ c: 1, r: R })].z = '0';
+                ws[XLSX.utils.encode_cell({ c: 4, r: R })].t = 's'; // GTIN column
+                ws[XLSX.utils.encode_cell({ c: 6, r: R })].t = 's'; // Serial Number column
             }
-    
+
             const wbout = XLSX.write(wb, { type: 'base64', bookType: "xlsx" });
-    
+
             const uri = FileSystem.documentDirectory + 'donations.xlsx';
             await FileSystem.writeAsStringAsync(uri, wbout, {
                 encoding: FileSystem.EncodingType.Base64
             });
-    
+
             const shareOptions = {
                 mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 dialogTitle: 'Share Donations Excel',
                 UTI: 'com.microsoft.excel.xlsx',
             };
-    
+
             if (await Sharing.isAvailableAsync()) {
                 await Sharing.shareAsync(uri, shareOptions);
             } else {
@@ -132,18 +134,21 @@ return () => backHandler.remove(); // Clean up the event listener on component u
         }
         setLoading(false);
     };
-    
 
     return (
         <View style={styles.fullContainer}>
-            <ScrollView horizontal style={styles.container}>
-                <ScrollView>
-                    <Table borderStyle={{ borderWidth: 2, borderColor: '#c8e1ff' }}>
-                      <Row data={tableHead} style={styles.head} textStyle={styles.text} widthArr={[120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120]} />
-                        <Rows data={tableData} textStyle={styles.text} widthArr={[120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120]} />
-                    </Table>
+            {loading ? (
+                <ActivityIndicator size="large" color="#0000ff" />
+            ) : (
+                <ScrollView horizontal style={styles.container}>
+                    <ScrollView>
+                        <Table borderStyle={{ borderWidth: 2, borderColor: '#c8e1ff' }}>
+                            <Row data={tableHead} style={styles.head} textStyle={styles.text} widthArr={[120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120]} />
+                            <Rows data={tableData} textStyle={styles.text} widthArr={[120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120]} />
+                        </Table>
+                    </ScrollView>
                 </ScrollView>
-            </ScrollView>
+            )}
             <View style={styles.buttonContainer}>
                 <TouchableOpacity onPress={handlePreviousPage} style={styles.button}>
                     <Text style={styles.buttonText}>Previous</Text>
@@ -155,9 +160,6 @@ return () => backHandler.remove(); // Clean up the event listener on component u
             <TouchableOpacity onPress={exportToExcel} style={styles.button}>
                 <Text style={styles.buttonText}>Export to Excel</Text>
             </TouchableOpacity>
-            {loading && (
-                <ActivityIndicator size="large" color="#0000ff" />
-            )}
         </View>
     );
 };
