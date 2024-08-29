@@ -318,7 +318,7 @@ const Inspect = () => {
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => navigation.navigate('Inspect')}>
                         <Image
-                            source={require("./assets/Inspection.png")}
+                            source={require("./assets/donate.png")}
                             style={styles.taskBarButtonInspect}
                         />
                     </TouchableOpacity>

@@ -51,7 +51,7 @@ const AdminLanding = () => {
                     <Image source={require("./assets/list.png")} style={styles.taskBarButton} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={handleInspect}>
-                    <Image source={require("./assets/Inspection.png")} style={styles.taskBarButtonInspect} />
+                    <Image source={require("./assets/donate.png")} style={styles.taskBarButtonInspect} />
                 </TouchableOpacity>
             </View>
         </View>
