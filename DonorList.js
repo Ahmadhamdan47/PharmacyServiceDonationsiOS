@@ -1,26 +1,36 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, TouchableOpacity, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { Table, Row, Rows } from 'react-native-table-component';
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import XLSX from 'xlsx';
+import { useNavigation } from '@react-navigation/native'; // Import useNavigation hook
+import BottomNavBar from './BottomNavBar'; // Import BottomNavBar
 
-const DonorList = () => {
-    const [tableHead] = useState(['Donation Code', 'Donor Name', 'Recipient Name', 'Drug Name', 'GTIN', 'LOT', 'Serial Number', 'Expiry Date', 'Form', 'Presentation', 'Owner', 'Country']);
-    const [tableData, setTableData] = useState([]);
-    const [allData, setAllData] = useState([]);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(25);
+const DonorList = ({ navigation }) => {
+    const [donations, setDonations] = useState([]);
     const [loading, setLoading] = useState(false);
     const [donorId, setDonorId] = useState(null);
-
-    
+    const [username, setUsername] = useState('');
 
     useEffect(() => {
+        // Set up the header with the user icon and name
+        navigation.setOptions({
+            headerRight: () => (
+                <View style={styles.userInfo}>
+                    {/* User Icon */}
+                    <View style={styles.userIconContainer}>
+                        <Text style={styles.userIconText}>{username.charAt(0).toUpperCase()}</Text>
+                    </View>
+                    {/* Username */}
+                    <Text style={styles.usernameText}>{username}</Text>
+                </View>
+            ),
+        });
+
         fetchDonorId();
-    }, []);
+    }, [navigation, username]); // Include navigation and username in dependencies to update header
 
     useEffect(() => {
         if (donorId) {
@@ -32,6 +42,7 @@ const DonorList = () => {
         try {
             const storedUsername = await AsyncStorage.getItem('username');
             if (storedUsername) {
+                setUsername(storedUsername); // Set the username state
                 const response = await axios.get(`https://apiv2.medleb.org/donor/byUsername/${storedUsername}`);
                 if (response.data && response.data.DonorId) {
                     setDonorId(response.data.DonorId);
@@ -47,7 +58,22 @@ const DonorList = () => {
         setLoading(true);
         try {
             const response = await axios.get(`https://apiv2.medleb.org/donation/byDonor/${donorId}`);
-            const formattedData = response.data.flatMap(item =>
+            setDonations(response.data);
+        } catch (error) {
+            console.error("Error fetching donations:", error);
+            Alert.alert("Error", "Failed to load donations.");
+        }
+        setLoading(false);
+    };
+
+    const handlePressDonation = (donation) => {
+        navigation.navigate('DonationDetails', { donation });
+    };
+
+    const exportToExcel = async () => {
+        setLoading(true);
+        try {
+            const formattedData = donations.flatMap(item =>
                 item.BatchLotTrackings.map(batchLot => [
                     item.DonationId || 'N/A',
                     item.DonorName || 'N/A',
@@ -63,87 +89,27 @@ const DonorList = () => {
                     batchLot.LaboratoryCountry || 'N/A',
                 ])
             ).filter(row => !row.includes('N/A'));
-            setAllData(formattedData);
-            setTableData(formattedData.slice(0, itemsPerPage));
-        } catch (error) {
-            console.error("Error fetching donations:", error);
-            Alert.alert("Error", "Failed to load donations.");
-        }
-        setLoading(false);
-    };
 
-    const handleNextPage = () => {
-        const nextPage = currentPage + 1;
-        const totalPages = Math.ceil(allData.length / itemsPerPage);
-        if (nextPage <= totalPages) {
-            setCurrentPage(nextPage);
-            const startIndex = (nextPage - 1) * itemsPerPage;
-            setTableData(allData.slice(startIndex, startIndex + itemsPerPage));
-        }
-    };
+            const ws = XLSX.utils.aoa_to_sheet([[
+                'Donation Code', 'Donor Name', 'Recipient Name', 'Drug Name', 'GTIN', 'LOT', 'Serial Number', 'Expiry Date', 'Form', 'Presentation', 'Owner', 'Country'
+            ], ...formattedData]);
 
-    const handlePreviousPage = () => {
-        const previousPage = currentPage - 1;
-        if (previousPage > 0) {
-            setCurrentPage(previousPage);
-            const startIndex = (previousPage - 1) * itemsPerPage;
-            setTableData(allData.slice(startIndex, startIndex + itemsPerPage));
-        }
-    };
-
-    const exportToExcel = async () => {
-        setLoading(true);
-        try {
-            const filteredData = allData.filter(row => !row.includes('N/A')); // Filter out rows with 'N/A' fields
-            const ws = XLSX.utils.aoa_to_sheet([tableHead, ...filteredData]);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Donations");
 
-            // Set column widths for better readability
-            const wscols = [
-                { wch: 15 }, // Donation ID
-                { wch: 20 }, // Donor Name
-                { wch: 20 }, // Recipient Name
-                { wch: 20 }, // Drug Name
-                { wch: 20 }, // GTIN
-                { wch: 15 }, // LOT
-                { wch: 20 }, // Serial Number
-                { wch: 15 }, // Expiry Date
-                { wch: 15 }, // Form
-                { wch: 20 }, // Presentation
-                { wch: 15 }, // Owner
-                { wch: 15 }, // Country
-            ];
-            ws['!cols'] = wscols;
-
-            // Apply number formatting for the GTIN and Serial Number columns
-            ws['!ref'] = XLSX.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: tableHead.length - 1, r: filteredData.length } });
-            for (let R = 1; R <= filteredData.length; ++R) {
-                ws[XLSX.utils.encode_cell({ c: 4, r: R })].t = 's'; // GTIN column
-                ws[XLSX.utils.encode_cell({ c: 6, r: R })].t = 's'; // Serial Number column
-            }
-
             const wbout = XLSX.write(wb, { type: 'base64', bookType: "xlsx" });
-
             const uri = FileSystem.documentDirectory + 'donations.xlsx';
-            await FileSystem.writeAsStringAsync(uri, wbout, {
-                encoding: FileSystem.EncodingType.Base64
-            });
 
-            const shareOptions = {
-                mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                dialogTitle: 'Share Donations Excel',
-                UTI: 'com.microsoft.excel.xlsx',
-            };
+            await FileSystem.writeAsStringAsync(uri, wbout, { encoding: FileSystem.EncodingType.Base64 });
 
             if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(uri, shareOptions);
+                await Sharing.shareAsync(uri);
             } else {
-                Alert.alert("Success", "Excel file has been saved to your device's storage.", [{ text: "OK" }]);
+                Alert.alert("Success", "Excel file has been saved to your device's storage.");
             }
         } catch (error) {
             console.error("Error exporting to Excel:", error);
-            Alert.alert("Error", "Failed to export to Excel. Please try again.", [{ text: "OK" }]);
+            Alert.alert("Error", "Failed to export to Excel. Please try again.");
         }
         setLoading(false);
     };
@@ -153,26 +119,32 @@ const DonorList = () => {
             {loading ? (
                 <ActivityIndicator size="large" color="#0000ff" />
             ) : (
-                <ScrollView horizontal style={styles.container}>
-                    <ScrollView>
-                        <Table borderStyle={{ borderWidth: 2, borderColor: '#c8e1ff' }}>
-                            <Row data={tableHead} style={styles.head} textStyle={styles.text} widthArr={[120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120]} />
-                            <Rows data={tableData} textStyle={styles.text} widthArr={[120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120]} />
-                        </Table>
-                    </ScrollView>
+                <ScrollView contentContainerStyle={styles.scrollViewContainer}>
+                    {donations.map((donation, index) => (
+                        <TouchableOpacity key={index} style={styles.cardContainer} onPress={() => handlePressDonation(donation)}>
+                            <Text style={[styles.statusText, donation.status === 'pending' ? styles.pendingText : styles.approvedText]}>
+                                {donation.status === 'pending' ? 'Pending' : 'Approved'}
+                            </Text>
+                            <View style={styles.cardContent}>
+                                <View style={styles.infoContainer}>
+                                    <Text style={styles.infoTitle}>Donation Title:</Text>
+                                    <Text style={styles.infoText}>{donation.DonationPurpose}</Text>
+                                    <Text style={styles.infoTitle}>To:</Text>
+                                    <Text style={styles.infoText}>{donation.RecipientName}</Text>
+                                </View>
+                                <View style={styles.detailsContainer}>
+                                    <Text style={styles.detailsText}>Date: {donation.DonationDate}</Text>
+                                    <Text style={styles.detailsText}>nb of box(es): {donation.NumberOfBoxes}</Text>
+                                    <Text style={styles.detailsText}>nb of pack(s): {donation.BatchLotTrackings.length}</Text>
+                                </View>
+                            </View>
+                        </TouchableOpacity>
+                    ))}
                 </ScrollView>
             )}
-            <View style={styles.buttonContainer}>
-                <TouchableOpacity onPress={handlePreviousPage} style={styles.button}>
-                    <Text style={styles.buttonText}>Previous</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleNextPage} style={styles.button}>
-                    <Text style={styles.buttonText}>Next</Text>
-                </TouchableOpacity>
-            </View>
-            <TouchableOpacity onPress={exportToExcel} style={styles.button}>
-                <Text style={styles.buttonText}>Export to Excel</Text>
-            </TouchableOpacity>
+
+            {/* Bottom Navigation Bar */}
+            <BottomNavBar />
         </View>
     );
 };
@@ -180,36 +152,88 @@ const DonorList = () => {
 const styles = StyleSheet.create({
     fullContainer: {
         flex: 1,
-        paddingTop: 30,
-        backgroundColor: '#fff'
+        backgroundColor: '#fff',
     },
-    container: {
-        flex: 1,
-        padding: 16,
+    userInfo: {
+        alignItems: 'center',
+        marginRight: 10,
     },
-    head: {
+    userIconContainer: {
+        width: 40, // Increased size of the circle
         height: 40,
-        backgroundColor: '#f1f8ff',
+        borderRadius: 25,
+        backgroundColor: '#fff', // White inside the circle
+        borderWidth: 2,
+        borderColor: '#00A651', // Green border
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 5, // Space between the circle and the username
     },
-    text: {
-        margin: 6,
-        fontSize: 10,
-        color: 'black'
+    userIconText: {
+        color: '#00A651', // Green text
+        fontWeight: 'bold',
+        fontSize: 20, // Increased font size for the circle text
     },
-    buttonContainer: {
+    usernameText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#121212',
+    },
+    scrollViewContainer: {
+        paddingBottom: 20,
+    },
+    cardContainer: {
+        marginHorizontal: 20,
+        marginVertical: 10,
+        borderWidth: 1,
+        borderColor: '#00A651',
+        borderRadius: 8,
+        padding: 10,
+        backgroundColor: '#fff',
+        position: 'relative',
+    },
+    statusText: {
+        position: 'absolute',
+        left: 10,
+        top: 10,
+        fontSize: 14,
+        fontStyle: 'italic',
+        fontWeight: '700',
+        zIndex: 1,
+        backgroundColor: '#fff',
+        paddingHorizontal: 5,
+    },
+    pendingText: {
+        color: '#DB7B2B',
+    },
+    approvedText: {
+        color: '#00A651',
+    },
+    cardContent: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
-        marginBottom: 5
+        justifyContent: 'space-between',
+        marginTop: 20,
     },
-    button: {
-        padding: 5,
-        margin: 5,
-        backgroundColor: 'green',
-        borderRadius: 5,
+    infoContainer: {
+        flex: 1,
     },
-    buttonText: {
-        color: 'white',
-        textAlign: 'center',
+    infoTitle: {
+        fontSize: 12,
+        fontWeight: '300',
+        color: '#121212',
+    },
+    infoText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#121212',
+    },
+    detailsContainer: {
+        alignItems: 'flex-end',
+    },
+    detailsText: {
+        fontSize: 12,
+        fontWeight: '300',
+        color: '#121212',
     },
 });
 

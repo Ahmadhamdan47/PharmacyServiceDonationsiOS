@@ -10,6 +10,8 @@ import Donate from './Donate';
 import List from './List';
 import Inspect from './Inspect';
 import DonorList from './DonorList';
+import DonationDetails from './DonationDetails'; // Import the DonationDetails component
+import BoxDetails from './BoxDetails';
 
 const Stack = createStackNavigator();
 
@@ -26,6 +28,9 @@ const App = () => {
         <Stack.Screen name="List" component={List} options={{ title: '' }}/>
         <Stack.Screen name="Inspect" component={Inspect} options={{ title: '' }}/>
         <Stack.Screen name="DonorList" component={DonorList}options={{ title: '' }} />
+        <Stack.Screen name="DonationDetails" component={DonationDetails} options={{ title: 'Donation Details' }} /> 
+        <Stack.Screen name="BoxDetails" component={BoxDetails} options={{ title: '' }} />
+
       </Stack.Navigator>
     </NavigationContainer>
   );
