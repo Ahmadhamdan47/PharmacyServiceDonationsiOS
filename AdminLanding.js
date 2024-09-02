@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Image, TouchableOpacity, Text } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import BottomNavBarInspection from './BottomNavBarInspection';  // Import BottomNavBarInspection
 
 const AdminLanding = () => {
     const navigation = useNavigation();
@@ -28,32 +29,30 @@ const AdminLanding = () => {
 
     return (
         <View style={styles.container}>
-            <Image source={require("./assets/medleblogo.png")} style={styles.logo} />
-
-            <Text style={styles.welcomeText}>Welcome, {username}!</Text>
-
-            <View style={styles.buttonsContainer}>
-                <TouchableOpacity onPress={() => navigation.navigate('List')}>
-                    <Image source={require("./assets/2.png")} style={styles.buttonImage} />
-                </TouchableOpacity>
-
-                <TouchableOpacity onPress={handleInspect}>
-                    <Image source={require("./assets/Inspection.jpg")} style={styles.buttonImage} />
-                  
-                </TouchableOpacity>
+            <View style={styles.header}>
+                <Image source={require("./assets/medleblogo.png")} style={styles.logo} />
+                <View style={styles.profileContainer}>
+                    <View style={styles.circle}>
+                        <Text style={styles.circleText}>{username ? username.charAt(0).toUpperCase() : ''}</Text>
+                    </View>
+                    <Text style={styles.profileText}>{username}</Text>
+                </View>
             </View>
 
-            <View style={styles.taskBar}>
-                <TouchableOpacity onPress={() => navigation.navigate('AdminLanding')}>
-                    <Image source={require("./assets/home.png")} style={styles.taskBarButton} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => navigation.navigate('List')}>
-                    <Image source={require("./assets/list.png")} style={styles.taskBarButton} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleInspect}>
-                    <Image source={require("./assets/donate.png")} style={styles.taskBarButtonInspect} />
-                </TouchableOpacity>
+            <View style={styles.content}>
+                <View style={styles.buttonsContainer}>
+                    <TouchableOpacity onPress={() => navigation.navigate('List')} style={styles.buttonWrapper}>
+                        <Image source={require("./assets/list.png")} style={styles.buttonImage} />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity onPress={handleInspect} style={styles.buttonWrapper}>
+                        <Image source={require("./assets/Inspection.png")} style={styles.buttonImage} />
+                    </TouchableOpacity>
+                </View>
             </View>
+
+            {/* Bottom navigation bar should always be at the bottom */}
+            <BottomNavBarInspection currentScreen="AdminLanding" />
         </View>
     );
 };
@@ -62,63 +61,74 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: "#fff",
-        padding: 10,
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingTop: 20,
     },
     logo: {
-        top: 10,
-        left: 10,
-        width: 200,
-        height: 80,
+        width: 150,
+        height: 100,
         resizeMode: "contain",
+    },
+    profileContainer: {
+        alignItems: 'center', // Center align items in profile container
+    },
+    circle: {
+        width: 40,
+        height: 40,
+        borderRadius: 25,
+        borderWidth: 2,
+        borderColor: '#00A651',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 5,  // Space between circle and username
+    },
+    circleText: {
+        fontSize: 16,
+        color: '#00A651',
+        fontWeight: 'bold',
+    },
+    profileText: {
+        fontSize: 14,
+        color: '#00A651',
+        fontWeight: 'bold',
+    },
+    content: {
+        flex: 1,  // Allows the content to take up available space
+        alignItems: 'center',
+        justifyContent: 'center',  // Center content vertically in the middle of the available space
+        paddingBottom: 60,  // Add padding to avoid overlapping with BottomNavBar
     },
     welcomeText: {
         fontSize: 20,
         fontWeight: 'bold',
         textAlign: 'center',
-        marginRight: 150,
-        marginBottom: 30,
+        marginBottom: 30,  // Adjust margin to move text down for better spacing
     },
     buttonsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-around',
-        width: '100%',
-        paddingTop: 200,
+        width: '80%',
+        paddingHorizontal: 20,  // Padding to add space from edges
+        marginTop: 20,  // Margin to separate from welcome text
+    },
+    buttonWrapper: {
+        alignItems: 'center',
     },
     buttonImage: {
         width: 120,
         height: 120,
         resizeMode: "contain",
+        marginBottom: 10,  // Space between the image and text
     },
-    buttonImageInspect: {
-        width: 90,
-        height: 87,
-        resizeMode: "contain",
-    },
-    taskBar: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        width: '100%',
-        position: 'absolute',
-        bottom: '2%',
-    },
-    taskBarButton: {
-        width: 25,
-        height: 25,
-        resizeMode: "contain",
-    },
-    taskBarButtonInspect: {
-        width: 30,
-        height: 30,
-        resizeMode: "contain",
-    },
-    inspectionText: {
-        fontFamily: 'Roboto Condensed',
-        fontStyle: 'normal',
-        fontWeight: '600',
-        fontSize: 20,
-        lineHeight: 50,
-        textAlign: 'center',
-        color: '#121212',
+    buttonText: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#00A651',
     },
 });
 

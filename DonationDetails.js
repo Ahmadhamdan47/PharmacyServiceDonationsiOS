@@ -1,16 +1,31 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import axios from 'axios';
-import BottomNavBar from './BottomNavBar'; // Import BottomNavBar
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import BottomNavBar from './BottomNavBar'; // Import BottomNavBar for Donor
+import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomNavBarInspection for Admin
 
 const DonationDetails = ({ route, navigation }) => {
     const { donation } = route.params;
     const [boxes, setBoxes] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [userRole, setUserRole] = useState('');  // State to store user role
 
     useEffect(() => {
-        fetchBoxes();
+        fetchUserRole();  // Fetch the user role from AsyncStorage
+        fetchBoxes();     // Fetch the boxes data
     }, []);
+
+    const fetchUserRole = async () => {
+        try {
+            const role = await AsyncStorage.getItem('userRole');
+            if (role) {
+                setUserRole(role);
+            }
+        } catch (error) {
+            console.error('Error fetching user role:', error);
+        }
+    };
 
     const fetchBoxes = async () => {
         setLoading(true);
@@ -25,7 +40,12 @@ const DonationDetails = ({ route, navigation }) => {
     };
 
     const handleBoxPress = (box) => {
-        navigation.navigate('BoxDetails', { box });
+        // Navigate to different screens based on user role
+        if (userRole === 'Admin') {
+            navigation.navigate('BoxInspection', { boxId: box.BoxId });
+        } else {
+            navigation.navigate('BoxDetails', { box });
+        }
     };
 
     return (
@@ -49,8 +69,12 @@ const DonationDetails = ({ route, navigation }) => {
                 </ScrollView>
             )}
 
-            {/* Bottom Navigation Bar */}
-            <BottomNavBar />
+            {/* Conditional Bottom Navigation Bar based on user role */}
+            {userRole === 'Admin' ? (
+                <BottomNavBarInspection currentScreen="DonationDetails" />
+            ) : (
+                <BottomNavBar />
+            )}
         </View>
     );
 };
@@ -59,7 +83,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#fff',
-        padding: 10 // Ensure space for the BottomNavBar
+        padding: 10,  // Ensure space for the BottomNavBar
     },
     title: {
         fontSize: 24,

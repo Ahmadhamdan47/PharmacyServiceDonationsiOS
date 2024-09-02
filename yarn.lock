@@ -2954,6 +2954,11 @@
   dependencies:
     merge-options "^3.0.4"
 
+"@react-native-community/checkbox@^0.5.17":
+  version "0.5.17"
+  resolved "https://registry.npmjs.org/@react-native-community/checkbox/-/checkbox-0.5.17.tgz"
+  integrity sha512-ZZx/eOH3SIxBg+hvA2zRd7lX5zPQEWcZU8C8Dn7WLdpJkiTkPmIUDFHWrmzxCnwZcyoD+BIt6gUZPKGGb9WmeQ==
+
 "@react-native-community/cli-clean@13.6.8":
   version "13.6.8"
   resolved "https://registry.npmjs.org/@react-native-community/cli-clean/-/cli-clean-13.6.8.tgz"
@@ -3109,7 +3114,14 @@
     prompts "^2.4.2"
     semver "^7.5.2"
 
-"@react-native-picker/picker@2.7.5":
+"@react-native-community/datetimepicker@^8.2.0":
+  version "8.2.0"
+  resolved "https://registry.npmjs.org/@react-native-community/datetimepicker/-/datetimepicker-8.2.0.tgz"
+  integrity sha512-qrUPhiBvKGuG9Y+vOqsc56RPFcHa1SU2qbAMT0hfGkoFIj3FodE0VuPVrEa8fgy7kcD5NQmkZIKgHOBLV0+hWg==
+  dependencies:
+    invariant "^2.2.4"
+
+"@react-native-picker/picker@^2.7.5":
   version "2.7.5"
   resolved "https://registry.npmjs.org/@react-native-picker/picker/-/picker-2.7.5.tgz"
   integrity sha512-vhMaOLkXSUb+YKVbukMJToU4g+89VMhBG2U9+cLYF8X8HtFRidrHjohGqT8/OyesDuKIXeLIP+UFYI9Q9CRA9Q==
@@ -7317,7 +7329,7 @@ expo-updates@~0.25.16:
     ignore "^5.3.1"
     resolve-from "^5.0.0"
 
-expo@*, expo@~51.0.8:
+expo@*, expo@>=50.0.0, expo@~51.0.8:
   version "51.0.11"
   resolved "https://registry.npmjs.org/expo/-/expo-51.0.11.tgz"
   integrity sha512-pLfYLLy1QB7Y5PXUuzblVwG+KvUJzAuLqv5lKuoHdX78VUy8Ezv9geSS/mKCN+C88btGLV4NHNo56RvVAnpgwg==
@@ -12090,7 +12102,7 @@ react-native-vector-icons@^10.1.0:
     prop-types "^15.7.2"
     yargs "^16.1.1"
 
-react-native@*, "react-native@^0.0.0-0 || >=0.60 <1.0", react-native@0.74.2:
+react-native@*, "react-native@^0.0.0-0 || >=0.60 <1.0", "react-native@>= 0.62", react-native@0.74.2:
   version "0.74.2"
   resolved "https://registry.npmjs.org/react-native/-/react-native-0.74.2.tgz"
   integrity sha512-EBMBjPPL4/GjHMP4NqsZabT3gI5WU9cSmduABGAGrd8uIcmTZ5F2Ng9k6gFmRm7n8e8CULxDNu98ZpQfBjl7Bw==

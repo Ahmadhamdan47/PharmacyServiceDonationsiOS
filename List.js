@@ -1,203 +1,436 @@
-import React, { useEffect, useState } from 'react';
-import { ScrollView, View, TouchableOpacity, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { Table, Row, Rows } from 'react-native-table-component';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import axios from 'axios';
+import BottomNavBarInspection from './BottomNavBarInspection';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
-import { BackHandler } from 'react-native';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import XLSX from 'xlsx';
 
-const ListDonations = () => {
-    const [tableHead] = useState(['Donation Code', 'Donor Name', 'Recipient Name', 'Drug Name', 'GTIN', 'LOT', 'Serial Number', 'Expiry Date', 'Form', 'Presentation', 'Owner', 'Country']);
-    const [tableData, setTableData] = useState([]);
-    const [allData, setAllData] = useState([]);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage] = useState(25);
-    const [loading, setLoading] = useState(false);
+const List = () => {
+    const [donations, setDonations] = useState([]);
+    const [donors, setDonors] = useState([]);
+    const [recipients, setRecipients] = useState([]);
+    const [donorId, setDonorId] = useState('');
+    const [recipientId, setRecipientId] = useState('');
+    const [status, setStatus] = useState('');
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
+    const [showDonorPicker, setShowDonorPicker] = useState(false);
+    const [showRecipientPicker, setShowRecipientPicker] = useState(false);
+    const [showStatusPicker, setShowStatusPicker] = useState(false);
+    const [showFromDatePicker, setShowFromDatePicker] = useState(false);
+    const [showToDatePicker, setShowToDatePicker] = useState(false);
+    const [username, setUsername] = useState('');
+    const scrollViewRef = useRef(null);
+
     const navigation = useNavigation();
 
     useEffect(() => {
-        const backAction = () => {
-            navigation.navigate('AdminLanding');
-            return true; // This will prevent the app from exiting
-        };
-
-        const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
-
-        fetchAllDonations();
-
-        return () => backHandler.remove(); // Clean up the event listener on component unmount
+        fetchDonors();
+        fetchRecipients();
+        getUsername();
     }, []);
 
-    const fetchAllDonations = async () => {
-        setLoading(true);
+    useEffect(() => {
+        navigation.setOptions({
+            headerTitle: '',
+            headerLeft: null,
+            headerRight: () => (
+                <View style={styles.profileContainer}>
+                    <View style={styles.circle}>
+                        <Text style={styles.circleText}>{username.charAt(0).toUpperCase()}</Text>
+                    </View>
+                    <Text style={styles.profileText}>{username}</Text>
+                </View>
+            ),
+            headerTitleAlign: 'left',
+        });
+    }, [navigation, username]);
+
+    const getUsername = async () => {
         try {
-            const response = await axios.get("https://apiv2.medleb.org/donation/all");
-            const formattedData = response.data.flatMap(item =>
-                item.BatchLotTrackings.map(batchLot => [
-                    item.DonationId || 'N/A',
-                    item.DonorName || 'N/A',
-                    item.RecipientName || 'N/A',
-                    batchLot.DrugName || 'N/A',
-                    batchLot.GTIN || 'N/A',
-                    batchLot.BatchNumber || 'N/A',
-                    batchLot.SerialNumber || 'N/A',
-                    batchLot.ExpiryDate || 'N/A',
-                    batchLot.Form || 'N/A',
-                    batchLot.Presentation || 'N/A',
-                    batchLot.Laboratory || 'N/A',
-                    batchLot.LaboratoryCountry || 'N/A',
-                ])
-            ).filter(row => !row.includes('N/A'));
-            setAllData(formattedData);
-            setTableData(formattedData.slice(0, itemsPerPage));
-        } catch (error) {
-            console.error("Error fetching donations:", error);
-            Alert.alert("Error", "Failed to load donations.");
-        }
-        setLoading(false);
-    };
-
-    const handleNextPage = () => {
-        const nextPage = currentPage + 1;
-        const totalPages = Math.ceil(allData.length / itemsPerPage);
-        if (nextPage <= totalPages) {
-            setCurrentPage(nextPage);
-            const startIndex = (nextPage - 1) * itemsPerPage;
-            setTableData(allData.slice(startIndex, startIndex + itemsPerPage));
-        }
-    };
-
-    const handlePreviousPage = () => {
-        const previousPage = currentPage - 1;
-        if (previousPage > 0) {
-            setCurrentPage(previousPage);
-            const startIndex = (previousPage - 1) * itemsPerPage;
-            setTableData(allData.slice(startIndex, startIndex + itemsPerPage));
-        }
-    };
-
-    const exportToExcel = async () => {
-        setLoading(true);
-        try {
-            const filteredData = allData.filter(row => !row.includes('N/A')); // Filter out rows with 'N/A' fields
-            const ws = XLSX.utils.aoa_to_sheet([tableHead, ...filteredData]);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Donations");
-
-            // Set column widths for better readability
-            const wscols = [
-                { wch: 15 }, // Donation ID
-                { wch: 20 }, // Donor Name
-                { wch: 20 }, // Recipient Name
-                { wch: 20 }, // Drug Name
-                { wch: 20 }, // GTIN
-                { wch: 15 }, // LOT
-                { wch: 20 }, // Serial Number
-                { wch: 15 }, // Expiry Date
-                { wch: 15 }, // Form
-                { wch: 20 }, // Presentation
-                { wch: 15 }, // Owner
-                { wch: 15 }, // Country
-            ];
-            ws['!cols'] = wscols;
-
-            // Apply number formatting for the GTIN and Serial Number columns
-            ws['!ref'] = XLSX.utils.encode_range({ s: { c: 0, r: 0 }, e: { c: tableHead.length - 1, r: filteredData.length } });
-            for (let R = 1; R <= filteredData.length; ++R) {
-                ws[XLSX.utils.encode_cell({ c: 4, r: R })].t = 's'; // GTIN column
-                ws[XLSX.utils.encode_cell({ c: 6, r: R })].t = 's'; // Serial Number column
+            const storedUsername = await AsyncStorage.getItem('username');
+            if (storedUsername) {
+                setUsername(storedUsername);
             }
+        } catch (error) {
+            console.error('Failed to load username:', error);
+        }
+    };
 
-            const wbout = XLSX.write(wb, { type: 'base64', bookType: "xlsx" });
+    const fetchDonations = async () => {
+        setDonations([]);
 
-            const uri = FileSystem.documentDirectory + 'donations.xlsx';
-            await FileSystem.writeAsStringAsync(uri, wbout, {
-                encoding: FileSystem.EncodingType.Base64
+        try {
+            const response = await axios.get('https://apiv2.medleb.org/donation/filtered', {
+                params: {
+                    donorId,
+                    recipientId,
+                    status,
+                    fromDate,
+                    toDate,
+                },
             });
 
-            const shareOptions = {
-                mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                dialogTitle: 'Share Donations Excel',
-                UTI: 'com.microsoft.excel.xlsx',
-            };
-
-            if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(uri, shareOptions);
+            if (Array.isArray(response.data)) {
+                setDonations(response.data);
             } else {
-                Alert.alert("Success", "Excel file has been saved to your device's storage.", [{ text: "OK" }]);
+                console.error('Unexpected response structure:', response.data);
+                setDonations([]);
             }
         } catch (error) {
-            console.error("Error exporting to Excel:", error);
-            Alert.alert("Error", "Failed to export to Excel. Please try again.", [{ text: "OK" }]);
+            console.error('Error fetching donations:', error);
+            setDonations([]);
         }
-        setLoading(false);
     };
 
-    return (
-        <View style={styles.fullContainer}>
-            {loading ? (
-                <ActivityIndicator size="large" color="#0000ff" />
-            ) : (
-                <ScrollView horizontal style={styles.container}>
-                    <ScrollView>
-                        <Table borderStyle={{ borderWidth: 2, borderColor: '#c8e1ff' }}>
-                            <Row data={tableHead} style={styles.head} textStyle={styles.text} widthArr={[120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120]} />
-                            <Rows data={tableData} textStyle={styles.text} widthArr={[120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120]} />
-                        </Table>
-                    </ScrollView>
-                </ScrollView>
-            )}
-            <View style={styles.buttonContainer}>
-                <TouchableOpacity onPress={handlePreviousPage} style={styles.button}>
-                    <Text style={styles.buttonText}>Previous</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleNextPage} style={styles.button}>
-                    <Text style={styles.buttonText}>Next</Text>
-                </TouchableOpacity>
+    const fetchDonors = async () => {
+        try {
+            const response = await axios.get('https://apiv2.medleb.org/donor/all');
+            setDonors(response.data);
+        } catch (error) {
+            console.error('Error fetching donors:', error);
+        }
+    };
+
+    const fetchRecipients = async () => {
+        try {
+            const response = await axios.get('https://apiv2.medleb.org/recipient/all');
+            setRecipients(response.data);
+        } catch (error) {
+            console.error('Error fetching recipients:', error);
+        }
+    };
+
+    const handleDateSelect = (type, date) => {
+        if (type === 'from') {
+            setFromDate(date);
+        } else {
+            setToDate(date);
+        }
+    };
+
+    const renderDatePicker = (type) => {
+        const today = new Date();
+        let dates = [];
+        for (let i = 0; i < 30; i++) {
+            const date = new Date(today);
+            date.setDate(today.getDate() + i);
+            dates.push(date.toISOString().split('T')[0]);
+        }
+
+        return (
+            <View style={styles.datePicker}>
+                {dates.map((date) => (
+                    <TouchableOpacity key={date} onPress={() => handleDateSelect(type, date)}>
+                        <Text style={styles.dateText}>{date}</Text>
+                    </TouchableOpacity>
+                ))}
             </View>
-            <TouchableOpacity onPress={exportToExcel} style={styles.button}>
-                <Text style={styles.buttonText}>Export to Excel</Text>
-            </TouchableOpacity>
+        );
+    };
+
+    const getStatusColor = (status) => {
+        switch (status.toLowerCase()) {
+            case 'pending':
+                return 'orange';
+            case 'approved':
+                return 'green';
+            case 'inspect':
+                return 'red';
+            default:
+                return 'black';
+        }
+    };
+
+    const handleDropdownOpen = (dropdownRef) => {
+        setTimeout(() => {
+            if (dropdownRef && scrollViewRef.current) {
+                dropdownRef.measureLayout(
+                    scrollViewRef.current,
+                    (x, y) => {
+                        scrollViewRef.current.scrollTo({ y: y - 20, animated: true });
+                    },
+                    () => {}
+                );
+            }
+        }, 100);
+    };
+
+    let donorDropdownRef;
+    let recipientDropdownRef;
+    let statusDropdownRef;
+
+    return (
+        <View style={styles.container}>
+            <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+                {/* Filters Section */}
+                <View style={styles.filterRow}>
+                    {/* Donor Dropdown */}
+                    <TouchableOpacity 
+                        onPress={() => {
+                            setShowDonorPicker(!showDonorPicker);
+                            handleDropdownOpen(donorDropdownRef);
+                        }} 
+                        style={styles.filterButton}
+                        ref={ref => donorDropdownRef = ref}
+                    >
+                        <Text style={styles.filterText}>{donors.find(d => d.DonorId === donorId)?.DonorName || 'Donor'}</Text>
+                    </TouchableOpacity>
+                    {showDonorPicker && (
+                        <View style={styles.dropdown}>
+                            <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
+                                {donors.map((d) => (
+                                    <TouchableOpacity key={d.DonorId} onPress={() => { 
+                                        setDonorId(d.DonorId); 
+                                        setShowDonorPicker(false); 
+                                    }}>
+                                        <Text style={styles.dropdownText}>{d.DonorName}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </View>
+                    )}
+
+                    {/* Recipient Dropdown */}
+                    <TouchableOpacity 
+                        onPress={() => {
+                            setShowRecipientPicker(!showRecipientPicker);
+                            handleDropdownOpen(recipientDropdownRef);
+                        }} 
+                        style={styles.filterButton}
+                        ref={ref => recipientDropdownRef = ref}
+                    >
+                        <Text style={styles.filterText}>{recipients.find(r => r.RecipientId === recipientId)?.RecipientName || 'Recipient'}</Text>
+                    </TouchableOpacity>
+                    {showRecipientPicker && (
+                        <View style={styles.dropdown}>
+                            <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
+                                {recipients.map((r) => (
+                                    <TouchableOpacity key={r.RecipientId} onPress={() => { 
+                                        setRecipientId(r.RecipientId); 
+                                        setShowRecipientPicker(false); 
+                                    }}>
+                                        <Text style={styles.dropdownText}>{r.RecipientName}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </View>
+                    )}
+
+                    {/* Status Dropdown */}
+                    <TouchableOpacity 
+                        onPress={() => {
+                            setShowStatusPicker(!showStatusPicker);
+                            handleDropdownOpen(statusDropdownRef);
+                        }} 
+                        style={styles.filterButton}
+                        ref={ref => statusDropdownRef = ref}
+                    >
+                        <Text style={styles.filterText}>{status || 'Status'}</Text>
+                    </TouchableOpacity>
+                    {showStatusPicker && (
+                        <View style={styles.dropdown}>
+                            <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
+                                {['Pending', 'Approved', 'Inspect'].map((s) => (
+                                    <TouchableOpacity key={s} onPress={() => { 
+                                        setStatus(s); 
+                                        setShowStatusPicker(false); 
+                                    }}>
+                                        <Text style={styles.dropdownText}>{s}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </View>
+                    )}
+                </View>
+
+                {/* Date Pickers Row */}
+                <View style={styles.dateRow}>
+                    <TouchableOpacity onPress={() => setShowFromDatePicker(!showFromDatePicker)} style={styles.datePickerButton}>
+                        <Text style={styles.filterText}>From {fromDate || 'Select'}</Text>
+                    </TouchableOpacity>
+                    {showFromDatePicker && renderDatePicker('from')}
+
+                    <TouchableOpacity onPress={() => setShowToDatePicker(!showToDatePicker)} style={styles.datePickerButton}>
+                        <Text style={styles.filterText}>To {toDate || 'Select'}</Text>
+                    </TouchableOpacity>
+                    {showToDatePicker && renderDatePicker('to')}
+                </View>
+
+                {/* Filter Button */}
+                <TouchableOpacity style={styles.filterButton} onPress={fetchDonations}>
+                    <Text style={styles.filterButtonText}>Filter</Text>
+                </TouchableOpacity>
+
+                {/* Results Count */}
+                <Text style={styles.resultCount}>number of result(s): {donations.length}</Text>
+
+                {/* Donations List */}
+                <ScrollView>
+                    {donations.map((donation, index) => (
+                        <TouchableOpacity 
+                            key={index} 
+                            style={styles.card} 
+                            onPress={() => navigation.navigate('DonationDetails', { donation })}
+                        >
+                            <View style={styles.cardHeader}>
+                                <Text style={[styles.statusText, { color: getStatusColor(donation.status) }]}>{donation.status}</Text>
+                            </View>
+                            <View style={styles.cardContent}>
+                                <Text style={styles.cardTitle}>Donation Title: {donation.DonationTitle}</Text>
+                                <Text style={styles.cardText}>From: {donation.DonorName}</Text>
+                                <Text style={styles.cardText}>To: {donation.RecipientName}</Text>
+                                <Text style={styles.cardText}>Date: {donation.DonationDate}</Text>
+                                <Text style={styles.cardText}>nb of box(es): {donation.NumberOfBoxes || 0}</Text>
+                            </View>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+            </ScrollView>
+
+            {/* Bottom Navigation Bar */}
+            <BottomNavBarInspection currentScreen="List" />
         </View>
     );
 };
 
 const styles = StyleSheet.create({
-    fullContainer: {
-        flex: 1,
-        paddingTop: 30,
-        backgroundColor: '#fff'
-    },
     container: {
         flex: 1,
-        padding: 16,
+        backgroundColor: '#fff',
     },
-    head: {
-        height: 40,
-        backgroundColor: '#f1f8ff',
+    scrollView: {
+        flex: 1,
     },
-    text: {
-        margin: 6,
-        fontSize: 10,
-        color: 'black'
+    contentContainer: {
+        paddingBottom: 80,
     },
-    buttonContainer: {
+    headerContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
-        marginBottom: 5
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        marginBottom: 10,
     },
-    button: {
-        padding: 5,
-        margin: 5,
-        backgroundColor: 'green',
+    profileContainer: {
+        alignItems: 'center',
+        flexDirection: 'row',
+        marginRight: 10,
+    },
+    circle: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        borderWidth: 2,
+        borderColor: '#00A651',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 5,
+    },
+    circleText: {
+        fontSize: 16,
+        color: '#00A651',
+        fontWeight: 'bold',
+    },
+    profileText: {
+        fontSize: 14,
+        color: '#000',
+    },
+    filterRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    filterButton: {
+        borderColor: '#00A651',
+        borderWidth: 1,
+        borderRadius: 20,
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        flex: 1,
+        marginHorizontal: 5,
+        alignItems: 'center',
+        position: 'relative',
+        zIndex: 1,
+    },
+    dateRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    datePickerButton: {
+        flex: 1,
+        borderColor: '#00A651',
+        borderWidth: 1,
+        borderRadius: 20,
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        marginHorizontal: 5,
+        alignItems: 'center',
+        position: 'relative',
+        zIndex: 1,
+    },
+    filterText: {
+        fontSize: 14,
+        color: '#00A651',
+    },
+    dropdown: {
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#ccc',
         borderRadius: 5,
+        marginTop: 5,
+        position: 'absolute',
+        width: '100%',
+        maxHeight: 120, // Limit height for scrolling
+        zIndex: 10,
     },
-    buttonText: {
-        color: 'white',
+    dropdownScroll: {
+        maxHeight: 120, // Set max height for scrolling
+    },
+    dropdownText: {
+        fontSize: 14,
+        padding: 10,
+    },
+    filterButtonText: {
+        color: '#00A651',
+        fontSize: 16,
+    },
+    resultCount: {
         textAlign: 'center',
+        marginVertical: 10,
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    card: {
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#00A651',
+        borderRadius: 8,
+        padding: 15,
+        marginVertical: 10,
+    },
+    statusText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        textAlign: 'left',
+        marginBottom: 5,
+    },
+    cardContent: {
+        marginTop: 5,
+    },
+    cardTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginBottom: 5,
+    },
+    cardText: {
+        fontSize: 14,
+        color: '#333',
+        marginBottom: 5,
+    },
+    navBarContainer: {
+        paddingBottom: 10,
     },
 });
 
-export default ListDonations;
+export default List;

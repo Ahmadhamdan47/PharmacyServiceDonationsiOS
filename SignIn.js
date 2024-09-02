@@ -20,6 +20,8 @@ const SignIn = () => {
                 // Store the token and username
                 await AsyncStorage.setItem('token', token);
                 await AsyncStorage.setItem('username', username);
+                await AsyncStorage.setItem('userRole', role);  // Store the user role
+
     
                 if (role === 'Admin') {
                     navigation.navigate('AdminLanding');

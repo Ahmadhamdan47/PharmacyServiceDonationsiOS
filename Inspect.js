@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Keyboard, BackHandler } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, Alert, StyleSheet, Keyboard, BackHandler } from 'react-native';
 import { Camera } from 'expo-camera';
 import { BarCodeScanner } from 'expo-barcode-scanner';
 import { CameraType } from 'expo-camera/build/legacy/Camera.types';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomNavBarInspection
 
 const Inspect = () => {
     const navigation = useNavigation();
@@ -14,17 +16,44 @@ const Inspect = () => {
     const [type, setType] = useState(CameraType.back);
     const [permission, setPermission] = useState(null);
     const [isInputFocused, setIsInputFocused] = useState(false);
-    const [scrollPosition, setScrollPosition] = useState(0);
     const [validationErrors, setValidationErrors] = useState({});
-    const [isFormValid, setIsFormValid] = useState(false);
     const [inspectionMessage, setInspectionMessage] = useState('');
+    const [username, setUsername] = useState('');
+    const [selectedOption, setSelectedOption] = useState('Packs'); // Default to 'Packs'
 
     useEffect(() => {
         (async () => {
             const { status } = await Camera.requestCameraPermissionsAsync();
             setPermission(status === 'granted');
         })();
+
+        const getUsername = async () => {
+            try {
+                const storedUsername = await AsyncStorage.getItem('username');
+                if (storedUsername) {
+                    setUsername(storedUsername);
+                }
+            } catch (error) {
+                console.error('Failed to load username:', error);
+            }
+        };
+
+        getUsername();
     }, []);
+
+    useEffect(() => {
+        navigation.setOptions({
+            headerRight: () => (
+                <View style={styles.profileContainer}>
+                    <View style={styles.circle}>
+                        <Text style={styles.circleText}>{username.charAt(0).toUpperCase()}</Text>
+                    </View>
+                    <Text style={styles.profileText}>{username}</Text>
+                </View>
+            ),
+            headerTitleAlign: 'center',
+        });
+    }, [navigation, username]);
 
     useEffect(() => {
         const keyboardDidHideListener = Keyboard.addListener(
@@ -50,46 +79,45 @@ const Inspect = () => {
             'Confirm Exit',
             'Are you sure you want to go back?',
             [
-                {
-                    text: 'Cancel',
-                    style: 'cancel',
-                },
-                {
-                    text: 'Yes',
-                    onPress: () => navigation.navigate('AdminLanding'),
-                },
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Yes', onPress: () => navigation.navigate('AdminLanding') },
             ],
             { cancelable: false }
         );
     };
 
-    const handleBarcodeDetected = ({ type, data }) => {
+    const handleBarcodeDetected = async ({ type, data }) => {
         try {
-            const response = extractDataMatrix(data);
-            const updatedBatchLot = {
-                ...batchLot,
-                gtin: response.gtin,
-                lotNumber: response.lot,
-                expiryDate: response.exp ? response.exp.toISOString().split('T')[0] : '',
-                serialNumber: response.sn,
-            };
-
-            setBatchLot(updatedBatchLot);
-            setIsCameraOpen(false);
-
-            setTimeout(() => {
-                const currentRef = batchLotRefs.current[0];
-                if (currentRef) {
-                    currentRef.measureLayout(scrollViewRef.current, (x, y) => {
-                        scrollViewRef.current.scrollTo({ y, animated: true });
-                    });
-                }
-            }, 100);
+            if (selectedOption === 'Packs') {
+                // Existing logic for Packs
+                const response = extractDataMatrix(data);
+                const updatedBatchLot = {
+                    ...batchLot,
+                    gtin: response.gtin,
+                    lotNumber: response.lot,
+                    expiryDate: response.exp ? response.exp.toISOString().split('T')[0] : '',
+                    serialNumber: response.sn,
+                };
+    
+                setBatchLot(updatedBatchLot);
+                setIsCameraOpen(false);
+    
+                // Automatically call CheckMate API after extracting data
+                await handleInspect(updatedBatchLot);
+    
+            } else if (selectedOption === 'Boxes') {
+                // New logic for Boxes
+                const boxId = data; // Assuming the barcode only contains the BoxId
+                setIsCameraOpen(false);
+                
+                // Directly navigate to BoxInspection passing the BoxId
+                navigation.navigate('BoxInspection', { boxId });
+            }
         } catch (error) {
-            console.error("Error parsing scanned data:", error);
+            console.error("Error processing scanned data:", error);
         }
     };
-
+    
     const extractDataMatrix = (code) => {
         const response = { gtin: '', lot: '', sn: '', exp: null };
         let responseCode = code;
@@ -167,18 +195,11 @@ const Inspect = () => {
         }
     };
 
-    const handleFieldChange = (field, value) => {
-        setBatchLot(prevBatchLot => ({
-            ...prevBatchLot,
-            [field]: value
-        }));
-    };
-
-    const validateFields = () => {
+    const validateFields = (batchLotData) => {
         const errors = {};
         const requiredFields = ['gtin', 'lotNumber', 'expiryDate', 'serialNumber'];
         requiredFields.forEach(field => {
-            if (!batchLot[field] || batchLot[field].trim() === '') {
+            if (!batchLotData[field] || batchLotData[field].trim() === '') {
                 errors[field] = 'This field is required';
             }
         });
@@ -186,8 +207,8 @@ const Inspect = () => {
         return Object.keys(errors).length === 0;
     };
 
-    const handleInspect = async () => {
-        if (!validateFields()) {
+    const handleInspect = async (batchLotData) => {
+        if (!validateFields(batchLotData)) {
             return;
         }
         try {
@@ -197,10 +218,10 @@ const Inspect = () => {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    GTIN: batchLot.gtin,
-                    BatchNumber: batchLot.lotNumber,
-                    SerialNumber: batchLot.serialNumber,
-                    ExpiryDate: batchLot.expiryDate
+                    GTIN: batchLotData.gtin,
+                    BatchNumber: batchLotData.lotNumber,
+                    SerialNumber: batchLotData.serialNumber,
+                    ExpiryDate: batchLotData.expiryDate
                 }),
             });
 
@@ -211,16 +232,86 @@ const Inspect = () => {
 
             const data = await response.json();
             setInspectionMessage(data.message.messageEN || 'Inspection successful.');
+
+            if (response.ok && data.message.isValid && data.message.batchLot) {
+                // Fetch the BoxLabel using the BoxId
+                const boxLabel = await fetchBoxLabel(data.message.batchLot.BoxId);
+                const donationId = await fetchDonationId(data.message.batchLot.BoxId)
+                console.log(data.message.batchLot.BatchLotId);
+                // Navigate to PackInspection with the batch and box information
+                navigation.navigate('PackInspection', {
+                    batchLot: { 
+                        ...batchLotData, 
+                        drugName: data.message.batchLot.DrugName,
+                        donationId:donationId,
+                        form: data.message.batchLot.Form,
+                        presentation: data.message.batchLot.Presentation,
+                        quantity: data.message.batchLot.Quantity,
+                        owner: data.message.batchLot.Laboratory,
+                        country: data.message.batchLot.LaboratoryCountry,
+                        boxId: data.message.batchLot.BoxId,
+                        boxLabel: boxLabel,
+                        batchLotId: data.message.batchLot.BatchLotId
+                    }
+                });
+            }
         } catch (error) {
             setInspectionMessage(error.message);
         }
     };
 
+    // Function to fetch the BoxLabel using BoxId
+    const fetchBoxLabel = async (boxId) => {
+        try {
+            const response = await fetch(`https://apiv2.medleb.org/boxes/${boxId}`);
+            
+            // Log the full response for debugging
+            console.log('Full response:', response);
+    
+            // Check if the response is OK and in JSON format
+            const contentType = response.headers.get('content-type');
+            if (!response.ok || !contentType || !contentType.includes('application/json')) {
+                const textResponse = await response.text();  // Read the text response for debugging
+                console.error('Error: Response not JSON or not OK', textResponse);
+                throw new Error('Failed to fetch box label or response is not JSON');
+            }
+    
+            const data = await response.json();
+            console.log('JSON response data:', data);
+            return data.BoxLabel;
+        } catch (error) {
+            console.error('Error fetching box label:', error);
+            return '';
+        }
+    };
+    
+const fetchDonationId = async (boxId) => { try {
+        const response = await fetch(`https://apiv2.medleb.org/boxes/${boxId}`);
+        
+        // Log the full response for debugging
+        console.log('Full response:', response);
+
+        // Check if the response is OK and in JSON format
+        const contentType = response.headers.get('content-type');
+        if (!response.ok || !contentType || !contentType.includes('application/json')) {
+            const textResponse = await response.text();  // Read the text response for debugging
+            console.error('Error: Response not JSON or not OK', textResponse);
+            throw new Error('Failed to fetch Donation Id or response is not JSON');
+        }
+
+        const data = await response.json();
+        console.log('JSON response data:', data);
+        return data.DonationId;
+    } catch (error) {
+        console.error('Error fetching Donation ID:', error);
+        return '';
+    }
+};
     return (
         <View style={styles.container}>
             {isCameraOpen ? (
                 <BarCodeScanner
-                    style={{ ...StyleSheet.absoluteFillObject, height: '100%' }}
+                    style={StyleSheet.absoluteFillObject}
                     type={type}
                     onBarCodeScanned={handleBarcodeDetected}
                 />
@@ -229,100 +320,29 @@ const Inspect = () => {
                     ref={scrollViewRef}
                     onScroll={event => setScrollPosition(event.nativeEvent.contentOffset.y)}
                     scrollEventThrottle={16}
-                    contentContainerStyle={{ flexGrow: 1 }}
+                    contentContainerStyle={styles.scrollViewContainer}
                 >
-                    <View style={styles.originalFormContainer}>
-                        <TouchableOpacity onPress={() => handleOpenCamera()} activeOpacity={0.6} style={styles.cameraContainer} ref={el => batchLotRefs.current[0] = el}>
-                            {batchLot.gtin === '' && (
-                                <Image
-                                    source={require("./assets/2d.png")}
-                                    style={styles.cameraImage}
-                                />
-                            )}
-                        </TouchableOpacity>
-
-                        <View style={styles.barcodeContainer}>
-                            <TextInput
-                                style={[styles.input, validationErrors.gtin ? styles.inputError : null]}
-                                placeholder="GTIN"
-                                value={batchLot.gtin}
-                                onChangeText={text => handleFieldChange('gtin', text)}
-                                onFocus={() => setIsInputFocused(true)}
-                                onBlur={() => setIsInputFocused(false)}
-                            />
-                            {validationErrors.gtin && (
-                                <Text style={styles.errorMessage}>{validationErrors.gtin}</Text>
-                            )}
-
-                            <FieldLabel label="LOT Number" />
-                            <TextInput
-                                style={[styles.input, validationErrors.lotNumber ? styles.inputError : null]}
-                                placeholder="LOT Number"
-                                value={batchLot.lotNumber}
-                                onChangeText={text => handleFieldChange('lotNumber', text)}
-                                onFocus={() => setIsInputFocused(true)}
-                                onBlur={() => setIsInputFocused(false)}
-                            />
-                            {validationErrors.lotNumber && <Text style={styles.errorMessage}>{validationErrors.lotNumber}</Text>}
-
-                            <FieldLabel label="Expiry Date" />
-                            <TextInput
-                                style={[styles.input, validationErrors.expiryDate ? styles.inputError : null]}
-                                placeholder="Expiry Date"
-                                value={batchLot.expiryDate}
-                                onChangeText={text => handleFieldChange('expiryDate', text)}
-                                onFocus={() => setIsInputFocused(true)}
-                                onBlur={() => setIsInputFocused(false)}
-                            />
-                            {validationErrors.expiryDate && <Text style={styles.errorMessage}>{validationErrors.expiryDate}</Text>}
-
-                            <FieldLabel label="Serial Number" />
-                            <TextInput
-                                style={[styles.input, validationErrors.serialNumber ? styles.inputError : null]}
-                                placeholder="Serial Number"
-                                value={batchLot.serialNumber}
-                                onChangeText={text => handleFieldChange('serialNumber', text)}
-                                onFocus={() => setIsInputFocused(true)}
-                                onBlur={() => setIsInputFocused(false)}
-                            />
-                            {validationErrors.serialNumber && <Text style={styles.errorMessage}>{validationErrors.serialNumber}</Text>}
-                        </View>
-                    </View>
+                    {/* Dropdown Button */}
+                    <TouchableOpacity style={styles.dropdownButton} onPress={() => setSelectedOption(selectedOption === 'Packs' ? 'Boxes' : 'Packs')}>
+    <Text style={styles.dropdownButtonText}>{selectedOption}</Text>
+    <Text style={styles.dropdownArrow}>▼</Text>
+</TouchableOpacity>
+                    {/* Barcode Scanner Icon */}
+                    <TouchableOpacity onPress={handleOpenCamera} style={styles.cameraButton}>
+                        <Image source={require("./assets/2d.png")} style={styles.cameraImage} />
+                    </TouchableOpacity>
 
                     {inspectionMessage !== '' && (
                         <View style={styles.inspectionMessageContainer}>
                             <Text style={styles.inspectionMessage}>{inspectionMessage}</Text>
                         </View>
                     )}
-
-                    <View style={styles.buttonContainer}>
-                        <TouchableOpacity style={styles.button} onPress={handleInspect}>
-                            <Text style={styles.buttonText}>Inspect</Text>
-                        </TouchableOpacity>
-                    </View>
                 </ScrollView>
             )}
+
+            {/* Bottom Navigation Bar */}
             {!isCameraOpen && !isInputFocused && (
-                <View style={styles.taskBar}>
-                    <TouchableOpacity onPress={() => navigation.navigate('AdminLanding')}>
-                        <Image
-                            source={require("./assets/home.png")}
-                            style={styles.taskBarButton}
-                        />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => navigation.navigate('List')}>
-                        <Image
-                            source={require("./assets/list.png")}
-                            style={styles.taskBarButton}
-                        />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => navigation.navigate('Inspect')}>
-                        <Image
-                            source={require("./assets/donate.png")}
-                            style={styles.taskBarButtonInspect}
-                        />
-                    </TouchableOpacity>
-                </View>
+                <BottomNavBarInspection currentScreen="Inspect" />
             )}
         </View>
     );
@@ -335,128 +355,74 @@ const createEmptyBatchLot = () => ({
     serialNumber: '',
 });
 
-const FieldLabel = ({ label }) => (
-    <Text style={styles.fieldLabel}>{label}</Text>
-);
-
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        padding: 20,
-        backgroundColor: '#f0f0f0',
-    },
-    cameraContainer: {
-        marginBottom: 20,
-        alignItems: 'center',
-        width: '100%',
-    },
-    cameraImage: {
-        width: 280,
-        height: 140,
-        resizeMode: "contain",
-    },
-    barcodeContainer: {
-        marginBottom: 20,
-    },
-    barcodeInputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        position: 'relative',
-    },
-    barcodeIcon: {
-        position: 'absolute',
-        right: -20,
-        top: -5,
-        height: 50,
-        width: 50,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    barcodeImage: {
-        width: '100%',
-        height: '100%',
-        resizeMode: "contain",
-    },
-    fieldLabel: {
-        color: '#707070',
-        fontSize: 16,
-        marginBottom: 5,
-        marginLeft: 20,
-    },
-    input: {
-        borderWidth: 1,
-        borderColor: '#00a651',
-        borderRadius: 20,
-        paddingVertical: 10,
-        paddingHorizontal: 15,
-        marginBottom: 15,
-        height: 50,
-        width: '90%',
-        alignSelf: 'center',
         backgroundColor: '#fff',
     },
-    inputError: {
-        borderColor: 'red',
-    },
-    errorMessage: {
-        color: 'red',
-        marginLeft: 20,
-        marginBottom: 10,
-    },
-    separator: {
-        height: 2,
-        backgroundColor: '#ccc',
-        width: '100%',
-        marginBottom: 20,
-    },
-    detailsContainer: {
-        padding: 20,
-    },
-    header: {
-        fontSize: 18,
-        color: '#00a651',
-        fontWeight: 'bold',
-        marginBottom: 10,
-        alignSelf: 'center',
-    },
-    buttonContainer: {
-        marginHorizontal: 20,
-        marginBottom: 20,
-    },
-    button: {
-        backgroundColor: '#00a651',
-        paddingVertical: 15,
-        paddingHorizontal: 30,
-        borderRadius: 25,
-        width: '90%',
-        alignSelf: 'center',
+    scrollViewContainer: {
+        flexGrow: 1,
+        justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 20,
+        paddingVertical: 20,
     },
-    buttonText: {
-        color: 'white',
-        fontWeight: 'bold',
-        fontSize: 18,
+    profileContainer: {
+        alignItems: 'center',
+        marginRight: 15,
     },
-    taskBar: {
-        marginTop: 10,
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        width: '100%',
-        position: 'absolute',
-        bottom: '2%',
-        backgroundColor: '#f0f0f0',
-    },
-    taskBarButton: {
-        width: 25,
-        height: 25,
-        resizeMode: "contain",
-        marginTop: 6,
-    },
-    taskBarButtonInspect: {
+    circle: {
         width: 30,
         height: 30,
-        resizeMode: "contain",
+        borderRadius: 15,
+        borderWidth: 2,
+        borderColor: '#00A651',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 5,
+    },
+    circleText: {
+        fontSize: 16,
+        color: '#00A651',
+        fontWeight: 'bold',
+    },
+    profileText: {
+        fontSize: 14,
+        color: '#000',
+        fontWeight: 'bold',
+    },
+    dropdownButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#00A651',
+        borderRadius: 20,
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        marginTop: 10,
+        marginBottom: 20,
+    },
+    dropdownButtonText: {
+        fontSize: 16,
+        color: '#00A651',
+        fontWeight: 'bold',
+    },
+    dropdownArrow: {
+        marginLeft: 10,
+        fontSize: 16,
+        color: '#00A651',
+    },
+    cameraButton: {
+        alignItems: 'center',
+        marginBottom: 20,
+        overflow: 'visible',
+    },
+    cameraImage: {
+        width: 200,
+        height: 200,
+        resizeMode: 'contain',
+        marginBottom: 150,
     },
     inspectionMessageContainer: {
         marginTop: 20,
@@ -464,7 +430,7 @@ const styles = StyleSheet.create({
     },
     inspectionMessage: {
         fontSize: 18,
-        color: '#00a651',
+        color: '#00A651',
         textAlign: 'center',
         marginHorizontal: 20,
     },
