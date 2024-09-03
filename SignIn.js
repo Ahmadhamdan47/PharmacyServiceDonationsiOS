@@ -13,20 +13,35 @@ const SignIn = () => {
         try {
             const response = await axios.post('https://apiv2.medleb.org/users/login', { username, password });
             if (response.data.token) {
-                const { token, role } = response.data;
+                const { token, role, donorData } = response.data;
                 console.log('Response Data:', response.data);
                 console.log('User role:', role);
+                console.log('Status:', donorData ? donorData.IsActive : null);
     
-                // Store the token and username
+                // Store the token, username, and user role
                 await AsyncStorage.setItem('token', token);
                 await AsyncStorage.setItem('username', username);
-                await AsyncStorage.setItem('userRole', role);  // Store the user role
-
+                await AsyncStorage.setItem('userRole', role); 
     
                 if (role === 'Admin') {
                     navigation.navigate('AdminLanding');
                 } else if (role === 'Donor') {
-                    navigation.navigate('DonorLanding');
+                    if (donorData) {
+                        if (donorData.IsActive === true) {
+                            // Convert boolean to string before storing in AsyncStorage
+                            await AsyncStorage.setItem('status', 'true');
+                            // Navigate to DonorLanding
+                            navigation.navigate('DonorLanding');
+                        } else if (donorData.IsActive === false) {
+                            await AsyncStorage.setItem('status', 'false');
+                            Alert.alert('Account Banned', 'Your account has been banned. Please contact support.');
+                        } else if (donorData.IsActive === null) {
+                            await AsyncStorage.setItem('status', 'null');
+                            Alert.alert('Account Not Validated', 'Your account is still not validated.');
+                        }
+                    } else {
+                        Alert.alert('Error', 'No donor data found.');
+                    }
                 } else {
                     Alert.alert('Error', 'Invalid role');
                 }
@@ -38,6 +53,7 @@ const SignIn = () => {
             Alert.alert('Error', 'Failed to sign in');
         }
     };
+    
     return (
         <View style={styles.container}>
             <Image source={require('./assets/medleblogo.png')} style={styles.logo} />

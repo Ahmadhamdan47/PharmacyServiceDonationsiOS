@@ -367,18 +367,20 @@ const styles = StyleSheet.create({
         paddingVertical: 20,
     },
     profileContainer: {
+        marginTop:10,
+        flexDirection: 'column',
         alignItems: 'center',
-        marginRight: 15,
+        marginLeft: 'auto',
+        marginRight:5,
     },
     circle: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         borderWidth: 2,
         borderColor: '#00A651',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 5,
     },
     circleText: {
         fontSize: 16,
@@ -386,8 +388,8 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     profileText: {
-        fontSize: 14,
-        color: '#000',
+        fontSize: 10,
+        color: '#000',  // Changed to black
         fontWeight: 'bold',
     },
     dropdownButton: {

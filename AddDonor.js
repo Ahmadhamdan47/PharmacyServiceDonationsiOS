@@ -33,17 +33,23 @@ const AddDonor = () => {
 
   useEffect(() => {
     navigation.setOptions({
-      headerTitle: '',
-      headerRight: () => (
-        <View style={styles.profileContainer}>
-          <View style={styles.circle}>
-            <Text style={styles.circleText}>{donorName.charAt(0).toUpperCase()}</Text>
-          </View>
-          <Text style={styles.profileText}>{donorName}</Text>
-        </View>
-      ),
+        headerTitle: 'Donate',
+        headerLeft: () => (
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
+                <Text style={styles.backButtonText}>Back</Text>
+            </TouchableOpacity>
+        ),
+        headerRight: () => (
+            <View style={styles.profileContainer}>
+                <View style={styles.circle}>
+                    <Text style={styles.circleText}>{donorName.charAt(0).toUpperCase()}</Text>
+                </View>
+                <Text style={styles.profileText}>{donorName}</Text>
+            </View>
+        ),
+        headerTitleAlign: 'center',
     });
-  }, [navigation, donorName]);
+}, [navigation, donorName]);
 
   const fetchDonorNameAndId = async () => {
     try {
@@ -168,13 +174,17 @@ const AddDonor = () => {
 };
 
 const styles = StyleSheet.create({
+  header:{
+marginTop:10,
+  },
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#fff"
   },
   profileContainer: {
     alignItems: 'center',
     marginRight: 10,
+    marginTop:10
   },
   circle: {
     width: 40, // Increased size of the circle
@@ -184,7 +194,7 @@ const styles = StyleSheet.create({
     borderColor: '#00A651',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 5, // Space between the circle and the username
+    marginBottom: 1, // Space between the circle and the username
   },
   circleText: {
     fontSize: 20, // Increased font size for the circle text
@@ -193,12 +203,12 @@ const styles = StyleSheet.create({
   },
   profileText: {
     fontSize: 14,
-    color: '#00A651',
+    color: '#000',
     fontWeight: 'bold',
   },
   formContainer: {
     paddingHorizontal: 20,
-    paddingTop: 80,
+    paddingTop: 120,
     flex: 1,
   },
   label: {
@@ -255,6 +265,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 18,
   },
+  backButtonText: {
+    fontSize: 16,
+    color: '#000',
+    fontWeight: 'bold',
+    marginLeft: 10,
+},
 });
 
 export default AddDonor;

@@ -1,38 +1,37 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
-import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomNavBarInspection
 
-const List = () => {
-    const [donations, setDonations] = useState([]);
+const Validate = () => {
     const [donors, setDonors] = useState([]);
-    const [recipients, setRecipients] = useState([]);
-    const [donorId, setDonorId] = useState('');
-    const [recipientId, setRecipientId] = useState('');
-    const [status, setStatus] = useState('All');
+    const [filteredDonors, setFilteredDonors] = useState([]);
     const [fromDate, setFromDate] = useState(null);
     const [toDate, setToDate] = useState(null);
+    const [status, setStatus] = useState('All');
+    const [selectedDonor, setSelectedDonor] = useState('All');
     const [showFromDatePicker, setShowFromDatePicker] = useState(false);
     const [showToDatePicker, setShowToDatePicker] = useState(false);
-    const [showDonorPicker, setShowDonorPicker] = useState(false);
-    const [showRecipientPicker, setShowRecipientPicker] = useState(false);
     const [showStatusPicker, setShowStatusPicker] = useState(false);
+    const [showDonorPicker, setShowDonorPicker] = useState(false);
     const [username, setUsername] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
     const scrollViewRef = useRef(null);
     const navigation = useNavigation();
 
     useEffect(() => {
         fetchDonors();
-        fetchRecipients();
         getUsername();
     }, []);
 
     useEffect(() => {
         navigation.setOptions({
-            headerTitle: 'List',
+            headerTitle: () => (
+                <Text style={styles.title}>Validate</Text>
+            ),
             headerLeft: () => (
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <Text style={styles.backButton}>Back</Text>
@@ -46,7 +45,7 @@ const List = () => {
                     <Text style={styles.profileText}>{username}</Text>
                 </View>
             ),
-            headerTitleAlign: 'left',
+            headerTitleAlign: 'center',
         });
     }, [navigation, username]);
 
@@ -61,47 +60,43 @@ const List = () => {
         }
     };
 
-    const fetchDonations = async () => {
-        setDonations([]);
-        try {
-            const response = await axios.get('https://apiv2.medleb.org/donation/filtered', {
-                params: {
-                    donorId,
-                    recipientId,
-                    status: status === 'All' ? '' : status,
-                    fromDate: fromDate ? fromDate.toISOString().split('T')[0] : '',
-                    toDate: toDate ? toDate.toISOString().split('T')[0] : '',
-                },
-            });
-
-            if (Array.isArray(response.data)) {
-                setDonations(response.data);
-            } else {
-                console.error('Unexpected response structure:', response.data);
-                setDonations([]);
-            }
-        } catch (error) {
-            console.error('Error fetching donations:', error);
-            setDonations([]);
-        }
-    };
-
     const fetchDonors = async () => {
         try {
             const response = await axios.get('https://apiv2.medleb.org/donor/all');
             setDonors(response.data);
+            setFilteredDonors(response.data); // Initialize with all donors
         } catch (error) {
             console.error('Error fetching donors:', error);
         }
     };
 
-    const fetchRecipients = async () => {
-        try {
-            const response = await axios.get('https://apiv2.medleb.org/recipient/all');
-            setRecipients(response.data);
-        } catch (error) {
-            console.error('Error fetching recipients:', error);
+    const filterDonors = () => {
+        let filtered = donors;
+
+        if (status !== 'All') {
+            filtered = filtered.filter(donor => (status === 'Active' ? donor.IsActive : !donor.IsActive));
         }
+
+        if (selectedDonor !== 'All') {
+            filtered = filtered.filter(donor => donor.DonorName === selectedDonor);
+        }
+
+        if (fromDate) {
+            filtered = filtered.filter(donor => new Date(donor.CreatedDate) >= fromDate);
+        }
+
+        if (toDate) {
+            filtered = filtered.filter(donor => new Date(donor.CreatedDate) <= toDate);
+        }
+
+        setFilteredDonors(filtered);
+        setCurrentPage(1);
+    };
+
+    const getPaginatedDonors = () => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return filteredDonors.slice(startIndex, endIndex);
     };
 
     const renderDatePicker = (type) => {
@@ -124,70 +119,49 @@ const List = () => {
         );
     };
 
-    // Add this function to determine the color based on status
-    const getStatusColor = (status) => {
-        switch (status.toLowerCase()) {
-            case 'pending':
-                return 'orange';
-            case 'approved':
-                return 'green';
-            case 'inspect':
-                return 'red';
-            default:
-                return 'black';
+    const getStatusText = (isActive) => {
+        if (isActive === true) {
+            return 'Validated';
+        } else if (isActive === false) {
+            return 'Rejected';
+        } else {
+            return 'Pending';
         }
+    };
+
+    const handleDonorClick = (donor) => {
+        navigation.navigate('DonorDetails', { donor });
     };
 
     return (
         <View style={styles.container}>
             <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-                {/* First Row: Date Filters */}
+                {/* Filters */}
                 <View style={styles.filterRow}>
+                    {/* From Date Picker */}
                     <TouchableOpacity onPress={() => setShowFromDatePicker(true)} style={styles.filterButton}>
                         <Text style={styles.filterText}>From {fromDate ? fromDate.toISOString().split('T')[0] : ''}</Text>
                     </TouchableOpacity>
                     {showFromDatePicker && renderDatePicker('from')}
 
+                    {/* To Date Picker */}
                     <TouchableOpacity onPress={() => setShowToDatePicker(true)} style={styles.filterButton}>
                         <Text style={styles.filterText}>To {toDate ? toDate.toISOString().split('T')[0] : ''}</Text>
                     </TouchableOpacity>
                     {showToDatePicker && renderDatePicker('to')}
                 </View>
 
-                {/* Second Row: Donor, Recipient, Status */}
                 <View style={styles.filterRow}>
                     {/* Donor Dropdown */}
                     <TouchableOpacity onPress={() => setShowDonorPicker(!showDonorPicker)} style={styles.filterButton}>
-                        <Text style={styles.filterText}>{donors.find(d => d.DonorId === donorId)?.DonorName || 'Donor'}</Text>
+                        <Text style={styles.filterText}>{selectedDonor}</Text>
                     </TouchableOpacity>
                     {showDonorPicker && (
                         <View style={styles.dropdown}>
                             <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
-                                <TouchableOpacity onPress={() => { setDonorId(''); setShowDonorPicker(false); }}>
-                                    <Text style={styles.dropdownText}>All</Text>
-                                </TouchableOpacity>
-                                {donors.map((d) => (
-                                    <TouchableOpacity key={d.DonorId} onPress={() => { setDonorId(d.DonorId); setShowDonorPicker(false); }}>
-                                        <Text style={styles.dropdownText}>{d.DonorName}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-                        </View>
-                    )}
-
-                    {/* Recipient Dropdown */}
-                    <TouchableOpacity onPress={() => setShowRecipientPicker(!showRecipientPicker)} style={styles.filterButton}>
-                        <Text style={styles.filterText}>{recipients.find(r => r.RecipientId === recipientId)?.RecipientName || 'Recipient'}</Text>
-                    </TouchableOpacity>
-                    {showRecipientPicker && (
-                        <View style={styles.dropdown}>
-                            <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
-                                <TouchableOpacity onPress={() => { setRecipientId(''); setShowRecipientPicker(false); }}>
-                                    <Text style={styles.dropdownText}>All</Text>
-                                </TouchableOpacity>
-                                {recipients.map((r) => (
-                                    <TouchableOpacity key={r.RecipientId} onPress={() => { setRecipientId(r.RecipientId); setShowRecipientPicker(false); }}>
-                                        <Text style={styles.dropdownText}>{r.RecipientName}</Text>
+                                {['All', ...donors.map(donor => donor.DonorName)].map(donorName => (
+                                    <TouchableOpacity key={donorName} onPress={() => { setSelectedDonor(donorName); setShowDonorPicker(false); filterDonors(); }}>
+                                        <Text style={styles.dropdownText}>{donorName}</Text>
                                     </TouchableOpacity>
                                 ))}
                             </ScrollView>
@@ -201,8 +175,8 @@ const List = () => {
                     {showStatusPicker && (
                         <View style={styles.dropdown}>
                             <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
-                                {['All', 'Pending', 'Approved', 'Inspect'].map((s) => (
-                                    <TouchableOpacity key={s} onPress={() => { setStatus(s); setShowStatusPicker(false); }}>
+                                {['All', 'Active', 'Inactive'].map(s => (
+                                    <TouchableOpacity key={s} onPress={() => { setStatus(s); setShowStatusPicker(false); filterDonors(); }}>
                                         <Text style={styles.dropdownText}>{s}</Text>
                                     </TouchableOpacity>
                                 ))}
@@ -211,54 +185,67 @@ const List = () => {
                     )}
                 </View>
 
-                {/* Third Row: Filter Button */}
-                <TouchableOpacity style={styles.filterButton} onPress={fetchDonations}>
+                {/* Filter Button */}
+                <TouchableOpacity style={styles.filterButton} onPress={filterDonors}>
                     <Text style={styles.filterButtonText}>Filter</Text>
                 </TouchableOpacity>
 
                 {/* Results Count */}
-                <Text style={styles.resultCount}>number of result(s): {donations.length}</Text>
+                <Text style={styles.resultCount}>number of result(s): {filteredDonors.length}</Text>
 
-                {/* Donations List */}
+                {/* Display Donors */}
                 <ScrollView>
-                    {donations.map((donation, index) => (
-                        <TouchableOpacity 
-                            key={index} 
-                            style={styles.card} 
-                            onPress={() => navigation.navigate('DonationDetails', { donation })}
-                        >
-                            <View style={styles.cardHeader}>
-                                <Text style={[styles.statusText, { color: getStatusColor(donation.status) }]}>{donation.status}</Text>
-                            </View>
-                            <View style={styles.cardContent}>
-                                <Text style={styles.cardTitle}>Donation Title: {donation.DonationTitle}</Text>
-                                <Text style={styles.cardText}>From: {donation.DonorName}</Text>
-                                <Text style={styles.cardText}>To: {donation.RecipientName}</Text>
-                                <Text style={styles.cardText}>Date: {donation.DonationDate}</Text>
-                                <Text style={styles.cardText}>nb of box(es): {donation.NumberOfBoxes || 0}</Text>
-                            </View>
-                        </TouchableOpacity>
+                    {getPaginatedDonors().map((donor, index) => (
+                         <TouchableOpacity key={index} style={styles.card} onPress={() => handleDonorClick(donor)}>
+                         <Text style={[styles.statusText, { color: getStatusText(donor.IsActive) === 'Validated' ? 'green' : getStatusText(donor.IsActive) === 'Rejected' ? 'red' : 'orange' }]}>
+                             {getStatusText(donor.IsActive)}
+                         </Text>
+                         <Text style={styles.cardText}><Text style={styles.cardLabel}>Donor: </Text><Text style={styles.boldText}>{donor.DonorName}</Text></Text>
+                         <Text style={styles.cardText}>Country: {donor.DonorCountry}</Text>
+                         <Text style={styles.cardText}>Donor Type: {donor.DonorType}</Text>
+                         <Text style={styles.cardText}>Date: {donor.CreatedDate}</Text>
+                     </TouchableOpacity>
                     ))}
                 </ScrollView>
-            </ScrollView>
 
-            {/* Bottom Navigation Bar */}
-            <BottomNavBarInspection currentScreen="List" />
+                {/* Pagination Controls */}
+                <View style={styles.paginationContainer}>
+                    <TouchableOpacity
+                        disabled={currentPage === 1}
+                        onPress={() => setCurrentPage(currentPage - 1)}
+                    >
+                        <Text style={[styles.paginationText, currentPage === 1 && styles.disabledText]}>Previous</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.paginationText}>{currentPage}</Text>
+                    <TouchableOpacity
+                        disabled={currentPage * itemsPerPage >= filteredDonors.length}
+                        onPress={() => setCurrentPage(currentPage + 1)}
+                    >
+                        <Text style={[styles.paginationText, currentPage * itemsPerPage >= filteredDonors.length && styles.disabledText]}>Next</Text>
+                    </TouchableOpacity>
+                </View>
+            </ScrollView>
         </View>
     );
 };
 
 const styles = StyleSheet.create({
+    title: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        marginRight: 25,
+    },
     container: {
         flex: 1,
         backgroundColor: '#fff',
+        padding: 20,
     },
     scrollView: {
         flex: 1,
     },
     contentContainer: {
         paddingBottom: 80,
-        marginTop: 40,
+        marginTop: 0,
     },
     profileContainer: {
         marginTop:10,
@@ -285,13 +272,6 @@ const styles = StyleSheet.create({
         fontSize: 10,
         color: '#000',  // Changed to black
         fontWeight: 'bold',
-    },
-    backButton: {
-        fontSize: 16,
-        color: '#000',
-        fontWeight: 'bold',
-        marginLeft: 10,
-        paddingRight: 100,
     },
     filterRow: {
         flexDirection: 'row',
@@ -332,10 +312,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         padding: 10,
     },
-    filterButtonText: {
-        color: '#00A651',
-        fontSize: 16,
-    },
     resultCount: {
         textAlign: 'center',
         marginVertical: 10,
@@ -344,31 +320,50 @@ const styles = StyleSheet.create({
     },
     card: {
         backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#00A651',
         borderRadius: 8,
         padding: 15,
         marginVertical: 10,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 1.41,
     },
     statusText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        textAlign: 'left',
-        marginBottom: 5,
-    },
-    cardContent: {
-        marginTop: 5,
-    },
-    cardTitle: {
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: 'bold',
         marginBottom: 5,
     },
     cardText: {
         fontSize: 14,
         color: '#333',
-        marginBottom: 5,
+    },
+    cardLabel: {
+        fontWeight: 'bold',
+    },
+    boldText: {
+        fontWeight: 'bold',
+    },
+    paginationContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 20,
+    },
+    paginationText: {
+        fontSize: 16,
+        color: '#00A651',
+        fontWeight: 'bold',
+    },
+    disabledText: {
+        color: '#ccc',
+    },
+    backButton: {
+        fontSize: 16,
+        color: '#000',
+        fontWeight: 'bold',
+        marginLeft: 10,
     },
 });
 
-export default List;
+export default Validate;

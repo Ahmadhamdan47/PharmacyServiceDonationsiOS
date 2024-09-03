@@ -14,6 +14,8 @@ import DonationDetails from './DonationDetails'; // Import the DonationDetails c
 import BoxDetails from './BoxDetails';
 import PackInspection from './PackInspection'; // Import the PackInspection component
 import BoxInspection from './BoxInspection';
+import Validate from './Validate';  // Import the Validate component
+import DonorDetails from './DonorDetails';
 const Stack = createStackNavigator();
 
 const App = () => {
@@ -24,15 +26,18 @@ const App = () => {
         <Stack.Screen name="SignUp" component={SignUp} options={{ title: '' }} />
         <Stack.Screen name="AdminLanding" component={AdminLanding} options={{ title: '' }} />
         <Stack.Screen name="DonorLanding" component={DonorLanding} options={{ title: '' }} />
-        <Stack.Screen name="AddDonor" component={AddDonor} options={{ title: '' }} />
-        <Stack.Screen name="Donate" component={Donate} options={{ title: '' }} />
-        <Stack.Screen name="List" component={List} options={{ title: '' }} />
-        <Stack.Screen name="Inspect" component={Inspect} options={{ title: '' }} />
-        <Stack.Screen name="DonorList" component={DonorList} options={{ title: '' }} />
+        <Stack.Screen name="AddDonor" component={AddDonor} options={{ title: 'Donate' }} />
+        <Stack.Screen name="Donate" component={Donate} options={{ title: 'Donate' }} />
+        <Stack.Screen name="List" component={List} options={{ title: 'List' }} />
+        <Stack.Screen name="Inspect" component={Inspect} options={{ title: 'Inspect' }} />
+        <Stack.Screen name="DonorList" component={DonorList} options={{ title: 'List' }} />
         <Stack.Screen name="DonationDetails" component={DonationDetails} options={{ title: 'Donation Details' }} />
-        <Stack.Screen name="BoxDetails" component={BoxDetails} options={{ title: '' }} />
+        <Stack.Screen name="BoxDetails" component={BoxDetails} options={{ title: 'Boxes List' }} />
         <Stack.Screen name="PackInspection" component={PackInspection} options={{ title: 'Pack Inspection' }} />
         <Stack.Screen name="BoxInspection" component={BoxInspection} options={{ title: 'Box Inspection' }} />
+        <Stack.Screen name="Validate" component={Validate}  options={{ title: 'Validate' }}/>
+        <Stack.Screen name="DonorDetails" component={DonorDetails}  options={{ title: 'DonorDetails' }}/>
+
 
       </Stack.Navigator>
     </NavigationContainer>

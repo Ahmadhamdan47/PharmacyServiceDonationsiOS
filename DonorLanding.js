@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useLayoutEffect } from 'react';
 import { StyleSheet, View, Image, TouchableOpacity, Text } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -26,18 +26,27 @@ const DonorLanding = () => {
     // Extract the first letter of the username for the circle icon
     const firstLetter = username ? username.charAt(0).toUpperCase() : '';
 
+    // Use useLayoutEffect to customize header
+    useLayoutEffect(() => {
+        navigation.setOptions({
+            headerLeft: () => null, // Remove the built-in back arrow
+            headerTitle: () => (
+                <View style={styles.headerContainer}>
+                    <Image source={require("./assets/medleblogo.png")} style={styles.logo} />
+                    <TouchableOpacity style={styles.profileContainer}>
+                        <View style={styles.circle}>
+                            <Text style={styles.circleText}>{firstLetter}</Text>
+                        </View>
+                        <Text style={styles.profileText}>{username}</Text>
+                    </TouchableOpacity>
+                </View>
+            ),
+            headerTitleAlign: 'center', // Center align the custom title
+        });
+    }, [navigation, username]);
+
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <Image source={require("./assets/medleblogo.png")} style={styles.logo} />
-                <View style={styles.profileContainer}>
-                    <View style={styles.circle}>
-                        <Text style={styles.circleText}>{firstLetter}</Text>
-                    </View>
-                    <Text style={styles.profileText}>{username}</Text>
-                </View>
-            </View>
-
             <View style={styles.content}>
                 <View style={styles.buttonsContainer}>
                     <TouchableOpacity onPress={() => navigation.navigate('AddDonor')} style={styles.buttonWrapper}>
@@ -61,20 +70,23 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: "#fff",
     },
-    header: {
+    headerContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        width: '100%',
         paddingHorizontal: 20,
-        paddingTop: 20,
     },
     logo: {
+        marginTop:50,
         width: 150,
-        height: 100,
+        height: 150,
         resizeMode: "contain",
     },
     profileContainer: {
         alignItems: 'center', // Center align the icon and username
+        marginLeft: 'auto',  // Push the profile container to the right
+        marginTop:50,
     },
     circle: {
         width: 40, // Increase the size of the circle
@@ -93,14 +105,14 @@ const styles = StyleSheet.create({
     },
     profileText: {
         fontSize: 14,
-        color: '#00A651',
+        color: '#000',  // Changed to black
         fontWeight: 'bold',
     },
     content: {
         flex: 1,  // Allows the content to take up available space
         alignItems: 'center',
         justifyContent: 'center',  // Center content vertically in the middle of the available space
-        paddingBottom: 60,  // Add padding to avoid overlapping with BottomNavBar
+        paddingBottom: 0,  // Add padding to avoid overlapping with BottomNavBar
     },
     buttonsContainer: {
         flexDirection: 'row',
@@ -113,8 +125,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     buttonImage: {
-        width: 120,
-        height: 120,
+        width: 130,
+        height: 130,
         resizeMode: "contain",
         marginBottom: 10,  // Space between the image and text
     },

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Dimensions, Keyboard, BackHandler } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Camera } from 'expo-camera';
 import { BarCodeScanner } from 'expo-barcode-scanner';
 import { CameraType } from 'expo-camera/build/legacy/Camera.types';
@@ -46,7 +47,7 @@ const BatchLotForm = React.forwardRef(({ form, index, handleFieldChange, drugIte
   };
 
   return (
-    <View ref={ref} key={index} style={styles.detailsContainer}>
+    <View ref={ref} key={index} style={styles.formContainer}>
       {index > 0 && (
         <View style={styles.newDrugSeparator}>
           <Text style={styles.newDrugTitle}>New Drug</Text>
@@ -148,67 +149,119 @@ const BatchLotForm = React.forwardRef(({ form, index, handleFieldChange, drugIte
         searchable={true}
         placeholder="Select a drug"
         searchPlaceholder="Search..."
-        style={[styles.input, validationErrors[index]?.drugName ? styles.inputError : {}, form.drugValid === false ? { borderColor: 'red' } : {}]}
+        style={{
+          borderWidth: 1,
+          borderColor: '#00a651',
+          borderRadius: 10,
+          paddingVertical: 5,
+          paddingHorizontal: 10,
+          height: 40, // Matches the GTIN input height
+          width: '95%', // Matches the GTIN input width
+          alignSelf: 'center',
+          backgroundColor: '#fff',
+          marginBottom: 14, // Matches spacing consistency
+        }}
         dropDownContainerStyle={{
-          backgroundColor: "#fff"
+          backgroundColor: "#fff",
+          borderWidth: 1,
+          borderColor: '#00a651',
+          borderRadius: 10,
+          width: '90%', // Matches the GTIN input width
+          alignSelf: 'center',
+          zIndex: 1000, // Ensures dropdown appears above other elements
         }}
       />
       {validationErrors[index]?.drugName && <Text style={styles.errorMessage}>{validationErrors[index].drugName}</Text>}
       {form.drugValid && <Icon name="check" size={30} color="green" style={{ marginLeft: 270 }} />}
       {form.drugValid === false && <Text style={{ color: 'red' }}>{form.drugValidationMessage}</Text>}
 
-      <FieldLabel label="Presentation" />
-      <TextInput
-        ref={inputRefs.presentation}
-        style={[styles.input, validationErrors[index]?.presentation ? styles.inputError : null]}
-        placeholder="Presentation"
-        value={form.presentation}
-        onChangeText={text => handleFieldChange(index, 'presentation', text)}
-        onFocus={() => setIsInputFocused(true)}
-        onBlur={() => setIsInputFocused(false)}
-      />
-      {validationErrors[index]?.presentation && <Text style={styles.errorMessage}>{validationErrors[index].presentation}</Text>}
-
-      <FieldLabel label="Form" />
-      <TextInput
-        ref={inputRefs.form}
-        style={[styles.input, validationErrors[index]?.form ? styles.inputError : null]}
-        placeholder="Form"
-        value={form.form}
-        onChangeText={text => handleFieldChange(index, 'form', text)}
-        onFocus={() => setIsInputFocused(true)}
-        onBlur={() => setIsInputFocused(false)}
-      />
-      {validationErrors[index]?.form && <Text style={styles.errorMessage}>{validationErrors[index].form}</Text>}
-
-      <FieldLabel label="Owner" />
-      <TextInput
-        ref={inputRefs.owner}
-        style={[styles.input, validationErrors[index]?.owner ? styles.inputError : null]}
-        placeholder="Owner"
-        value={form.owner}
-        onChangeText={text => handleFieldChange(index, 'owner', text)}
-        onFocus={() => setIsInputFocused(true)}
-        onBlur={() => setIsInputFocused(false)}
-      />
-      {validationErrors[index]?.owner && <Text style={styles.errorMessage}>{validationErrors[index].owner}</Text>}
-
-      <FieldLabel label="Country" />
-      <TextInput
-        ref={inputRefs.country}
-        style={[styles.input, validationErrors[index]?.country ? styles.inputError : null]}
-        placeholder="Country"
-        value={form.country}
-        onChangeText={text => handleFieldChange(index, 'country', text)}
-        onFocus={() => setIsInputFocused(true)}
-        onBlur={() => setIsInputFocused(false)}
-      />
-      {validationErrors[index]?.country && <Text style={styles.errorMessage}>{validationErrors[index].country}</Text>}
+      <View style={styles.row}>
+        <View style={styles.halfWidth}>
+          <FieldLabel label="Presentation *" />
+          <TextInput
+            style={styles.input}
+            placeholder="Presentation"
+            value={form.presentation}
+            onChangeText={text => handleFieldChange(index, 'presentation', text)}
+            onFocus={() => setIsInputFocused(true)}
+            onBlur={() => setIsInputFocused(false)}
+          />
+        </View>
+        <View style={styles.halfWidth}>
+          <FieldLabel label="Form *" />
+          <TextInput
+            style={styles.input}
+            placeholder="Form"
+            value={form.form}
+            onChangeText={text => handleFieldChange(index, 'form', text)}
+            onFocus={() => setIsInputFocused(true)}
+            onBlur={() => setIsInputFocused(false)}
+          />
+        </View>
+      </View>
+      <View style={styles.row}>
+        <View style={styles.halfWidth}>
+          <FieldLabel label="Laboratory *" />
+          <TextInput
+            style={styles.input}
+            placeholder="Laboratory"
+            value={form.owner}
+            onChangeText={text => handleFieldChange(index, 'owner', text)}
+            onFocus={() => setIsInputFocused(true)}
+            onBlur={() => setIsInputFocused(false)}
+          />
+        </View>
+        <View style={styles.halfWidth}>
+          <FieldLabel label="Country *" />
+          <TextInput
+            style={styles.input}
+            placeholder="Country"
+            value={form.country}
+            onChangeText={text => handleFieldChange(index, 'country', text)}
+            onFocus={() => setIsInputFocused(true)}
+            onBlur={() => setIsInputFocused(false)}
+          />
+        </View>
+      </View>
     </View>
   );
 });
 
 const Donate = ({ route }) => {
+  const [username, setUsername] = useState('');
+
+    useEffect(() => {
+        const fetchUsername = async () => {
+            try {
+                const storedUsername = await AsyncStorage.getItem('username');
+                if (storedUsername) {
+                    setUsername(storedUsername);
+                }
+            } catch (error) {
+                console.error('Failed to load username:', error);
+            }
+        };
+
+        fetchUsername();
+    }, []);
+
+    useEffect(() => {
+      navigation.setOptions({
+        headerLeft: () => (
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={styles.backButton}>Back</Text>
+          </TouchableOpacity>
+        ),
+        headerRight: () => (
+          <View style={styles.packContainer}>
+            <Text style={styles.packText}>Packs: {packCounter}</Text>  
+          </View>
+        ),
+        headerTitleAlign: 'center',
+        headerTitle: 'Donate',
+      });
+    }, [navigation, username, packCounter]);  // Add packCounter to dependencies
+  
   const { donorId, recipientId, donationPurpose, donationId } = route.params || {};
   const navigation = useNavigation();
   const scrollViewRef = useRef(null);
@@ -228,6 +281,8 @@ const Donate = ({ route }) => {
   const [currentBox, setCurrentBox] = useState(1);
   const [packCount, setPackCount] = useState(0);
   const [boxLabelCounter, setBoxLabelCounter] = useState(1);
+  const [packCounter, setPackCounter] = useState(1);  // Initialize packCounter with 1
+
 
   useEffect(() => {
     (async () => {
@@ -267,6 +322,7 @@ const Donate = ({ route }) => {
       'keyboardDidHide',
       () => setIsInputFocused(false)
     );
+    
 
     const backAction = () => {
       showExitConfirmation();
@@ -491,6 +547,9 @@ const Donate = ({ route }) => {
 
   const addBatchLotForm = () => {
     setBatchLots([...batchLots, createEmptyBatchLot()]);
+    setPackCounter(packCounter + 1);  // Increment packCounter on adding more batch lots
+    console.log(packCounter);
+
   };
 
   const exportToExcel = async (donationData, donorName, recipientName, donationDate) => {
@@ -766,10 +825,9 @@ const Donate = ({ route }) => {
               {validationErrors[0]?.serialNumber && <Text style={styles.errorMessage}>{validationErrors[0].serialNumber}</Text>}
             </View>
 
-            <View style={styles.separator} />
 
             <View style={styles.detailsContainer}>
-              <Text style={styles.header}>Medication Details</Text>
+              <Text style={styles.header}> Medication Details</Text>
               <DropDownPicker
                 open={batchLots[0].open}
                 value={batchLots[0].drugName}
@@ -806,61 +864,88 @@ const Donate = ({ route }) => {
                 searchable={true}
                 placeholder="Select a drug"
                 searchPlaceholder="Search..."
-                style={[styles.input, batchLots[0].drugValid === false ? { borderColor: 'red' } : {}]}
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#00a651',
+                  borderRadius: 10,
+                  paddingVertical: 5,
+                  paddingHorizontal: 10,
+                  height: 40, // Matches the GTIN input height
+                  width: '95%', // Matches the GTIN input width
+                  alignSelf: 'center',
+                  backgroundColor: '#fff',
+                  marginBottom: 14, // Matches spacing consistency
+                }}
                 dropDownContainerStyle={{
-                  backgroundColor: "#fff"
+                  backgroundColor: "#fff",
+                  borderWidth: 1,
+                  borderColor: '#00a651',
+                  borderRadius: 10,
+                  width: '90%', // Matches the GTIN input width
+                  alignSelf: 'center',
+                  zIndex: 1000, // Ensures dropdown appears above other elements
                 }}
               />
 
               {batchLots[0].drugValid && <Icon name="check" size={30} color="green" style={{ marginLeft: 270 }} />}
               {batchLots[0].drugValid === false && <Text style={{ color: 'red' }}>{batchLots[0].drugValidationMessage}</Text>}
 
-              <FieldLabel label="Presentation" />
-              <TextInput
-                style={[styles.input, validationErrors[0]?.presentation ? styles.inputError : null]}
+              <View style={styles.detailsContainer}>
+
+    {/* Presentation and Form side by side */}
+    <View style={styles.row}>
+        <View style={styles.halfWidth}>
+            <FieldLabel label="Presentation *" />
+            <TextInput
+                style={styles.input}
                 placeholder="Presentation"
                 value={batchLots[0].presentation}
                 onChangeText={text => handleFieldChange(0, 'presentation', text)}
                 onFocus={() => setIsInputFocused(true)}
                 onBlur={() => setIsInputFocused(false)}
-              />
-              {validationErrors[0]?.presentation && <Text style={styles.errorMessage}>{validationErrors[0].presentation}</Text>}
-
-              <FieldLabel label="Form" />
-              <TextInput
-                style={[styles.input, validationErrors[0]?.form ? styles.inputError : null]}
+            />
+        </View>
+        <View style={styles.halfWidth}>
+            <FieldLabel label="Form *" />
+            <TextInput
+                style={styles.input}
                 placeholder="Form"
                 value={batchLots[0].form}
                 onChangeText={text => handleFieldChange(0, 'form', text)}
                 onFocus={() => setIsInputFocused(true)}
                 onBlur={() => setIsInputFocused(false)}
-              />
-              {validationErrors[0]?.form && <Text style={styles.errorMessage}>{validationErrors[0].form}</Text>}
+            />
+        </View>
+    </View>
 
-              <FieldLabel label="Owner" />
-              <TextInput
-                style={[styles.input, validationErrors[0]?.owner ? styles.inputError : null]}
-                placeholder="Owner"
+    {/* Laboratory and Country side by side */}
+    <View style={styles.row}>
+        <View style={styles.halfWidth}>
+            <FieldLabel label="Laboratory *" />
+            <TextInput
+                style={styles.input}
+                placeholder="Laboratory"
                 value={batchLots[0].owner}
                 onChangeText={text => handleFieldChange(0, 'owner', text)}
                 onFocus={() => setIsInputFocused(true)}
                 onBlur={() => setIsInputFocused(false)}
-              />
-              {validationErrors[0]?.owner && <Text style={styles.errorMessage}>{validationErrors[0].owner}</Text>}
-
-              <FieldLabel label="Country" />
-              <TextInput
-                style={[styles.input, validationErrors[0]?.country ? styles.inputError : null]}
+            />
+        </View>
+        <View style={styles.halfWidth}>
+            <FieldLabel label="Country *" />
+            <TextInput
+                style={styles.input}
                 placeholder="Country"
                 value={batchLots[0].country}
                 onChangeText={text => handleFieldChange(0, 'country', text)}
                 onFocus={() => setIsInputFocused(true)}
                 onBlur={() => setIsInputFocused(false)}
-              />
-              {validationErrors[0]?.country && <Text style={styles.errorMessage}>{validationErrors[0].country}</Text>}
-            </View>
-          </View>
-
+            />
+        </View>
+    </View>
+</View>
+</View>
+</View>
           {batchLots.slice(1).map((form, index) => (
             <BatchLotForm
               key={index + 1}
@@ -904,33 +989,31 @@ const Donate = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-
     backgroundColor: '#fff',
   },
   cameraContainer: {
-    marginBottom: 20,
+    marginBottom: 10, // Reduced margin
     alignItems: 'center',
     width: '100%',
   },
   cameraImage: {
-    width: 280,
-    height: 140,
+    width: 200, // Reduced width
+    height: 100, // Reduced height
     resizeMode: "contain",
   },
   barcodeContainer: {
-    marginBottom: 20,
+    marginBottom: 10, // Reduced margin
   },
   barcodeInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     position: 'relative',
+    
   },
   barcodeIcon: {
     position: 'absolute',
-    right: -20,
+    right: 0,
     top: -5,
-    height: 50,
-    width: 50,
+    height: 40, // Reduced height
+    width: 40, // Reduced width
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -941,73 +1024,123 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     color: '#707070',
-    fontSize: 16,
-    marginBottom: 5,
-    marginLeft: 40,
+    fontSize: 12, // Reduced font size
+    marginBottom: 3, // Reduced margin
+    marginLeft: 20, // Reduced margin
   },
   input: {
     borderWidth: 1,
     borderColor: '#00a651',
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    marginBottom: 15,
-    height: 50,
-    width: '90%',
-    alignSelf: 'center',
+    borderRadius: 10, // Reduced border radius
+    paddingVertical: 5, // Reduced padding
+    paddingHorizontal: 10, // Reduced padding
+    marginBottom: 8, // Reduced margin
+    height: 38, // Reduced height
+    width: '85%',
+    alignSelf: 'left',
+    marginLeft:20,
     backgroundColor: '#fff',
+    
+    
   },
   inputError: {
     borderColor: 'red',
   },
   errorMessage: {
     color: 'red',
-    marginLeft: 20,
-    marginBottom: 10,
+    marginLeft: 20, // Adjusted margin
+    marginBottom: 5, // Reduced margin
   },
   separator: {
-    height: 2,
+    height: 1, // Reduced height
     backgroundColor: '#ccc',
     width: '100%',
-    marginBottom: 20,
+    marginBottom: 5, // Reduced margin
   },
   detailsContainer: {
-    padding: 20,
+    padding: 0,
   },
   header: {
-    fontSize: 18,
+    fontSize: 14, // Reduced font size
     color: '#00a651',
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 8, // Reduced margin
     alignSelf: 'center',
   },
   buttonContainer: {
     marginHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 20, // Reduced margin
   },
-  
   button: {
     backgroundColor: '#00a651',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 25,
+    paddingVertical: 10, // Reduced padding
+    paddingHorizontal: 20, // Reduced padding
+    borderRadius: 20, // Reduced border radius
     width: '90%',
     alignSelf: 'center',
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 10, // Reduced margin
   },
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
-    fontSize: 18,
+    fontSize: 16, // Reduced font size
   },
   newDrugSeparator: {
     backgroundColor: '#fff',
-    padding: 10,
+    padding: 5, // Reduced padding
   },
   newDrugTitle: {
     color: '#00a651',
-    fontSize: 18,
+    fontSize: 14, // Reduced font size
+    fontWeight: 'bold',
+    marginLeft:12,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8, // Reduced margin
+  },
+  halfWidth: {
+    width: '49%', // Adjusted width to create space between fields
+  },
+  backButton: {
+    fontSize: 14, // Reduced font size
+    fontWeight: 'bold',
+    color: '#000',
+    marginLeft: 10,
+  },
+  profileContainer: {
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  circle: {
+    width: 30, // Reduced size
+    height: 30, // Reduced size
+    borderRadius: 15, // Adjusted for reduced size
+    borderWidth: 2,
+    borderColor: '#00A651',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  circleText: {
+    fontSize: 12, // Reduced font size
+    color: '#00A651',
+    fontWeight: 'bold',
+  },
+  profileText: {
+    fontSize: 12, // Reduced font size
+    color: '#000',
+    fontWeight: 'bold',
+  },
+  packContainer: {
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  packText: {
+    fontSize: 14,
+    color: '#000',
     fontWeight: 'bold',
   },
 });
