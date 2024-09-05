@@ -381,9 +381,37 @@ const Donate = ({ route }) => {
     }
   };
 
-  const handleBarcodeDetected = ({ type, data }) => {
+  const handleBarcodeDetected = async ({ type, data }) => {
     try {
       const response = extractDataMatrix(data);
+      
+      // Close the camera immediately after scanning
+      setIsCameraOpen(false);
+  
+      // Call the checkDonationStatus API
+      const donationStatusResponse = await axios.post('https://apiv2.medleb.org/batchserial/checkDonationStatus', {
+        GTIN: response.gtin,
+        BatchNumber: response.lot,
+        SerialNumber: response.sn,
+        ExpiryDate: response.exp ? response.exp.toISOString().split('T')[0] : '',
+      });
+  
+      const { isValid, isDonated, messageEN } = donationStatusResponse.data;
+  
+      if (isValid) {
+        setTimeout(() => {
+          Alert.alert(
+            'Drug Status',
+            messageEN,  // Display the message from the API response
+            [{ text: 'OK' }]
+          );
+        }, 100);
+  
+        setIsFormValid(false);  // Disable form submission
+        return;
+      }
+  
+      // If the drug is found but not donated, continue with the donation process
       const updatedBatchLots = [...batchLots];
       updatedBatchLots[cameraIndex] = {
         ...updatedBatchLots[cameraIndex],
@@ -392,10 +420,9 @@ const Donate = ({ route }) => {
         expiryDate: response.exp ? response.exp.toISOString().split('T')[0] : '',
         serialNumber: response.sn,
       };
-
+  
       setBatchLots(updatedBatchLots);
-      setIsCameraOpen(false);
-
+  
       setTimeout(() => {
         const currentRef = batchLotRefs.current[cameraIndex];
         if (currentRef) {
@@ -405,9 +432,12 @@ const Donate = ({ route }) => {
         }
       }, 100);
     } catch (error) {
-      console.error("Error parsing scanned data:", error);
+      console.error("Error checking donation status or parsing scanned data:", error);
+      Alert.alert("Error", "Failed to check donation status. Please try again.");
     }
   };
+  
+  
 
   const extractDataMatrix = (code) => {
     const response = { gtin: '', lot: '', sn: '', exp: null };

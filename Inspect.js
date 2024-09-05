@@ -10,13 +10,11 @@ import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomN
 const Inspect = () => {
     const navigation = useNavigation();
     const scrollViewRef = useRef(null);
-    const batchLotRefs = useRef([]);
     const [batchLot, setBatchLot] = useState(createEmptyBatchLot());
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [type, setType] = useState(CameraType.back);
     const [permission, setPermission] = useState(null);
     const [isInputFocused, setIsInputFocused] = useState(false);
-    const [validationErrors, setValidationErrors] = useState({});
     const [inspectionMessage, setInspectionMessage] = useState('');
     const [username, setUsername] = useState('');
     const [selectedOption, setSelectedOption] = useState('Packs'); // Default to 'Packs'
@@ -89,7 +87,7 @@ const Inspect = () => {
     const handleBarcodeDetected = async ({ type, data }) => {
         try {
             if (selectedOption === 'Packs') {
-                // Existing logic for Packs
+                // Logic for Packs
                 const response = extractDataMatrix(data);
                 const updatedBatchLot = {
                     ...batchLot,
@@ -98,18 +96,17 @@ const Inspect = () => {
                     expiryDate: response.exp ? response.exp.toISOString().split('T')[0] : '',
                     serialNumber: response.sn,
                 };
-    
+
                 setBatchLot(updatedBatchLot);
                 setIsCameraOpen(false);
-    
+
                 // Automatically call CheckMate API after extracting data
                 await handleInspect(updatedBatchLot);
-    
             } else if (selectedOption === 'Boxes') {
-                // New logic for Boxes
+                // Logic for Boxes
                 const boxId = data; // Assuming the barcode only contains the BoxId
                 setIsCameraOpen(false);
-                
+
                 // Directly navigate to BoxInspection passing the BoxId
                 navigation.navigate('BoxInspection', { boxId });
             }
@@ -117,7 +114,7 @@ const Inspect = () => {
             console.error("Error processing scanned data:", error);
         }
     };
-    
+
     const extractDataMatrix = (code) => {
         const response = { gtin: '', lot: '', sn: '', exp: null };
         let responseCode = code;
@@ -195,24 +192,9 @@ const Inspect = () => {
         }
     };
 
-    const validateFields = (batchLotData) => {
-        const errors = {};
-        const requiredFields = ['gtin', 'lotNumber', 'expiryDate', 'serialNumber'];
-        requiredFields.forEach(field => {
-            if (!batchLotData[field] || batchLotData[field].trim() === '') {
-                errors[field] = 'This field is required';
-            }
-        });
-        setValidationErrors(errors);
-        return Object.keys(errors).length === 0;
-    };
-
     const handleInspect = async (batchLotData) => {
-        if (!validateFields(batchLotData)) {
-            return;
-        }
         try {
-            const response = await fetch('https://apiv2.medleb.org/drugs/checkMate', {
+            const response = await fetch('https://apiv2.medleb.org/batchserial/checkDonationStatus', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -231,82 +213,97 @@ const Inspect = () => {
             }
 
             const data = await response.json();
-            setInspectionMessage(data.message.messageEN || 'Inspection successful.');
+            const { isValid, isDonated, messageEN } = data;
 
-            if (response.ok && data.message.isValid && data.message.batchLot) {
+            if (isValid && isDonated) {
+                // Drug is valid and donated, proceed with the inspection process
+                setInspectionMessage('');
+
                 // Fetch the BoxLabel using the BoxId
-                const boxLabel = await fetchBoxLabel(data.message.batchLot.BoxId);
-                const donationId = await fetchDonationId(data.message.batchLot.BoxId)
-                console.log(data.message.batchLot.BatchLotId);
+                const boxLabel = await fetchBoxLabel(data.batchLot.BoxId);
+                const donationId = await fetchDonationId(data.batchLot.BoxId);
+                const serialNumberId= await fetchSerialNumberId(batchLotData.serialNumber);
+                
                 // Navigate to PackInspection with the batch and box information
                 navigation.navigate('PackInspection', {
                     batchLot: { 
                         ...batchLotData, 
-                        drugName: data.message.batchLot.DrugName,
-                        donationId:donationId,
-                        form: data.message.batchLot.Form,
-                        presentation: data.message.batchLot.Presentation,
-                        quantity: data.message.batchLot.Quantity,
-                        owner: data.message.batchLot.Laboratory,
-                        country: data.message.batchLot.LaboratoryCountry,
-                        boxId: data.message.batchLot.BoxId,
+                        drugName: data.batchLot.DrugName,
+                        donationId: donationId,
+                        form: data.batchLot.Form,
+                        presentation: data.batchLot.Presentation,
+                        quantity: data.batchLot.Quantity,
+                        owner: data.batchLot.Laboratory,
+                        country: data.batchLot.LaboratoryCountry,
+                        boxId: data.batchLot.BoxId,
                         boxLabel: boxLabel,
-                        batchLotId: data.message.batchLot.BatchLotId
+                        batchLotId: data.batchLot.BatchLotId,
+                        serialNumberId : serialNumberId
                     }
                 });
+
+            } else if (isValid && !isDonated) {
+                // Drug is found but not donated, show a message
+                Alert.alert('Drug Status', 'This drug is already found in our database but not donated.', [{ text: 'OK' }]);
+            } else if (!isValid) {
+                // Drug is not found, show a message
+                Alert.alert('Drug Status', 'This drug is not found in our database.', [{ text: 'OK' }]);
             }
         } catch (error) {
             setInspectionMessage(error.message);
         }
     };
 
-    // Function to fetch the BoxLabel using BoxId
     const fetchBoxLabel = async (boxId) => {
         try {
             const response = await fetch(`https://apiv2.medleb.org/boxes/${boxId}`);
-            
-            // Log the full response for debugging
-            console.log('Full response:', response);
-    
-            // Check if the response is OK and in JSON format
             const contentType = response.headers.get('content-type');
+
             if (!response.ok || !contentType || !contentType.includes('application/json')) {
-                const textResponse = await response.text();  // Read the text response for debugging
+                const textResponse = await response.text();
                 console.error('Error: Response not JSON or not OK', textResponse);
                 throw new Error('Failed to fetch box label or response is not JSON');
             }
-    
+
             const data = await response.json();
-            console.log('JSON response data:', data);
             return data.BoxLabel;
         } catch (error) {
             console.error('Error fetching box label:', error);
             return '';
         }
     };
-    
-const fetchDonationId = async (boxId) => { try {
-        const response = await fetch(`https://apiv2.medleb.org/boxes/${boxId}`);
-        
-        // Log the full response for debugging
-        console.log('Full response:', response);
-
-        // Check if the response is OK and in JSON format
-        const contentType = response.headers.get('content-type');
-        if (!response.ok || !contentType || !contentType.includes('application/json')) {
-            const textResponse = await response.text();  // Read the text response for debugging
-            console.error('Error: Response not JSON or not OK', textResponse);
-            throw new Error('Failed to fetch Donation Id or response is not JSON');
+    const fetchSerialNumberId = async (serialNumber) => {
+        try {
+            const response = await fetch(`https://apiv2.medleb.org/batchserial/${serialNumber}`);
+            if (!response.ok) {
+                throw new Error('Failed to fetch serial number ID.');
+            }
+            const data = await response.json();
+            return data.BatchSerialNumberId;
+        } catch (error) {
+            console.error('Error fetching serial number ID:', error);
+            return null;
         }
+    };
+    const fetchDonationId = async (boxId) => {
+        try {
+            const response = await fetch(`https://apiv2.medleb.org/boxes/${boxId}`);
+            const contentType = response.headers.get('content-type');
 
-        const data = await response.json();
-        console.log('JSON response data:', data);
-        return data.DonationId;
-    } catch (error) {
-        console.error('Error fetching Donation ID:', error);
-        return '';
-    }
-};
+            if (!response.ok || !contentType || !contentType.includes('application/json')) {
+                const textResponse = await response.text();
+                console.error('Error: Response not JSON or not OK', textResponse);
+                throw new Error('Failed to fetch Donation Id or response is not JSON');
+            }
+
+            const data = await response.json();
+            return data.DonationId;
+        } catch (error) {
+            console.error('Error fetching Donation ID:', error);
+            return '';
+        }
+    };
+
     return (
         <View style={styles.container}>
             {isCameraOpen ? (
@@ -318,15 +315,14 @@ const fetchDonationId = async (boxId) => { try {
             ) : (
                 <ScrollView
                     ref={scrollViewRef}
-                    onScroll={event => setScrollPosition(event.nativeEvent.contentOffset.y)}
-                    scrollEventThrottle={16}
                     contentContainerStyle={styles.scrollViewContainer}
                 >
                     {/* Dropdown Button */}
                     <TouchableOpacity style={styles.dropdownButton} onPress={() => setSelectedOption(selectedOption === 'Packs' ? 'Boxes' : 'Packs')}>
-    <Text style={styles.dropdownButtonText}>{selectedOption}</Text>
-    <Text style={styles.dropdownArrow}>▼</Text>
-</TouchableOpacity>
+                        <Text style={styles.dropdownButtonText}>{selectedOption}</Text>
+                        <Text style={styles.dropdownArrow}>▼</Text>
+                    </TouchableOpacity>
+
                     {/* Barcode Scanner Icon */}
                     <TouchableOpacity onPress={handleOpenCamera} style={styles.cameraButton}>
                         <Image source={require("./assets/2d.png")} style={styles.cameraImage} />
@@ -367,11 +363,11 @@ const styles = StyleSheet.create({
         paddingVertical: 20,
     },
     profileContainer: {
-        marginTop:10,
+        marginTop: 10,
         flexDirection: 'column',
         alignItems: 'center',
         marginLeft: 'auto',
-        marginRight:5,
+        marginRight: 5,
     },
     circle: {
         width: 40,
@@ -389,7 +385,7 @@ const styles = StyleSheet.create({
     },
     profileText: {
         fontSize: 10,
-        color: '#000',  // Changed to black
+        color: '#000',
         fontWeight: 'bold',
     },
     dropdownButton: {

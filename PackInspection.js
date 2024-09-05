@@ -64,29 +64,30 @@ const PackInspection = ({ route }) => {
 
     const handleInspect = async () => {
         try {
-            const response = await axios.post(`https://apiv2.medleb.org/batchLots/inspected/${batchLot.batchLotId}`);
+            console.log(batchLot.serialNumberId);
+            const response = await axios.put(`https://apiv2.medleb.org/batchserial/inspect/${batchLot.serialNumberId}`);
             if (response.status === 200) {
-                Alert.alert('Success', 'Batch lot marked as inspected.');
+                Alert.alert('Success', 'Batch serial number marked as inspected.');
             } else {
                 throw new Error('Failed to update status to inspected.');
             }
         } catch (error) {
-            console.error('Error inspecting batch lot:', error);
-            Alert.alert('Error', 'Failed to mark batch lot as inspected.');
+            console.error('Error inspecting batch serial number:', error);
+            Alert.alert('Alert', 'this drug was already inspeted.');
         }
     };
 
     const handleReject = async () => {
         try {
-            const response = await axios.post(`https://apiv2.medleb.org/batchLots/rejected/${batchLot.batchLotId}`);
+            const response = await axios.put(`https://apiv2.medleb.org/batchserial/reject/${batchLot.serialNumberId}`);
             if (response.status === 200) {
-                Alert.alert('Success', 'Batch lot marked as rejected.');
+                Alert.alert('Success', 'Batch serial number marked as rejected.');
             } else {
                 throw new Error('Failed to update status to rejected.');
             }
         } catch (error) {
-            console.error('Error rejecting batch lot:', error);
-            Alert.alert('Error', 'Failed to mark batch lot as rejected.');
+            console.error('Error rejecting batch serial number:', error);
+            Alert.alert('Alert', 'this pack was already inspected.');
         }
     };
 
@@ -253,7 +254,7 @@ const styles = StyleSheet.create({
         flexDirection: 'column',
         alignItems: 'center',
         marginRight: 15,
-        marginTop:10,
+        marginTop: 10,
     },
     circle: {
         width: 40,
