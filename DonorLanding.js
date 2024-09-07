@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useLayoutEffect } from 'react';
-import { StyleSheet, View, Image, TouchableOpacity, Text } from 'react-native';
+import { StyleSheet, View, Image, TouchableOpacity, Text, BackHandler, ToastAndroid } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import BottomNavBar from './BottomNavBar';  // Import BottomNavBar
+import BottomNavBar from './BottomNavBar'; // Import BottomNavBar
 
 const DonorLanding = () => {
     const navigation = useNavigation();
     const [username, setUsername] = useState('');
+    const [backPressedOnce, setBackPressedOnce] = useState(false); // To handle back button
+    const [dropdownVisible, setDropdownVisible] = useState(false); // To handle the dropdown visibility
 
     useEffect(() => {
         const getUsername = async () => {
@@ -23,8 +25,40 @@ const DonorLanding = () => {
         getUsername();
     }, []);
 
-    // Extract the first letter of the username for the circle icon
-    const firstLetter = username ? username.charAt(0).toUpperCase() : '';
+    useEffect(() => {
+        const backAction = () => {
+            if (backPressedOnce) {
+                BackHandler.exitApp(); // Close the app on second back press
+            } else {
+                setBackPressedOnce(true);
+                ToastAndroid.show('Press back again to exit', ToastAndroid.SHORT);
+
+                setTimeout(() => {
+                    setBackPressedOnce(false);
+                }, 2000);
+
+                return true; // Prevent default back behavior
+            }
+        };
+
+        const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+
+        return () => backHandler.remove(); // Clean up on component unmount
+    }, [backPressedOnce]);
+
+    const handleSignOut = async () => {
+        try {
+            await AsyncStorage.clear(); // Clear all stored data (token, username, etc.)
+            navigation.navigate('SignIn'); // Navigate to SignIn screen
+        } catch (error) {
+            console.error('Error signing out:', error);
+        }
+    };
+
+    // Toggle dropdown visibility when profile is clicked
+    const toggleDropdown = () => {
+        setDropdownVisible(!dropdownVisible);
+    };
 
     // Use useLayoutEffect to customize header
     useLayoutEffect(() => {
@@ -33,9 +67,9 @@ const DonorLanding = () => {
             headerTitle: () => (
                 <View style={styles.headerContainer}>
                     <Image source={require("./assets/medleblogo.png")} style={styles.logo} />
-                    <TouchableOpacity style={styles.profileContainer}>
+                    <TouchableOpacity onPress={toggleDropdown} style={styles.profileContainer}>
                         <View style={styles.circle}>
-                            <Text style={styles.circleText}>{firstLetter}</Text>
+                            <Text style={styles.circleText}>{username.charAt(0).toUpperCase()}</Text>
                         </View>
                         <Text style={styles.profileText}>{username}</Text>
                     </TouchableOpacity>
@@ -47,6 +81,15 @@ const DonorLanding = () => {
 
     return (
         <View style={styles.container}>
+            {/* Dropdown for profile */}
+            {dropdownVisible && (
+                <View style={styles.dropdown}>
+                    <TouchableOpacity onPress={handleSignOut} style={styles.dropdownItem}>
+                        <Text style={styles.dropdownItemText}>Sign Out</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
             <View style={styles.content}>
                 <View style={styles.buttonsContainer}>
                     <TouchableOpacity onPress={() => navigation.navigate('AddDonor')} style={styles.buttonWrapper}>
@@ -78,7 +121,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
     },
     logo: {
-        marginTop:50,
+        marginTop: 50,
         width: 150,
         height: 150,
         resizeMode: "contain",
@@ -86,7 +129,7 @@ const styles = StyleSheet.create({
     profileContainer: {
         alignItems: 'center', // Center align the icon and username
         marginLeft: 'auto',  // Push the profile container to the right
-        marginTop:50,
+        marginTop: 50,
     },
     circle: {
         width: 40, // Increase the size of the circle
@@ -105,7 +148,28 @@ const styles = StyleSheet.create({
     },
     profileText: {
         fontSize: 14,
-        color: '#000',  // Changed to black
+        color: '#000',
+        fontWeight: 'bold',
+    },
+    dropdown: {
+        position: 'absolute',
+        top: 100,
+        right: 10,
+        backgroundColor: '#fff',
+        padding: 10,
+        borderRadius: 5,
+        elevation: 5, // For Android shadow
+        shadowColor: '#000', // For iOS shadow
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 3,
+    },
+    dropdownItem: {
+        paddingVertical: 10,
+    },
+    dropdownItemText: {
+        fontSize: 16,
+        color: '#FF0000', // Red color for sign out
         fontWeight: 'bold',
     },
     content: {

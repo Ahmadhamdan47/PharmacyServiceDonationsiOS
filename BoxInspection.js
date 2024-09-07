@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, TouchableOpacity } from 'react-native';
 import axios from 'axios';
-import { Table, Row, Rows } from 'react-native-table-component';
-import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomNavBarInspection
+import { Table, Row } from 'react-native-table-component';
+import BottomNavBarInspection from './BottomNavBarInspection';
 
 const BoxInspection = ({ route, navigation }) => {
     const { boxId } = route.params;
@@ -12,33 +12,29 @@ const BoxInspection = ({ route, navigation }) => {
     const [recipientName, setRecipientName] = useState('');
     const [batchLots, setBatchLots] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [selectedRows, setSelectedRows] = useState([]); // To track selected rows
     const [tableHead] = useState(['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Status']);
     const [widthArr] = useState([30, 100, 80, 80, 100, 80, 100, 80, 80, 100, 100]);
 
     useEffect(() => {
         const fetchBoxDetails = async () => {
             try {
-                // Fetch BoxLabel and DonationId using BoxId
-                const boxResponse = await fetch(`https://apiv2.medleb.org/boxes/${boxId}`);
-                const boxData = await boxResponse.json();
+                const boxResponse = await axios.get(`https://apiv2.medleb.org/boxes/${boxId}`);
+                const boxData = boxResponse.data;
                 setBoxLabel(boxData.BoxLabel);
 
-                // Fetch DonationTitle, Donor, and Recipient using DonationId
-                const donationResponse = await fetch(`https://apiv2.medleb.org/donation/${boxData.DonationId}`);
-                const donationData = await donationResponse.json();
+                const donationResponse = await axios.get(`https://apiv2.medleb.org/donation/${boxData.DonationId}`);
+                const donationData = donationResponse.data;
                 setDonationTitle(donationData.DonationTitle);
                 setDonorName(donationData.DonorName);
                 setRecipientName(donationData.RecipientName);
 
-                // Fetch all batches related to BoxId
-                const batchesResponse = await fetch(`https://apiv2.medleb.org/batchLots/byBox/${boxId}`);
-                const batchesData = await batchesResponse.json();
+                const batchesResponse = await axios.get(`https://apiv2.medleb.org/batchserial/byBox/${boxId}`);
+                const batchesData = batchesResponse.data.data;
                 setBatchLots(batchesData);
 
-                // Check if all batch lots are inspected
                 const allInspected = batchesData.every(batch => batch.Inspection === 'inspected');
                 if (allInspected) {
-                    // Call inspect box API
                     await markBoxAsInspected(boxId);
                 }
 
@@ -62,16 +58,112 @@ const BoxInspection = ({ route, navigation }) => {
         }
     };
 
+    const toggleSelectRow = (index) => {
+        setSelectedRows(prevSelectedRows => {
+            if (prevSelectedRows.includes(index)) {
+                return prevSelectedRows.filter(row => row !== index);
+            } else {
+                return [...prevSelectedRows, index];
+            }
+        });
+    };
+
+    const handleInspect = async () => {
+        try {
+            let alreadyRejected = false;
+    
+            for (let index of selectedRows) {
+                const batchLot = batchLots[index];
+    
+                if (batchLot.Inspection === 'rejected') {
+                    alreadyRejected = true;
+                    break;
+                }
+    
+                // Call the API to inspect each selected pack using batchSerialNumberId
+                const response = await axios.put(`https://apiv2.medleb.org/batchserial/inspect/${batchLot.BatchSerialNumberId}`);
+                
+                if (response.data.message) {
+                    Alert.alert('Notice', response.data.message); 
+                } else {
+                    batchLot.Inspection = 'inspected';
+                }
+            }
+    
+            if (alreadyRejected) {
+                Alert.alert('Error', 'You have some already rejected packs.');
+            } else {
+                await markBoxAsInspected(boxId);
+                Alert.alert('Success', 'Selected packs inspected successfully.');
+            }
+    
+        } catch (error) {
+            console.error('Error inspecting packs:', error);
+            Alert.alert('Error', 'Failed to inspect selected packs.');
+        }
+    };
+    
+    const handleReject = async () => {
+        try {
+            for (let index of selectedRows) {
+                const batchLot = batchLots[index];
+    
+                // Call the API to reject each selected pack using batchSerialNumberId
+                const response = await axios.put(`https://apiv2.medleb.org/batchserial/reject/${batchLot.BatchSerialNumberId}`);
+    
+                if (response.data.message) {
+                    Alert.alert('Notice', response.data.message); 
+                } else {
+                    batchLot.Inspection = 'rejected';
+                }
+            }
+    
+            Alert.alert('Success', 'Selected packs rejected successfully.');
+        } catch (error) {
+            console.error('Error rejecting packs:', error);
+            Alert.alert('Error', 'Failed to reject selected packs.');
+        }
+    };
+
+    const handleReport = async () => {
+        try {
+            for (let index of selectedRows) {
+                const batchLot = batchLots[index];
+    
+                // Call the API to report each selected pack using batchSerialNumberId
+                const response = await axios.put(`https://apiv2.medleb.org/batchserial/report/${batchLot.BatchSerialNumberId}`);
+    
+                if (response.data.message) {
+                    Alert.alert('Notice', response.data.message); 
+                } else {
+                    batchLot.Inspection = 'underReport';
+                }
+            }
+    
+            Alert.alert('Success', 'Selected packs reported successfully.');
+        } catch (error) {
+            console.error('Error reporting packs:', error);
+            Alert.alert('Error', 'Failed to report selected packs.');
+        }
+    };
+
+    const selectAllRows = () => {
+        const allIndexes = batchLots.map((_, index) => index);
+        setSelectedRows(allIndexes);
+    };
+
     return (
         <View style={styles.container}>
             <View style={styles.headerContainer}>
-    
                 <View style={styles.headerTextContainer}>
                     <Text style={styles.title}>{boxLabel}</Text>
                     <Text style={styles.subtitle}>{donationTitle}</Text>
                     <Text style={styles.subtitle}>Donor: {donorName}</Text>
                     <Text style={styles.subtitle}>Recipient: {recipientName}</Text>
                 </View>
+                <TouchableOpacity onPress={selectAllRows}>
+                    <Text style={styles.selectAllButton}>Select All</Text>
+                </TouchableOpacity>
             </View>
 
             {loading ? (
@@ -81,29 +173,52 @@ const BoxInspection = ({ route, navigation }) => {
                     <View>
                         <Table borderStyle={{ borderWidth: 1, borderColor: '#C1C0B9' }}>
                             <Row data={tableHead} style={styles.head} textStyle={styles.headText} widthArr={widthArr} />
-                            <Rows
-                                data={batchLots.map((lot, index) => [
-                                    index + 1,
-                                    lot.DrugName || 'N/A',
-                                    lot.Presentation || 'N/A',
-                                    lot.Form || 'N/A',
-                                    lot.Laboratory || 'N/A',
-                                    lot.LaboratoryCountry || 'N/A',
-                                    lot.GTIN || 'N/A',
-                                    lot.BatchNumber || 'N/A',
-                                    lot.ExpiryDate || 'N/A',
-                                    lot.SerialNumber || 'N/A',
-                                    lot.Inspection || 'N/A'
-                                ])}
-                                textStyle={styles.text}
-                                widthArr={widthArr}
-                            />
+                            {batchLots.map((lot, index) => (
+                                <TouchableOpacity
+                                    key={index}
+                                    onPress={() => toggleSelectRow(index)}
+                                    style={[
+                                        styles.row,
+                                        selectedRows.includes(index) && styles.selectedRow
+                                    ]}
+                                >
+                                    <Row
+                                        data={[
+                                            index + 1,
+                                            lot.DrugName || 'N/A',
+                                            lot.Presentation || 'N/A',
+                                            lot.Form || 'N/A',
+                                            lot.Laboratory || 'N/A',
+                                            lot.LaboratoryCountry || 'N/A',
+                                            lot.GTIN || 'N/A',
+                                            lot.BatchNumber || 'N/A',
+                                            lot.ExpiryDate || 'N/A',
+                                            lot.SerialNumber || 'N/A',
+                                            lot.Inspection || 'N/A'
+                                        ]}
+                                        widthArr={widthArr}
+                                        textStyle={styles.text}
+                                    />
+                                </TouchableOpacity>
+                            ))}
                         </Table>
                     </View>
                 </ScrollView>
             )}
-                    <BottomNavBarInspection currentScreen="PackInspection" />
 
+            <View style={styles.buttonContainer}>
+                <TouchableOpacity style={styles.inspectButton} onPress={handleInspect}>
+                    <Text style={styles.buttonText}>Inspect</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.rejectButton} onPress={handleReject}>
+                    <Text style={styles.buttonText}>Reject</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.reportButton} onPress={handleReport}>
+                    <Text style={styles.buttonText}>Report</Text>
+                </TouchableOpacity>
+            </View>
+
+            <BottomNavBarInspection currentScreen="PackInspection" />
         </View>
     );
 };
@@ -119,14 +234,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 10,
-    },
-    backButton: {
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-    },
-    backButtonText: {
-        color: '#000',
-        fontSize: 16,
     },
     headerTextContainer: {
         flex: 1,
@@ -155,6 +262,41 @@ const styles = StyleSheet.create({
         margin: 6,
         textAlign: 'center',
         fontSize: 10,
+    },
+    row: {
+        backgroundColor: '#fff',
+    },
+    selectedRow: {
+        backgroundColor: '#d0f0c0', // Light green color for selected rows
+    },
+    buttonContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        marginTop: 20,
+    },
+    inspectButton: {
+        backgroundColor: 'green',
+        padding: 10,
+        borderRadius: 5,
+    },
+    rejectButton: {
+        backgroundColor: 'red',
+        padding: 10,
+        borderRadius: 5,
+    },
+    reportButton: {
+        backgroundColor: 'orange',
+        padding: 10,
+        borderRadius: 5,
+    },
+    buttonText: {
+        color: '#fff',
+        fontWeight: 'bold',
+    },
+    selectAllButton: {
+        color: 'green',
+        fontWeight: 'bold',
+        fontSize: 16,
     },
 });
 

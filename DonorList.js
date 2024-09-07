@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, BackHandler } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import XLSX from 'xlsx';
-import { useNavigation } from '@react-navigation/native'; // Import useNavigation hook
+import { useNavigation, useFocusEffect } from '@react-navigation/native'; // Import useNavigation and useFocusEffect
 import BottomNavBar from './BottomNavBar'; // Import BottomNavBar
 
 const DonorList = ({ navigation }) => {
@@ -17,6 +17,11 @@ const DonorList = ({ navigation }) => {
     useEffect(() => {
         // Set up the header with the user icon and name
         navigation.setOptions({
+            headerLeft: () => (
+                <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
+                    <Text style={styles.backButtonText}>Back</Text>
+                </TouchableOpacity>
+            ),
             headerRight: () => (
                 <View style={styles.userInfo}>
                     {/* User Icon */}
@@ -30,6 +35,12 @@ const DonorList = ({ navigation }) => {
         });
 
         fetchDonorId();
+
+        // Add event listener for physical back button press
+        const backHandler = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+
+        // Clean up event listener on component unmount
+        return () => backHandler.remove();
     }, [navigation, username]); // Include navigation and username in dependencies to update header
 
     useEffect(() => {
@@ -37,6 +48,11 @@ const DonorList = ({ navigation }) => {
             fetchDonations();
         }
     }, [donorId]);
+
+    const handleBackPress = () => {
+        navigation.navigate('DonorLanding'); // Navigate back to DonorLanding
+        return true; // Prevent default back behavior
+    };
 
     const fetchDonorId = async () => {
         try {
@@ -234,6 +250,14 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '300',
         color: '#121212',
+    },
+    backButton: {
+        marginLeft: 10,
+    },
+    backButtonText: {
+        fontSize: 16,
+        color: '#000',
+        fontWeight: 'bold',
     },
 });
 

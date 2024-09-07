@@ -81,11 +81,16 @@ const AddDonor = () => {
   };
 
   const handleContinue = async () => {
+    if (!donationTitle.trim()) {
+      Alert.alert('Error', 'Donation title is required.');
+      return;  // Prevent further execution
+    }
+  
     if (!donorId) {
       Alert.alert('Error', 'Failed to load donor information.');
       return;
     }
-
+  
     try {
       const response = await axios.post("https://apiv2.medleb.org/donation/add", {
         DonorId: donorId,
@@ -94,11 +99,12 @@ const AddDonor = () => {
         DonationPurpose: donationPurpose,
         DonationDate: new Date().toISOString(),
       });
-
+  
       const donationId = response.data.DonationId;
       const selectedRecipientName = recipients.find(recipient => recipient.value === selectedRecipient).label;
       const donationDate = new Date().toISOString().replace(/:/g, '-');
       console.log("Donation created successfully with ID:", donationId);
+      
       navigation.navigate('Donate', {
         donorId: donorId,
         recipientId: selectedRecipient,
@@ -112,6 +118,7 @@ const AddDonor = () => {
       console.error("Error creating donation:", error);
     }
   };
+  
 
   return (
     <View style={styles.container}>

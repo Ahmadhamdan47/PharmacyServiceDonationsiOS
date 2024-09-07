@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Image, ScrollView, TouchableOpacity, Alert, StyleSheet, Keyboard, BackHandler } from 'react-native';
+import { View, Text, TextInput, Image, ScrollView, TouchableOpacity, Alert, StyleSheet, Keyboard, BackHandler } from 'react-native';
 import { Camera } from 'expo-camera';
 import { BarCodeScanner } from 'expo-barcode-scanner';
 import { CameraType } from 'expo-camera/build/legacy/Camera.types';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomNavBarInspection
+import axios from 'axios';
 
 const Inspect = () => {
     const navigation = useNavigation();
@@ -18,6 +19,8 @@ const Inspect = () => {
     const [inspectionMessage, setInspectionMessage] = useState('');
     const [username, setUsername] = useState('');
     const [selectedOption, setSelectedOption] = useState('Packs'); // Default to 'Packs'
+    const [isFieldsVisible, setIsFieldsVisible] = useState(false); // Show fields after a successful scan
+    const [isCheckButtonVisible, setIsCheckButtonVisible] = useState(false); // Show Check button after scanning
 
     useEffect(() => {
         (async () => {
@@ -87,7 +90,7 @@ const Inspect = () => {
     const handleBarcodeDetected = async ({ type, data }) => {
         try {
             if (selectedOption === 'Packs') {
-                // Logic for Packs
+                // Extract data from barcode
                 const response = extractDataMatrix(data);
                 const updatedBatchLot = {
                     ...batchLot,
@@ -98,16 +101,13 @@ const Inspect = () => {
                 };
 
                 setBatchLot(updatedBatchLot);
-                setIsCameraOpen(false);
+                setIsCameraOpen(false);  // Close the camera after the scan
+                setIsFieldsVisible(true); // Show fields after scan
+                setIsCheckButtonVisible(true); // Show Check button after scan
 
-                // Automatically call CheckMate API after extracting data
-                await handleInspect(updatedBatchLot);
             } else if (selectedOption === 'Boxes') {
-                // Logic for Boxes
-                const boxId = data; // Assuming the barcode only contains the BoxId
+                const boxId = data;
                 setIsCameraOpen(false);
-
-                // Directly navigate to BoxInspection passing the BoxId
                 navigation.navigate('BoxInspection', { boxId });
             }
         } catch (error) {
@@ -126,11 +126,9 @@ const Inspect = () => {
 
         prefixes.forEach(({ prefix, key, length }) => {
             const position = responseCode.indexOf(prefix);
-
             if (position !== -1) {
                 const start = position + prefix.length;
                 const end = start + length;
-
                 response[key] = key === 'exp' ? parseExpiryDate(responseCode.substring(start, end)) : responseCode.substring(start, end);
                 responseCode = responseCode.slice(0, position) + responseCode.slice(end);
             }
@@ -196,9 +194,7 @@ const Inspect = () => {
         try {
             const response = await fetch('https://apiv2.medleb.org/batchserial/checkDonationStatus', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     GTIN: batchLotData.gtin,
                     BatchNumber: batchLotData.lotNumber,
@@ -206,104 +202,118 @@ const Inspect = () => {
                     ExpiryDate: batchLotData.expiryDate
                 }),
             });
-
+    
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.error || 'Inspection failed. Please check your inputs.');
             }
-
+    
             const data = await response.json();
-            const { isValid, isDonated, messageEN } = data;
-
+            const { isValid, isDonated, batchLot } = data;
+    
             if (isValid && isDonated) {
-                // Drug is valid and donated, proceed with the inspection process
                 setInspectionMessage('');
-
-                // Fetch the BoxLabel using the BoxId
-                const boxLabel = await fetchBoxLabel(data.batchLot.BoxId);
-                const donationId = await fetchDonationId(data.batchLot.BoxId);
-                const serialNumberId= await fetchSerialNumberId(batchLotData.serialNumber);
-                
-                // Navigate to PackInspection with the batch and box information
+                let boxLabel = '';
+                let donationId = '';
+                let serialNumberId = '';
+    
+                if (batchLot.BoxId) {
+                    boxLabel = await fetchBoxLabel(batchLot.BoxId);
+                    donationId = await fetchDonationId(batchLot.BoxId);
+                }
+    
+                serialNumberId = await fetchSerialNumberId(batchLotData.serialNumber);
+    
                 navigation.navigate('PackInspection', {
                     batchLot: { 
                         ...batchLotData, 
-                        drugName: data.batchLot.DrugName,
+                        drugName: batchLot.DrugName,
                         donationId: donationId,
-                        form: data.batchLot.Form,
-                        presentation: data.batchLot.Presentation,
-                        quantity: data.batchLot.Quantity,
-                        owner: data.batchLot.Laboratory,
-                        country: data.batchLot.LaboratoryCountry,
-                        boxId: data.batchLot.BoxId,
+                        form: batchLot.Form,
+                        presentation: batchLot.Presentation,
+                        quantity: batchLot.Quantity,
+                        owner: batchLot.Laboratory,
+                        country: batchLot.LaboratoryCountry,
+                        boxId: batchLot.BoxId,
                         boxLabel: boxLabel,
-                        batchLotId: data.batchLot.BatchLotId,
-                        serialNumberId : serialNumberId
+                        batchLotId: batchLot.BatchLotId,
+                        serialNumberId: serialNumberId
                     }
                 });
-
+    
             } else if (isValid && !isDonated) {
-                // Drug is found but not donated, show a message
                 Alert.alert('Drug Status', 'This drug is already found in our database but not donated.', [{ text: 'OK' }]);
             } else if (!isValid) {
-                // Drug is not found, show a message
                 Alert.alert('Drug Status', 'This drug is not found in our database.', [{ text: 'OK' }]);
             }
         } catch (error) {
             setInspectionMessage(error.message);
         }
     };
+    
+    
 
-    const fetchBoxLabel = async (boxId) => {
-        try {
-            const response = await fetch(`https://apiv2.medleb.org/boxes/${boxId}`);
-            const contentType = response.headers.get('content-type');
-
-            if (!response.ok || !contentType || !contentType.includes('application/json')) {
-                const textResponse = await response.text();
-                console.error('Error: Response not JSON or not OK', textResponse);
-                throw new Error('Failed to fetch box label or response is not JSON');
-            }
-
-            const data = await response.json();
-            return data.BoxLabel;
-        } catch (error) {
-            console.error('Error fetching box label:', error);
-            return '';
-        }
-    };
     const fetchSerialNumberId = async (serialNumber) => {
         try {
-            const response = await fetch(`https://apiv2.medleb.org/batchserial/${serialNumber}`);
-            if (!response.ok) {
-                throw new Error('Failed to fetch serial number ID.');
-            }
-            const data = await response.json();
-            return data.BatchSerialNumberId;
+            // Make the GET request using axios with the correct URL and string interpolation
+            const response = await axios.get(`https://apiv2.medleb.org/batchserial/${serialNumber}`);
+            
+            // Since axios automatically handles JSON parsing, just access the data
+            return response.data.BatchSerialNumberId;
+            
         } catch (error) {
-            console.error('Error fetching serial number ID:', error);
+            if (error.response) {
+                // The request was made and the server responded with a status code not in the 2xx range
+                console.error('Error fetching serial number ID:', error.response.data);
+            } else if (error.request) {
+                // The request was made but no response was received
+                console.error('No response received:', error.request);
+            } else {
+                // Something else happened during the request setup
+                console.error('Error setting up request:', error.message);
+            }
             return null;
         }
     };
-    const fetchDonationId = async (boxId) => {
-        try {
-            const response = await fetch(`https://apiv2.medleb.org/boxes/${boxId}`);
-            const contentType = response.headers.get('content-type');
+    
 
-            if (!response.ok || !contentType || !contentType.includes('application/json')) {
-                const textResponse = await response.text();
-                console.error('Error: Response not JSON or not OK', textResponse);
-                throw new Error('Failed to fetch Donation Id or response is not JSON');
-            }
-
-            const data = await response.json();
-            return data.DonationId;
-        } catch (error) {
-            console.error('Error fetching Donation ID:', error);
-            return '';
+const fetchBoxLabel = async (boxId) => {
+    try {
+        const response = await axios.get(`https://apiv2.medleb.org/boxes/${boxId}`);
+        console.log('Box Data:', response.data); // Log the data for debugging
+        return response.data.BoxLabel;  // axios automatically parses the JSON
+    } catch (error) {
+        if (error.response) {
+            // The request was made and the server responded with a status code outside 2xx
+            console.error('Error fetching box label:', error.response.data);
+        } else if (error.request) {
+            // The request was made but no response was received
+            console.error('Error: No response from server', error.request);
+        } else {
+            // Something happened in setting up the request
+            console.error('Error setting up request:', error.message);
         }
-    };
+        return '';
+    }
+};
+const fetchDonationId = async (boxId) => {
+    try {
+        const response = await axios.get(`https://apiv2.medleb.org/boxes/${boxId}`);
+        return response.data.DonationId;  // axios automatically handles JSON parsing
+    } catch (error) {
+        if (error.response) {
+            console.error('Error fetching donation ID:', error.response.data);
+        } else if (error.request) {
+            console.error('Error: No response from server', error.request);
+        } else {
+            console.error('Error setting up request:', error.message);
+        }
+        return '';
+    }
+};
 
+
+    
     return (
         <View style={styles.container}>
             {isCameraOpen ? (
@@ -317,16 +327,60 @@ const Inspect = () => {
                     ref={scrollViewRef}
                     contentContainerStyle={styles.scrollViewContainer}
                 >
-                    {/* Dropdown Button */}
-                    <TouchableOpacity style={styles.dropdownButton} onPress={() => setSelectedOption(selectedOption === 'Packs' ? 'Boxes' : 'Packs')}>
-                        <Text style={styles.dropdownButtonText}>{selectedOption}</Text>
-                        <Text style={styles.dropdownArrow}>▼</Text>
-                    </TouchableOpacity>
+                    {/* Show picker and scan button only before the scan */}
+                    {!isFieldsVisible && (
+                        <>
+                            {/* Dropdown Button */}
+                            <TouchableOpacity style={styles.dropdownButton} onPress={() => setSelectedOption(selectedOption === 'Packs' ? 'Boxes' : 'Packs')}>
+                                <Text style={styles.dropdownButtonText}>{selectedOption}</Text>
+                                <Text style={styles.dropdownArrow}>▼</Text>
+                            </TouchableOpacity>
 
-                    {/* Barcode Scanner Icon */}
-                    <TouchableOpacity onPress={handleOpenCamera} style={styles.cameraButton}>
-                        <Image source={require("./assets/2d.png")} style={styles.cameraImage} />
-                    </TouchableOpacity>
+                            {/* Scan Barcode Button */}
+                            <TouchableOpacity onPress={handleOpenCamera} style={styles.cameraButton}>
+                                <Image source={require("./assets/2d.png")} style={styles.cameraImage} />
+                            </TouchableOpacity>
+                        </>
+                    )}
+
+                    {/* Show fields and Check button after a successful scan */}
+                    {isFieldsVisible && (
+                        <>
+                            <View style={styles.inputContainer}>
+                                <Text>GTIN *</Text>
+                                <TextInput 
+                                    style={styles.inputField}
+                                    value={batchLot.gtin}
+                                    onChangeText={text => setBatchLot({ ...batchLot, gtin: text })}
+                                />
+                                <Text>LOT/Batch Number *</Text>
+                                <TextInput 
+                                    style={styles.inputField}
+                                    value={batchLot.lotNumber}
+                                    onChangeText={text => setBatchLot({ ...batchLot, lotNumber: text })}
+                                />
+                                <Text>Expiry Date *</Text>
+                                <TextInput 
+                                    style={styles.inputField}
+                                    value={batchLot.expiryDate}
+                                    onChangeText={text => setBatchLot({ ...batchLot, expiryDate: text })}
+                                />
+                                <Text>Serial Number *</Text>
+                                <TextInput 
+                                    style={styles.inputField}
+                                    value={batchLot.serialNumber}
+                                    onChangeText={text => setBatchLot({ ...batchLot, serialNumber: text })}
+                                />
+                            </View>
+
+                            {/* Show Check Button after fields are visible */}
+                            {isCheckButtonVisible && (
+                                <TouchableOpacity style={styles.checkButton} onPress={() => handleInspect(batchLot)}>
+                                    <Text style={styles.checkButtonText}>Check</Text>
+                                </TouchableOpacity>
+                            )}
+                        </>
+                    )}
 
                     {inspectionMessage !== '' && (
                         <View style={styles.inspectionMessageContainer}>
@@ -336,7 +390,6 @@ const Inspect = () => {
                 </ScrollView>
             )}
 
-            {/* Bottom Navigation Bar */}
             {!isCameraOpen && !isInputFocused && (
                 <BottomNavBarInspection currentScreen="Inspect" />
             )}
@@ -411,6 +464,17 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#00A651',
     },
+    inputContainer: {
+        width: '90%',
+        paddingVertical: 10,
+    },
+    inputField: {
+        borderColor: '#00A651',
+        borderWidth: 1,
+        borderRadius: 5,
+        padding: 10,
+        marginBottom: 10,
+    },
     cameraButton: {
         alignItems: 'center',
         marginBottom: 20,
@@ -421,6 +485,17 @@ const styles = StyleSheet.create({
         height: 200,
         resizeMode: 'contain',
         marginBottom: 150,
+    },
+    checkButton: {
+        backgroundColor: '#00A651',
+        padding: 10,
+        borderRadius: 5,
+        marginTop: 20,
+    },
+    checkButtonText: {
+        color: '#fff',
+        fontWeight: 'bold',
+        textAlign: 'center',
     },
     inspectionMessageContainer: {
         marginTop: 20,
@@ -435,3 +510,4 @@ const styles = StyleSheet.create({
 });
 
 export default Inspect;
+    

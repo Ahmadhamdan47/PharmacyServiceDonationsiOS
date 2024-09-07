@@ -1,84 +1,47 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import axios from 'axios';
 import { Table, Row, Rows } from 'react-native-table-component';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import XLSX from 'xlsx';
+import BottomNavBarInspection from './BottomNavBarInspection';
 
 const BoxDetails = ({ route, navigation }) => {
     const { box } = route.params;
-    const [batchLots, setBatchLots] = useState([]);
+    const [batchLots, setBatchLots] = useState([]);  // Initialize as an empty array
     const [loading, setLoading] = useState(true);
-    const [tableHead] = useState(['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb']);
-    const [widthArr] = useState([30, 100, 80, 80, 100, 80, 100, 80, 80, 100]);
+    const [tableHead] = useState(['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Status']);
+    const [widthArr] = useState([30, 100, 80, 80, 100, 80, 100, 80, 80, 100, 100]);
 
     useEffect(() => {
-        fetchBatchLots();
+        fetchSerialNumbers();
     }, []);
 
-    const fetchBatchLots = async () => {
+    const fetchSerialNumbers = async () => {
         try {
-            const response = await axios.get(`https://apiv2.medleb.org/batchlots/byBox/${box.BoxId}`);
-            setBatchLots(response.data);
+            const response = await axios.get(`https://apiv2.medleb.org/batchserial/byBox/${box.BoxId}`);
+            const data = response.data.data; // Ensure you access the 'data' property correctly
+console.log(data);
+            if (Array.isArray(data)) {
+                setBatchLots(data); // Correctly set the array of batch lots
+            } else {
+                setBatchLots([]);  // Fallback to an empty array if the response is not an array
+            }
         } catch (error) {
-            console.error('Error fetching batch lots:', error);
-            Alert.alert('Error', 'Failed to load batch lots.');
+            console.error('Error fetching serial numbers:', error);
+            Alert.alert('Error', 'Failed to load serial numbers.');
         }
         setLoading(false);
     };
 
-    const exportToExcel = async () => {
-        try {
-            const formattedData = batchLots.map((lot, index) => [
-                index + 1,
-                lot.DrugName || 'N/A',
-                lot.Presentation || 'N/A',
-                lot.Form || 'N/A',
-                lot.Laboratory || 'N/A',
-                lot.LaboratoryCountry || 'N/A',
-                lot.GTIN || 'N/A',
-                lot.BatchNumber || 'N/A',
-                lot.ExpiryDate || 'N/A',
-                lot.SerialNumber || 'N/A'
-            ]);
-
-            const ws = XLSX.utils.aoa_to_sheet([tableHead, ...formattedData]);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Batch Lots");
-
-            const wbout = XLSX.write(wb, { type: 'base64', bookType: "xlsx" });
-            const uri = FileSystem.documentDirectory + 'batch_lots.xlsx';
-
-            await FileSystem.writeAsStringAsync(uri, wbout, { encoding: FileSystem.EncodingType.Base64 });
-
-            if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(uri);
-            } else {
-                Alert.alert("Success", "Excel file has been saved to your device's storage.");
-            }
-        } catch (error) {
-            console.error("Error exporting to Excel:", error);
-            Alert.alert("Error", "Failed to export to Excel. Please try again.");
-        }
-    };
-
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Text style={styles.backButton}>Back</Text>
-                </TouchableOpacity>
-                <Text style={styles.title}>Support Lebanon - Box {box.BoxNumber} - {box.NumberOfPacks} Packs</Text>
-                <View style={styles.headerRight}>
-                    <TouchableOpacity style={styles.exportLink} onPress={exportToExcel}>
-                        <Text style={styles.exportLinkText}>Export .xlsx</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.qrCodeLink}>
-                        <Text style={styles.qrCodeText}>Box QR Code</Text>
-                    </TouchableOpacity>
+            <View style={styles.headerContainer}>
+                <View style={styles.headerTextContainer}>
+                    <Text style={styles.title}>Box {box.BoxNumber}</Text>
+                    <Text style={styles.subtitle}>Donor: {box.DonorName}</Text>
+                    <Text style={styles.subtitle}>Recipient: {box.RecipientName}</Text>
                 </View>
             </View>
+
             {loading ? (
                 <ActivityIndicator size="large" color="#0000ff" />
             ) : (
@@ -86,22 +49,28 @@ const BoxDetails = ({ route, navigation }) => {
                     <View>
                         <Table borderStyle={{ borderWidth: 1, borderColor: '#C1C0B9' }}>
                             <Row data={tableHead} style={styles.head} textStyle={styles.headText} widthArr={widthArr} />
-                            <Rows data={batchLots.map((lot, index) => [
-                                index + 1,
-                                lot.DrugName,
-                                lot.Presentation,
-                                lot.Form,
-                                lot.Laboratory,
-                                lot.LaboratoryCountry,
-                                lot.GTIN,
-                                lot.BatchNumber,
-                                lot.ExpiryDate,
-                                lot.SerialNumber
-                            ])} textStyle={styles.text} widthArr={widthArr} />
+                            <Rows
+                                data={batchLots.map((lot, index) => [
+                                    index + 1,  // Row index
+                                    lot.DrugName || 'N/A',  // Brand Name
+                                    lot.Presentation || 'N/A',  // Presentation
+                                    lot.Form || 'N/A',  // Form
+                                    lot.Laboratory || 'N/A',  // Laboratory
+                                    lot.LaboratoryCountry || 'N/A',  // Country
+                                    lot.GTIN || 'N/A',  // GTIN
+                                    lot.BatchNumber || 'N/A',  // LOT Number
+                                    lot.ExpiryDate || 'N/A',  // Expiry Date
+                                    lot.SerialNumber || 'N/A',  // Serial Number
+                                    lot.Inspection || 'N/A'  // Status (Inspection)
+                                ])}
+                                textStyle={styles.text}
+                                widthArr={widthArr}
+                            />
                         </Table>
                     </View>
                 </ScrollView>
             )}
+            <BottomNavBarInspection currentScreen="PackInspection" />
         </View>
     );
 };
@@ -112,39 +81,23 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         padding: 10,
     },
-    header: {
+    headerContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: '#ddd',
+        marginBottom: 10,
     },
-    backButton: {
-        fontSize: 16,
-        color: '#000',
-    },
-    title: {
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    headerRight: {
-        flexDirection: 'row',
+    headerTextContainer: {
+        flex: 1,
         alignItems: 'center',
     },
-    exportLink: {
-        marginRight: 15,
-    },
-    exportLinkText: {
-        color: '#00A651',
-        fontSize: 16,
+    title: {
+        fontSize: 18,
         fontWeight: 'bold',
     },
-    qrCodeLink: {},
-    qrCodeText: {
-        color: '#00A651',
-        fontSize: 16,
-        fontWeight: 'bold',
+    subtitle: {
+        fontSize: 14,
+        color: '#666',
     },
     head: {
         height: 40,
