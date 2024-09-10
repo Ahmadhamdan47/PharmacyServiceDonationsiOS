@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useLayoutEffect } from 'react';
 import { View, TextInput, Text, StyleSheet, Alert, Image, TouchableOpacity, ScrollView } from 'react-native';
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
@@ -215,7 +215,26 @@ const SignUp = () => {
         { label: 'Zambia', value: 'Zambia' },
         { label: 'Zimbabwe', value: 'Zimbabwe' },
     ]);
-    
+    useLayoutEffect(() => {
+        navigation.setOptions({
+            headerTitle: () => (
+                <Image
+                    source={require('./assets/medleblogo.png')}
+                    style={{ width: 166, height: 54 }}
+                />
+            ),
+            headerTitleAlign: 'center',  // Center the logo horizontally
+            headerLeft: () => null,      // Remove the back button
+            headerStyle: {
+                height: 150,             // Adjust the height of the header
+                backgroundColor: '#f9f9f9',
+            },
+            headerTitleStyle: {
+                marginTop: 50,           // Distance from the top (50px)
+            },
+        });
+    }, [navigation]);
+
     const navigation = useNavigation();
 
     const handleSignUp = async () => {
@@ -239,15 +258,14 @@ const SignUp = () => {
     return (
         <ScrollView contentContainerStyle={styles.scrollContainer}>
             <View style={styles.container}>
-                <Image source={require('./assets/medleblogo.png')} style={styles.logo} />
-                <Text style={styles.label}>Donor Name</Text>
+                <Text style={styles.label}>Donor Name*</Text>
                 <TextInput
                     style={styles.input}
                     value={donorName}
                     onChangeText={setDonorName}
                     placeholder="Donor Name"
                 />
-                <Text style={styles.label}>Donor Type</Text>
+                <Text style={styles.label}>Donor Type*</Text>
                 <DropDownPicker
                     open={open}
                     value={organizationType}
@@ -257,9 +275,9 @@ const SignUp = () => {
                     setItems={setItems}
                     placeholder="Select Donor Type"
                     style={styles.dropdown}
-                    containerStyle={{ marginBottom: 20 }}
+                    containerStyle={styles.dropdownContainer}  // Ensure container is styled
                 />
-                <Text style={styles.label}>Password</Text>
+                <Text style={styles.label}>Password*</Text>
                 <TextInput
                     style={styles.input}
                     value={password}
@@ -267,28 +285,28 @@ const SignUp = () => {
                     placeholder="Password"
                     secureTextEntry
                 />
-                <Text style={styles.label}>Address</Text>
+                <Text style={styles.label}>Address*</Text>
                 <TextInput
                     style={styles.input}
                     value={address}
                     onChangeText={setAddress}
                     placeholder="Address"
                 />
-                <Text style={styles.label}>Phone Number</Text>
+                <Text style={styles.label}>Phone Number*</Text>
                 <TextInput
                     style={styles.input}
                     value={phoneNumber}
                     onChangeText={setPhoneNumber}
                     placeholder="Phone Number"
                 />
-                <Text style={styles.label}>Email</Text>
+                <Text style={styles.label}>Email*</Text>
                 <TextInput
                     style={styles.input}
                     value={email}
                     onChangeText={setEmail}
                     placeholder="Email"
                 />
-                <Text style={styles.label}>Country</Text>
+                <Text style={styles.label}>Country*</Text>
                 <DropDownPicker
                     open={countryOpen}
                     value={country}
@@ -300,8 +318,8 @@ const SignUp = () => {
                     searchable={true}
                     searchPlaceholder="Search country..."
                     style={styles.dropdown}
-                    containerStyle={{ marginBottom: 20 }}
-                    dropDownContainerStyle={styles.dropdownContainer}
+                    containerStyle={styles.dropdownContainer}
+                    dropDownContainerStyle={styles.dropdownMenuContainer}
                 />
                 <TouchableOpacity style={styles.button} onPress={handleSignUp}>
                     <Text style={styles.buttonText}>Sign Up</Text>
@@ -313,15 +331,18 @@ const SignUp = () => {
 
 const styles = StyleSheet.create({
     scrollContainer: {
-        flexGrow: 1,
+        flexGrow: 0,
         justifyContent: 'center',
+        
+        
     },
     container: {
         flex: 1,
         justifyContent: 'center',
         padding: 20,
-        backgroundColor: '#fff',
-    },
+        backgroundColor:'#f9f9f9',
+        paddingBottom:'100%'
+        },
     logo: {
         width: 200,
         height: 80,
@@ -330,36 +351,48 @@ const styles = StyleSheet.create({
         marginBottom: 30,
     },
     label: {
-        fontSize: 16,
-        marginBottom: 10,
+        fontSize: 14,
+        marginBottom: 5,
         color: "#A9A9A9",
+        marginLeft:10,
     },
     input: {
         borderWidth: 1,
         borderColor: '#00a651',
-        padding: 10,
+        padding: 5,
+        paddingLeft:10,
         marginBottom: 20,
         borderRadius: 20,
+        height: 30,  // Match input height
     },
     dropdown: {
         borderColor: '#00a651',
         borderRadius: 20,
+        minHeight: 30,  // Set height same as input
+        paddingHorizontal: 10,  // Ensure text fits within the dropdown
+        backgroundColor:'#f9f9f9'
     },
     dropdownContainer: {
-        borderColor: '#00a651',
+        marginBottom: 20,  // Ensure space between elements
+        height: 30,  // Same height as inputs
+    },
+    dropdownMenuContainer: {
+        borderColor: '#00a651',  // Make sure the dropdown menu's border is styled consistently
     },
     button: {
         backgroundColor: '#00a651',
-        paddingVertical: 15,
-        paddingHorizontal: 30,
+        paddingVertical: 5,
+        paddingHorizontal: 10,
         borderRadius: 25,
-        alignItems: 'center',
         marginTop: 20,
+        height:30,
+        justifyContent: 'center',// Center button text vertically
+        alignItems: 'center',
     },
     buttonText: {
         color: 'white',
         fontWeight: 'bold',
-        fontSize: 18,
+        fontSize: 14,
     },
 });
 

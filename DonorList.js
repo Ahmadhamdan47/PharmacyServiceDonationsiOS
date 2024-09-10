@@ -50,7 +50,7 @@ const DonorList = ({ navigation }) => {
     }, [donorId]);
 
     const handleBackPress = () => {
-        navigation.navigate('DonorLanding'); // Navigate back to DonorLanding
+        navigation.navigate('Landing'); // Navigate back to Landing
         return true; // Prevent default back behavior
     };
 

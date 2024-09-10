@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, TextInput, Button, Text, StyleSheet, Alert, Image, TouchableOpacity } from 'react-native';
+import React, { useState, useLayoutEffect } from 'react';
+import { View, TextInput, Text, StyleSheet, Alert, Image, TouchableOpacity } from 'react-native';
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -9,42 +9,40 @@ const SignIn = () => {
     const [password, setPassword] = useState('');
     const navigation = useNavigation();
 
+    // Customize the navigation header
+    useLayoutEffect(() => {
+        navigation.setOptions({
+            headerTitle: () => (
+                <Image
+                    source={require('./assets/medleblogo.png')}
+                    style={{ width: 166, height: 54 }}
+                />
+            ),
+            headerTitleAlign: 'center',  // Center the logo horizontally
+            headerLeft: () => null,      // Remove the back button
+            headerStyle: {
+                height: 150,             // Adjust the height of the header
+                backgroundColor: '#f9f9f9',
+            },
+            headerTitleStyle: {
+                marginTop: 50,           // Distance from the top (50px)
+            },
+        });
+    }, [navigation]);
+
     const handleSignIn = async () => {
         try {
             const response = await axios.post('https://apiv2.medleb.org/users/login', { username, password });
             if (response.data.token) {
-                const { token, role, donorData } = response.data;
-                console.log('Response Data:', response.data);
-                console.log('User role:', role);
-                console.log('Status:', donorData ? donorData.IsActive : null);
-    
+                const { token, role } = response.data;
+
                 // Store the token, username, and user role
                 await AsyncStorage.setItem('token', token);
                 await AsyncStorage.setItem('username', username);
                 await AsyncStorage.setItem('userRole', role); 
-    
-                if (role === 'Admin') {
-                    navigation.navigate('AdminLanding');
-                } else if (role === 'Donor') {
-                    if (donorData) {
-                        if (donorData.IsActive === true) {
-                            // Convert boolean to string before storing in AsyncStorage
-                            await AsyncStorage.setItem('status', 'true');
-                            // Navigate to DonorLanding
-                            navigation.navigate('DonorLanding');
-                        } else if (donorData.IsActive === false) {
-                            await AsyncStorage.setItem('status', 'false');
-                            Alert.alert('Account Banned', 'Your account has been banned. Please contact support.');
-                        } else if (donorData.IsActive === null) {
-                            await AsyncStorage.setItem('status', 'null');
-                            Alert.alert('Account Not Validated', 'Your account is still not validated.');
-                        }
-                    } else {
-                        Alert.alert('Error', 'No donor data found.');
-                    }
-                } else {
-                    Alert.alert('Error', 'Invalid role');
-                }
+                await AsyncStorage.setItem('pinSet', 'true');
+
+                navigation.navigate('Landing'); // Navigate to the unified Landing screen
             } else {
                 Alert.alert('Error', 'Invalid credentials');
             }
@@ -53,28 +51,40 @@ const SignIn = () => {
             Alert.alert('Error', 'Failed to sign in');
         }
     };
-    
+
     return (
         <View style={styles.container}>
-            <Image source={require('./assets/medleblogo.png')} style={styles.logo} />
+            {/* Title */}
+            <Text style={styles.title}>Welcome to MedLeb</Text>
+
+            {/* Paragraph */}
+            <Text style={styles.paragraph}>
+            This application is developed for the Pharmacy Service at the Ministry of Public Health, to manage the drug donation procedure to Lebanon.
+            </Text>
+            
+            {/* Username Label and Input */}
             <Text style={styles.label}>Username</Text>
             <TextInput
                 style={styles.input}
                 value={username}
                 onChangeText={setUsername}
-                placeholder="Username"
             />
+            
+            {/* Password Label and Input */}
             <Text style={styles.label}>Password</Text>
             <TextInput
                 style={styles.input}
                 value={password}
                 onChangeText={setPassword}
-                placeholder="Password"
                 secureTextEntry
             />
+            
+            {/* Sign In Button */}
             <TouchableOpacity style={styles.button} onPress={handleSignIn}>
                 <Text style={styles.buttonText}>Sign In</Text>
             </TouchableOpacity>
+
+            {/* Sign Up Link */}
             <Text style={styles.link} onPress={() => navigation.navigate('SignUp')}>
                 Don't have an account? Sign Up
             </Text>
@@ -84,42 +94,63 @@ const SignIn = () => {
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
+        flex: 0,
         justifyContent: 'center',
         padding: 20,
-        backgroundColor: '#fff',
+        backgroundColor: '#f9f9f9',
+        paddingBottom:'100%',
     },
-    logo: {
-        width: 400,
-        height: 160,
-        resizeMode: 'contain',
-        alignSelf: 'center',
-        marginBottom: 30,
+    title: {
+        fontSize: 14,           // Adjust the title font size as needed
+        fontWeight: 'bold',     // Title in bold
+        textAlign: 'center',
+        marginTop: 47 ,         // 150px from the top border
+        marginBottom: 46,       // 46px space between the title and the logo
+        color: '#121212',
+    },
+    paragraph: {
+        fontSize: 14,           // Paragraph font size
+        fontWeight: '500',      // Medium weight
+        textAlign: 'center',
+        marginHorizontal: 30,   // Horizontal margin for text width control
+        marginBottom: 110,       // 47px space between paragraph and title
+        width: 298,             // Set specific width
+        height: 54,             // Set specific height
+        alignSelf: 'center',    // Center the paragraph horizontally
+        color: '#555',          // Set paragraph text color
     },
     label: {
-        fontSize: 16,
-        marginBottom: 10,
+        fontSize: 12,
+        marginBottom: 5,        // Distance between label and input field
         color: "#A9A9A9",
+        marginLeft: 30,         // Distance between label and the left side
     },
     input: {
         borderWidth: 1,
         borderColor: '#00a651',
-        padding: 10,
-        marginBottom: 20,
+        paddingLeft: 15,
+        height: 30,             // Set height to 30px for inputs
         borderRadius: 20,
+        marginBottom: 10,       // Distance between input fields
+        marginLeft: 15,         // Align inputs with labels
+        marginRight: 15, 
+        fontSize: 12,           // Adjust the font size to fit the 30px height input
+        // Add right margin for even spacing
     },
     button: {
         backgroundColor: '#00a651',
-        paddingVertical: 15,
-        paddingHorizontal: 30,
-        borderRadius: 25,
-        alignItems: 'center',
-        marginTop: 20,
+        height: 30,             // Set button height to 30px
+        justifyContent: 'center',// Center button text vertically
+        alignItems: 'center',    // Center button text horizontally
+        borderRadius: 25,        // Distance between button and last input field
+        marginLeft: 15,          // Align button with input fields
+        marginRight: 15,
+        marginTop: 10,           // Add right margin for even spacing
     },
     buttonText: {
         color: 'white',
         fontWeight: 'bold',
-        fontSize: 18,
+        fontSize: 14,
     },
     link: {
         marginTop: 20,

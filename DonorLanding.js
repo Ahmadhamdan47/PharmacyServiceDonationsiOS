@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBar from './BottomNavBar'; // Import BottomNavBar
 
-const DonorLanding = () => {
+const Landing = () => {
     const navigation = useNavigation();
     const [username, setUsername] = useState('');
     const [backPressedOnce, setBackPressedOnce] = useState(false); // To handle back button
@@ -28,7 +28,8 @@ const DonorLanding = () => {
     useEffect(() => {
         const backAction = () => {
             if (backPressedOnce) {
-                BackHandler.exitApp(); // Close the app on second back press
+                // This will exit the app without resetting the login state
+                BackHandler.exitApp();
             } else {
                 setBackPressedOnce(true);
                 ToastAndroid.show('Press back again to exit', ToastAndroid.SHORT);
@@ -196,4 +197,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default DonorLanding;
+export default Landing;

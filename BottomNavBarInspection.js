@@ -8,9 +8,9 @@ const BottomNavBarInspection = ({ currentScreen }) => {
 
     return (
         <View style={styles.container}>
-            <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('AdminLanding')}>
+            <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Landing')}>
                 <Image
-                    source={currentScreen === 'AdminLanding' ? require('./assets/home-green.png') : require('./assets/home-grey.png')}
+                    source={currentScreen === 'Landing' ? require('./assets/home-green.png') : require('./assets/home-grey.png')}
                     style={styles.icon}
                 />
             </TouchableOpacity>
@@ -37,8 +37,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 10,
         borderTopWidth: 1,
-        borderTopColor: '#fff',
-        backgroundColor: '#fff',
+        borderTopColor: '#f9f9f9',
+        backgroundColor: '#f9f9f9',
     },
     navItem: {
         alignItems: 'center',

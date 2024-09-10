@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Dimensions, Keyboard, BackHandler } from 'react-native';
+import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Dimensions, Keyboard, BackHandler, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Camera } from 'expo-camera';
 import { BarCodeScanner } from 'expo-barcode-scanner';
@@ -70,11 +70,11 @@ const BatchLotForm = React.forwardRef(({ form, index, handleFieldChange, drugIte
       </View>
       {validationErrors[index]?.gtin && <Text style={styles.errorMessage}>{validationErrors[index].gtin}</Text>}
 
-      <FieldLabel label="LOT Number" />
+      <FieldLabel label="Batch Lot Number" />
       <TextInput
         ref={inputRefs.lotNumber}
         style={[styles.input, validationErrors[index]?.lotNumber ? styles.inputError : null]}
-        placeholder="LOT number"
+        placeholder="Batch Lot Number"
         value={form.lotNumber}
         onChangeText={text => handleFieldChange(index, 'lotNumber', text)}
         onFocus={() => setIsInputFocused(true)}
@@ -149,20 +149,22 @@ const BatchLotForm = React.forwardRef(({ form, index, handleFieldChange, drugIte
         searchable={true}
         placeholder="Select a drug"
         searchPlaceholder="Search..."
+        arrowIconStyle={{ display: 'none' }}
         style={{
           borderWidth: 1,
           borderColor: '#00a651',
-          borderRadius: 10,
-          paddingVertical: 5,
-          paddingHorizontal: 10,
-          height: 40, // Matches the GTIN input height
-          width: '95%', // Matches the GTIN input width
-          alignSelf: 'center',
-          backgroundColor: '#fff',
-          marginBottom: 14, // Matches spacing consistency
+          borderRadius: 20,
+          padding: 5,
+          paddingLeft:10,
+          minHeight: 30,  // Set height to 30px
+          marginBottom: 10,
+          backgroundColor: '#FFFCFC',
+          marginLeft:35,
+          marginRight:35,
+          width:325,
         }}
         dropDownContainerStyle={{
-          backgroundColor: "#fff",
+          backgroundColor: "#FFFCFC",
           borderWidth: 1,
           borderColor: '#00a651',
           borderRadius: 10,
@@ -179,7 +181,10 @@ const BatchLotForm = React.forwardRef(({ form, index, handleFieldChange, drugIte
         <View style={styles.halfWidth}>
           <FieldLabel label="Presentation *" />
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input, 
+              { fontSize: 12 } // Override the font size here directly
+            ]}
             placeholder="Presentation"
             value={form.presentation}
             onChangeText={text => handleFieldChange(index, 'presentation', text)}
@@ -190,7 +195,10 @@ const BatchLotForm = React.forwardRef(({ form, index, handleFieldChange, drugIte
         <View style={styles.halfWidth}>
           <FieldLabel label="Form *" />
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input, 
+              { fontSize: 12 } // Override the font size here directly
+            ]}
             placeholder="Form"
             value={form.form}
             onChangeText={text => handleFieldChange(index, 'form', text)}
@@ -203,7 +211,10 @@ const BatchLotForm = React.forwardRef(({ form, index, handleFieldChange, drugIte
         <View style={styles.halfWidth}>
           <FieldLabel label="Laboratory *" />
           <TextInput
-            style={styles.input}
+           style={[
+            styles.input, 
+            { fontSize: 12 } // Override the font size here directly
+          ]}
             placeholder="Laboratory"
             value={form.owner}
             onChangeText={text => handleFieldChange(index, 'owner', text)}
@@ -214,7 +225,10 @@ const BatchLotForm = React.forwardRef(({ form, index, handleFieldChange, drugIte
         <View style={styles.halfWidth}>
           <FieldLabel label="Country *" />
           <TextInput
-            style={styles.input}
+            style={[
+        styles.input, 
+        { fontSize: 12 } // Override the font size here directly
+      ]}
             placeholder="Country"
             value={form.country}
             onChangeText={text => handleFieldChange(index, 'country', text)}
@@ -248,17 +262,24 @@ const Donate = ({ route }) => {
     useEffect(() => {
       navigation.setOptions({
         headerLeft: () => (
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.backButton}>Back</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
+             
+              <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
           </TouchableOpacity>
-        ),
+      ),
         headerRight: () => (
           <View style={styles.packContainer}>
-            <Text style={styles.packText}>Packs: {packCounter}</Text>  
-          </View>
+          <Text style={styles.packText}>Packs :</Text>  
+          <Text style={styles.packText}>{packCounter}</Text>  
+        </View>
+        
         ),
         headerTitleAlign: 'center',
         headerTitle: 'Donate',
+        headerStyle: {
+           // Increase the header height to accommodate the margin
+          backgroundColor: '#f9f9f9',
+      },
       });
     }, [navigation, username, packCounter]);  // Add packCounter to dependencies
   
@@ -282,7 +303,9 @@ const Donate = ({ route }) => {
   const [packCount, setPackCount] = useState(0);
   const [boxLabelCounter, setBoxLabelCounter] = useState(1);
   const [packCounter, setPackCounter] = useState(1);  // Initialize packCounter with 1
-
+  const [finishModalVisible, setFinishModalVisible] = useState(false);
+  const [newPackCount, setNewPackCount] = useState(0);
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -696,26 +719,11 @@ const Donate = ({ route }) => {
       if (responses.every(response => response.status === 200)) {
         const newPackCount = packCount + batchLots.length;
         setPackCount(newPackCount);
-
+      
         await axios.put(`https://apiv2.medleb.org/boxes/${currentBox}`, { NumberOfPacks: newPackCount });
-
-        Alert.alert(
-          'Success',
-          `${newPackCount} packs have been added to Box ${boxLabelCounter - 1}. What would you like to do next?`,
-          [
-            {
-              text: 'Add Another Box',
-              onPress: () => {
-                handleAddAnotherBox();
-                setPackCount(0);
-              },
-            },
-            {
-              text: 'Finish Donation',
-              onPress: handleFinishDonation,
-            },
-          ]
-        );
+      
+        setNewPackCount(newPackCount); // Store new pack count in state
+        setFinishModalVisible(true); // Show the custom modal
       } else {
         Alert.alert('Warning', 'Make sure you entered all of the required fields correctly');
       }
@@ -746,21 +754,7 @@ const Donate = ({ route }) => {
   };
 
   const handleFinishDonation = () => {
-    Alert.alert(
-      'Confirm Finish',
-      'Are you sure you want to finish the donation?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Yes',
-          onPress: () => navigation.navigate('DonorList'),
-        },
-      ],
-      { cancelable: false }
-    );
+   setConfirmModalVisible(true);
   };
 
   const handleNavigation = (routeName) => {
@@ -788,7 +782,7 @@ const Donate = ({ route }) => {
           style={{ ...StyleSheet.absoluteFillObject, height: '100%' }}
           type={type}
           onBarCodeScanned={handleBarcodeDetected}
-        />
+      />
       ) : (
         <ScrollView
           ref={scrollViewRef}
@@ -808,6 +802,7 @@ const Donate = ({ route }) => {
             </TouchableOpacity>
 
             <View style={styles.barcodeContainer}>
+            <FieldLabel label="GTIN*" />
               <TextInput
                 style={[styles.input, validationErrors[0] && validationErrors[0].gtin ? styles.inputError : null]}
                 placeholder="GTIN"
@@ -823,17 +818,17 @@ const Donate = ({ route }) => {
                 <Text style={styles.errorMessage}>{validationErrors[0].gtin}</Text>
               )}
 
-              <FieldLabel label="LOT" />
+              <FieldLabel label="Batch Lot Number*" />
               <TextInput
                 style={[styles.input, validationErrors[0]?.lotNumber ? styles.inputError : null]}
-                placeholder="LOT number"
+                placeholder="Batch Lot number"
                 value={batchLots[0].lotNumber}
                 onChangeText={text => handleFieldChange(0, 'lotNumber', text)}
                 onFocus={() => setIsInputFocused(true)}
                 onBlur={() => setIsInputFocused(false)}
               />
               {validationErrors[0]?.lotNumber && <Text style={styles.errorMessage}>{validationErrors[0].lotNumber}</Text>}
-              <FieldLabel label="Expiry Date" />
+              <FieldLabel label="Expiry Date*" />
               <TextInput
                 style={[styles.input, validationErrors[0]?.expiryDate ? styles.inputError : null]}
                 placeholder="Expiry Date"
@@ -843,7 +838,7 @@ const Donate = ({ route }) => {
                 onBlur={() => setIsInputFocused(false)}
               />
               {validationErrors[0]?.expiryDate && <Text style={styles.errorMessage}>{validationErrors[0].expiryDate}</Text>}
-              <FieldLabel label="Serial Number" />
+              <FieldLabel label="Serial Number*" />
               <TextInput
                 style={[styles.input, validationErrors[0]?.serialNumber ? styles.inputError : null]}
                 placeholder="Serial Number"
@@ -857,7 +852,10 @@ const Donate = ({ route }) => {
 
 
             <View style={styles.detailsContainer}>
-              <Text style={styles.header}> Medication Details</Text>
+            <Image
+    source={require('./assets/medicationdetails.png')}
+    style={styles.detailsImage}
+  />
               <DropDownPicker
                 open={batchLots[0].open}
                 value={batchLots[0].drugName}
@@ -894,20 +892,22 @@ const Donate = ({ route }) => {
                 searchable={true}
                 placeholder="Select a drug"
                 searchPlaceholder="Search..."
+                arrowIconStyle={{ display: 'none' }}
                 style={{
                   borderWidth: 1,
                   borderColor: '#00a651',
-                  borderRadius: 10,
-                  paddingVertical: 5,
-                  paddingHorizontal: 10,
-                  height: 40, // Matches the GTIN input height
-                  width: '95%', // Matches the GTIN input width
-                  alignSelf: 'center',
-                  backgroundColor: '#fff',
-                  marginBottom: 14, // Matches spacing consistency
+                  borderRadius: 20,
+                  padding: 5,
+                  paddingLeft:10,
+                  minHeight: 30,  // Set height to 30px
+                  marginBottom: 10,
+                  backgroundColor: "#FFFCFC",
+                  marginLeft:35,
+                  marginRight:35,
+                  width:325,
                 }}
                 dropDownContainerStyle={{
-                  backgroundColor: "#fff",
+                  backgroundColor: "#FFFCFC",
                   borderWidth: 1,
                   borderColor: '#00a651',
                   borderRadius: 10,
@@ -994,12 +994,18 @@ const Donate = ({ route }) => {
           ))}
 
           <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[styles.button, !isFormValid ? { backgroundColor: 'grey' } : {}]}
-              onPress={() => isFormValid ? addBatchLotForm() : validateFields()}
-            >
-              <Text style={styles.buttonText}>Add more</Text>
-            </TouchableOpacity>
+          <TouchableOpacity
+    style={[
+      styles.button, 
+      styles.addMoreButton, 
+      !isFormValid && styles.disabledAddMoreButton // Apply disabled style when form is not valid
+    ]}
+    onPress={() => isFormValid ? addBatchLotForm() : validateFields()}
+  >
+    <Text style={[styles.addMoreButtonText, !isFormValid && styles.disabledAddMoreButtonText]}>
+      Add more
+    </Text>
+  </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, !isFormValid ? { backgroundColor: 'grey' } : {}]}
               onPress={() => isFormValid ? submitBatchLot() : validateFields()}
@@ -1012,6 +1018,78 @@ const Donate = ({ route }) => {
       {!isCameraOpen && !isInputFocused && !isDropDownOpen && (
         <BottomNavBar />
       )}
+      <Modal
+  animationType="fade"
+  transparent={true}
+  visible={finishModalVisible}
+  onRequestClose={() => setFinishModalVisible(false)}
+>
+  <View style={styles.modalBackground}>
+    <View style={styles.modalContainer}>
+      <Text style={styles.modalTitle}>{newPackCount} Packs in this box</Text>
+      <Text style={styles.modalSubtitle}>{`"Box ${boxLabelCounter - 1}"`}</Text>
+
+      <View style={styles.modalButtonContainer}>
+        <TouchableOpacity
+          style={[styles.modalButton, styles.addBoxButton]}
+          onPress={() => {
+            setFinishModalVisible(false);
+            handleAddAnotherBox();
+            setPackCount(0); // Reset pack count
+          }}
+        >
+          <Text style={styles.AddBoxButtonText}>Add Box</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.modalButton, styles.finishButton]}
+          onPress={() => {
+            setFinishModalVisible(false);
+            handleFinishDonation();
+          }}
+        >
+          <Text style={styles.modalButtonText}>Finish</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
+<Modal
+  animationType="fade"
+  transparent={true}
+  visible={confirmModalVisible}
+  onRequestClose={() => setConfirmModalVisible(false)}
+>
+  <View style={styles.modalBackground}>
+    <View style={styles.modalContainer}>
+      <Text style={styles.modalTitle}>{newPackCount} Confirm finish</Text>
+      <Text style={styles.modalSubtitle}>Are you sure you want to finish the donation</Text>
+
+      <View style={styles.modalButtonContainer}>
+        <TouchableOpacity
+          style={[styles.modalButton, styles.addBoxButton]}
+          onPress={() => {
+            setConfirmModalVisible(false);     
+            navigation.navigate('DonorList');
+
+          }}
+        >
+          <Text style={styles.AddBoxButtonText}>Yes</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.modalButton, styles.finishButton]}
+          onPress={() => {
+            setFinishModalVisible(false);
+           
+          }}
+        >
+          <Text style={styles.modalButtonText}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
     </View>
   );
 };
@@ -1019,7 +1097,7 @@ const Donate = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f9f9f9',
   },
   cameraContainer: {
     marginBottom: 10, // Reduced margin
@@ -1056,22 +1134,20 @@ const styles = StyleSheet.create({
     color: '#707070',
     fontSize: 12, // Reduced font size
     marginBottom: 3, // Reduced margin
-    marginLeft: 20, // Reduced margin
+    marginLeft: 40, // Reduced margin
   },
   input: {
     borderWidth: 1,
     borderColor: '#00a651',
-    borderRadius: 10, // Reduced border radius
-    paddingVertical: 5, // Reduced padding
-    paddingHorizontal: 10, // Reduced padding
-    marginBottom: 8, // Reduced margin
-    height: 38, // Reduced height
-    width: '85%',
-    alignSelf: 'left',
-    marginLeft:20,
-    backgroundColor: '#fff',
-    
-    
+    borderRadius: 20,
+    padding: 5,
+    paddingLeft:10,
+    height: 30,  // Set height to 30px
+    marginBottom: 10,
+    backgroundColor: '#FFFCFC',
+    marginLeft:35,
+    marginRight:35,
+
   },
   inputError: {
     borderColor: 'red',
@@ -1092,39 +1168,62 @@ const styles = StyleSheet.create({
   },
   header: {
     fontSize: 14, // Reduced font size
-    color: '#00a651',
+    color: '#000',
     fontWeight: 'bold',
     marginBottom: 8, // Reduced margin
     alignSelf: 'center',
   },
   buttonContainer: {
-    marginHorizontal: 20,
-    marginBottom: 20, // Reduced margin
+    marginLeft:75,
+    marginBottom: 60, // Reduced margin
+    flexDirection: 'row', // Align items horizontally (in a row)
+    marginTop:20,
   },
   button: {
     backgroundColor: '#00a651',
     paddingVertical: 10, // Reduced padding
-    paddingHorizontal: 20, // Reduced padding
+    paddingHorizontal: 10, // Reduced padding
     borderRadius: 20, // Reduced border radius
-    width: '90%',
+    width: '35%',
     alignSelf: 'center',
     alignItems: 'center',
     marginTop: 10, // Reduced margin
+    marginHorizontal: 5, // Add space between buttons
+
   },
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
     fontSize: 16, // Reduced font size
   },
+   addMoreButton: {
+    backgroundColor: '#fff',          // White background
+    borderColor: '#00a651',           // Green border
+    borderWidth: 2,                   // Border width of 2px
+    borderRadius: 20,                 // Same border radius as the original button
+    paddingVertical: 10,              // Same padding as original button
+    paddingHorizontal: 10,            // Same padding as original button
+    width: '35%',                     // Same width as original button
+    alignSelf: 'center',              // Center the button horizontally
+    alignItems: 'center',             // Center the text inside the button
+    marginTop: 10,                    // Same margin as original button
+    marginHorizontal: 5,              // Same margin as original button
+  },
+  addMoreButtonText: {
+    color: '#00a651',                 // Green text color
+    fontWeight: 'bold',               // Bold text
+    fontSize: 16,                     // Same font size as original button
+  },
   newDrugSeparator: {
-    backgroundColor: '#fff',
+    backgroundColor: '#f9f9f9',
     padding: 5, // Reduced padding
   },
   newDrugTitle: {
     color: '#00a651',
     fontSize: 14, // Reduced font size
     fontWeight: 'bold',
-    marginLeft:12,
+    marginLeft:35,
+    backgroundColor:'#f9f9f9'
   },
   row: {
     flexDirection: 'row',
@@ -1167,11 +1266,111 @@ const styles = StyleSheet.create({
   packContainer: {
     alignItems: 'center',
     marginRight: 10,
+    flexDirection: 'column', // Ensure items are stacked vertically
+
   },
   packText: {
     fontSize: 14,
-    color: '#000',
+    color: 'red',
     fontWeight: 'bold',
+  },
+  backButtonImage: {
+    width: 41,  // Adjust the size of the back button image
+    height: 15,
+    marginLeft: 10,
+  
+  },
+   detailsImage: {
+    width: 291,  // Adjust the width as needed
+    height: 15, // Adjust the height as needed
+    resizeMode: 'contain',  // Ensure the image maintains its aspect ratio
+    marginBottom: 10, // Add space between the image and the next elements
+    marginLeft:45,
+  },
+  disabledAddMoreButton: {
+    backgroundColor: '#fff',          // White background
+    borderColor: 'grey',              // Grey border when form is invalid
+    borderWidth: 2,
+  },
+  disabledAddMoreButtonText: {
+    color: 'grey',                    // Grey text color when form is invalid
+  },
+  modalBackground: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Darken background
+  },
+  modalContainer: {
+    width: 300,
+    backgroundColor: '#00a651', // Green background
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    height:300,
+  },
+  modalTitle: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 10,
+    marginTop:50,
+  },
+  modalSubtitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 55,
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    
+    width: '100%',
+
+  },
+  modalButton: {
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    width: '45%', // Two buttons should take 45% of the modal's width
+    alignItems: 'center',
+    
+  },
+  addBoxButton: {
+    backgroundColor: '#00a651',
+    borderWidth: 2,
+    borderColor: '#fff',
+    marginRight:5,
+    marginLeft:10,
+
+  },
+  finishButton: {
+    backgroundColor: '#fff',
+    marginRight:10,
+    marginLeft:5,
+  },
+  modalButtonText: {
+    color: '#00a651',
+    fontWeight: 'bold',
+  },
+  AddBoxButtonText:{
+color:'#ffff'
+  },
+  smallinput: {
+    
+    borderWidth: 1,
+    borderColor: '#00a651',
+    borderRadius: 20,
+    padding: 5,
+    paddingLeft: 10,
+    height: 30,  // Keep height as before
+    marginBottom: 10,
+    backgroundColor: '#FFFCFC',
+    marginLeft: 35,
+    marginRight: 35,
+      // Smaller font size for short fields
   },
 });
 

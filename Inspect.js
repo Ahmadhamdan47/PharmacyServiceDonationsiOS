@@ -81,7 +81,7 @@ const Inspect = () => {
             'Are you sure you want to go back?',
             [
                 { text: 'Cancel', style: 'cancel' },
-                { text: 'Yes', onPress: () => navigation.navigate('AdminLanding') },
+                { text: 'Yes', onPress: () => navigation.navigate('Landing') },
             ],
             { cancelable: false }
         );

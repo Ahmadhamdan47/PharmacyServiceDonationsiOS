@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useLayoutEffect} from 'react';
 import { View, Text, TextInput, Image, Keyboard, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import axios from 'axios';
 import DropDownPicker from 'react-native-dropdown-picker';
@@ -31,23 +31,35 @@ const AddDonor = () => {
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     navigation.setOptions({
         headerTitle: 'Donate',
         headerLeft: () => (
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
-                <Text style={styles.backButtonText}>Back</Text>
+               
+                <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
             </TouchableOpacity>
         ),
         headerRight: () => (
             <View style={styles.profileContainer}>
                 <View style={styles.circle}>
-                    <Text style={styles.circleText}>{donorName.charAt(0).toUpperCase()}</Text>
+                    <Text style={styles.circleText}>{donorName.charAt(0).toUpperCase()}</Text>  
                 </View>
-                <Text style={styles.profileText}>{donorName}</Text>
+                <Text style={styles.profileText}>{donorName}</Text> 
             </View>
         ),
         headerTitleAlign: 'center',
+        headerTitleStyle: {
+          marginTop: 30, // Add margin top of 42px to the header title
+          position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
+            backgroundColor: '#f9f9f9',
+            
+        },
+        headerStyle: {
+          height: 100, // Increase the header height to accommodate the margin
+          backgroundColor: '#f9f9f9',
+      },
+        
     });
 }, [navigation, donorName]);
 
@@ -118,7 +130,6 @@ const AddDonor = () => {
       console.error("Error creating donation:", error);
     }
   };
-  
 
   return (
     <View style={styles.container}>
@@ -130,7 +141,7 @@ const AddDonor = () => {
           editable={false}
         />
 
-        <Text style={styles.label}>Recipient</Text>
+        <Text style={styles.label}>Recipient*</Text>
         <View style={{ zIndex: 10 }}>
           <DropDownPicker
             open={recipientOpen}
@@ -148,7 +159,7 @@ const AddDonor = () => {
           />
         </View>
 
-        <Text style={styles.label}>Donation Title</Text>
+        <Text style={styles.label}>Donation Title*</Text>
         <TextInput
           style={styles.input}
           placeholder="Enter Donation Title"
@@ -160,7 +171,7 @@ const AddDonor = () => {
 
         <Text style={styles.label}>Purpose</Text>
         <TextInput
-          style={[styles.input, styles.textArea]}
+          style={[styles.input, styles.textArea]} // Use the custom text area style
           placeholder="Enter Donation Purpose"
           value={donationPurpose}
           onChangeText={setDonationPurpose}
@@ -181,45 +192,60 @@ const AddDonor = () => {
 };
 
 const styles = StyleSheet.create({
-  header:{
-marginTop:10,
-  },
   container: {
     flex: 1,
-    backgroundColor: "#fff"
+    backgroundColor: "#f9f9f9",
+  paddingTop: 20,  // Adjust padding based on the header height to prevent content overlap
+
   },
   profileContainer: {
-    alignItems: 'center',
-    marginRight: 10,
-    marginTop:10
+    width: 47,
+    height: 16,
+    backgroundColor: '#f9f9f9',
+    fontSize: 14,
+    fontFamily: 'Roboto Condensed',
+    fontWeight: '400',
+    marginRight:24,
+    marginLeft: 103,
+    
+    position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
+
   },
   circle: {
-    width: 40, // Increased size of the circle
+    backgroundColor: '#f9f9f9',
+    width: 40,
     height: 40,
     borderRadius: 25,
     borderWidth: 2,
     borderColor: '#00A651',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 1, // Space between the circle and the username
+    marginBottom: 2,
   },
   circleText: {
-    fontSize: 20, // Increased font size for the circle text
+    backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
+
+    fontSize: 20,
     color: '#00A651',
     fontWeight: 'bold',
   },
   profileText: {
+    backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
+
     fontSize: 14,
     color: '#000',
-    fontWeight: 'bold',
+    fontWeight: '400',
+    textAlign: 'center',
+    
   },
   formContainer: {
     paddingHorizontal: 20,
     paddingTop: 120,
     flex: 1,
+    backgroundColor: '#f9f9f9', // Add the background color for consistency
   },
   label: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold',
     marginBottom: 5,
     marginLeft: 10,
@@ -229,7 +255,9 @@ marginTop:10,
     borderWidth: 1,
     borderColor: '#00a651',
     borderRadius: 20,
-    padding: 8,
+    padding: 5,
+    paddingLeft:10,
+    height: 30,  // Set height to 30px
     marginBottom: 10,
     backgroundColor: '#f0f0f0',
     color: '#00a651',
@@ -238,46 +266,54 @@ marginTop:10,
     borderWidth: 1,
     borderColor: '#00a651',
     borderRadius: 20,
-    padding: 8,
+    padding: 5,
+    paddingLeft:10,
+    height: 30,  // Set height to 30px
     marginBottom: 10,
     backgroundColor: '#fff',
   },
   textArea: {
-    height: 60,
+    height: 95, // Set specific height for the text area (293x95)
     textAlignVertical: 'top',
+    alignSelf: 'left', // Ensure it's centered within the form
   },
   dropdown: {
     marginBottom: 10,
+    minHeight:30,
   },
   picker: {
     borderColor: '#00a651',
     borderWidth: 1,
     borderRadius: 20,
+    minHeight: 30, // Set height to 30px
   },
   dropDownContainer: {
     borderColor: '#00a651',
     borderWidth: 1,
     borderRadius: 20,
+    minHeight:30,
   },
   button: {
     backgroundColor: '#00a651',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 20,
+    width: 100,  // Set specific width for the button (100x35)
+    height: 35,  // Set specific height for the button
+    justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 20,
     marginTop: 20,
+    alignSelf: 'center',  // Center the button
   },
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
-    fontSize: 18,
+    fontSize: 14,
   },
-  backButtonText: {
-    fontSize: 16,
-    color: '#000',
-    fontWeight: 'bold',
+  backButtonImage: {
+    width: 41,  // Adjust the size of the back button image
+    height: 15,
     marginLeft: 10,
-},
+    marginTop:30,
+  },
 });
 
 export default AddDonor;

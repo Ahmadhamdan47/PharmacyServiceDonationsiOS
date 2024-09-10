@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useLayoutEffect } from 'react';
-import { StyleSheet, View, Image, TouchableOpacity, Text,  BackHandler, ToastAndroid } from 'react-native';
+import { StyleSheet, View, Image, TouchableOpacity, Text, BackHandler, ToastAndroid } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomNavBarInspection
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -40,9 +40,7 @@ const AdminLanding = () => {
             console.error('Error fetching user role or username:', error);
         }
     };
-    const handleInspect = () => {
-        navigation.navigate('Inspect'); // Define this function to navigate to the 'Inspect' screen
-    };
+
     const handleSignOut = async () => {
         try {
             await AsyncStorage.clear(); // Clear all stored data (token, username, etc.)
@@ -54,6 +52,11 @@ const AdminLanding = () => {
 
     const handleValidate = () => {
         navigation.navigate('Validate'); // Navigate to Validate screen
+    };
+
+    // Add this function to navigate to the PinPage for testing purposes
+    const handleOpenPinPage = () => {
+        navigation.navigate('PinPage');
     };
 
     // Toggle dropdown visibility when profile is clicked
@@ -114,6 +117,12 @@ const AdminLanding = () => {
                     <TouchableOpacity onPress={handleValidate} style={styles.dropdownItem}>
                         <Text style={styles.dropdownItemText}>Validate</Text>
                     </TouchableOpacity>
+
+                    {/* Add a new button to navigate to PinPage */}
+                    <TouchableOpacity onPress={handleOpenPinPage} style={styles.dropdownItem}>
+                        <Text style={styles.dropdownItemText}>Test Pin Page</Text>
+                    </TouchableOpacity>
+
                     <TouchableOpacity onPress={handleSignOut} style={styles.dropdownItem}>
                         <Text style={styles.dropdownItemText}>Sign Out</Text>
                     </TouchableOpacity>
@@ -126,7 +135,7 @@ const AdminLanding = () => {
                         <Image source={require("./assets/list.png")} style={styles.buttonImage} />
                     </TouchableOpacity>
 
-                    <TouchableOpacity onPress={handleInspect} style={styles.buttonWrapper}>
+                    <TouchableOpacity onPress={() => navigation.navigate('Inspect')} style={styles.buttonWrapper}>
                         <Image source={require("./assets/Inspection.png")} style={styles.buttonImage} />
                     </TouchableOpacity>
                 </View>
@@ -199,7 +208,7 @@ const styles = StyleSheet.create({
     },
     dropdownItemText: {
         fontSize: 16,
-        color: '#000', // Default color for validate
+        color: '#000', // Default color for dropdown items
         fontWeight: 'bold',
     },
     signOutButton: {
