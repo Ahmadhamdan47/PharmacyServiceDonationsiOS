@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Image } from 'react-native';
 import axios from 'axios';
 import BottomNavBarInspection from './BottomNavBarInspection';
 import { useNavigation } from '@react-navigation/native';
@@ -8,22 +8,39 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const PackInspection = ({ route }) => {
     const { batchLot } = route.params;
     const [donationTitle, setDonationTitle] = useState('');
+    const [donorName, setDonorName] = useState('');
+    const [recipientName, setRecipientName] = useState('');
     const [username, setUsername] = useState('');
     const navigation = useNavigation();
 
     useEffect(() => {
-        const fetchDonationTitle = async () => {
+        const fetchDonationDetails = async () => {
             try {
-                const response = await fetch(`https://apiv2.medleb.org/donation/${batchLot.donationId}`);
-                const data = await response.json();
-                setDonationTitle(data.DonationTitle);
+                // Fetch donation details to get DonorId and RecipientId
+                const donationResponse = await fetch(`https://apiv2.medleb.org/donation/${batchLot.donationId}`);
+                const donationData = await donationResponse.json();
+                setDonationTitle(donationData.DonationTitle);
+
+                // Fetch DonorName
+                if (donationData.DonorId) {
+                    const donorResponse = await fetch(`https://apiv2.medleb.org/donor/${donationData.DonorId}`);
+                    const donorData = await donorResponse.json();
+                    setDonorName(donorData.DonorName);
+                }
+
+                // Fetch RecipientName
+                if (donationData.RecipientId) {
+                    const recipientResponse = await fetch(`https://apiv2.medleb.org/recipient/${donationData.RecipientId}`);
+                    const recipientData = await recipientResponse.json();
+                    setRecipientName(recipientData.RecipientName);
+                }
             } catch (error) {
-                console.error('Error fetching donation details:', error);
+                console.error('Error fetching donation, donor, or recipient details:', error);
             }
         };
 
         if (batchLot.donationId) {
-            fetchDonationTitle();
+            fetchDonationDetails();
         }
     }, [batchLot.donationId]);
 
@@ -44,23 +61,29 @@ const PackInspection = ({ route }) => {
 
     useEffect(() => {
         navigation.setOptions({
+            headerTitle: '',
+
             headerLeft: () => (
-                <TouchableOpacity style={styles.headerLeft} onPress={() => navigation.goBack()}>
-                    <Text style={styles.backButtonText}>&lt; Back</Text>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
+                    <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
                 </TouchableOpacity>
             ),
-            headerTitle: 'Pack Inspection',
-            headerTitleAlign: 'center',
             headerRight: () => (
-                <View style={styles.profileContainer}>
-                    <View style={styles.circle}>
-                        <Text style={styles.circleText}>{username.charAt(0).toUpperCase()}</Text>
-                    </View>
-                    <Text style={styles.profileText}>{username}</Text>
+                <View style={styles.header}>
+                    <Text style={styles.headerTitle}>{donorName}/ {recipientName}</Text>
+                   
+                    <Text style={styles.headerTitle}>{batchLot.boxLabel}</Text>
+                    <Text style={styles.headerTitle}>{donationTitle}</Text>
+                    
                 </View>
             ),
+           
+            headerStyle: {
+                height: 100,
+                backgroundColor: '#f9f9f9',
+            },
         });
-    }, [navigation, username]);
+    }, [navigation, username, donationTitle, donorName, recipientName]);
 
     const handleInspect = async () => {
         try {
@@ -73,7 +96,7 @@ const PackInspection = ({ route }) => {
             }
         } catch (error) {
             console.error('Error inspecting batch serial number:', error);
-            Alert.alert('Alert', 'this drug was already inspeted.');
+            Alert.alert('Alert', 'this drug was already inspected.');
         }
     };
 
@@ -93,13 +116,6 @@ const PackInspection = ({ route }) => {
 
     return (
         <View style={styles.container}>
-            {/* Header Section */}
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>{batchLot.boxLabel}</Text>
-                <Text style={styles.headerSubtitle}>{donationTitle}</Text>
-            </View>
-
-            {/* Content Section */}
             <View style={styles.infoContainer}>
                 {/* Display all batch lot info */}
                 <Text style={styles.label}>GTIN *</Text>
@@ -120,29 +136,28 @@ const PackInspection = ({ route }) => {
                 <Text style={styles.info}>{batchLot.drugName}</Text>
 
                 <View style={styles.row}>
-                    <View style={styles.halfWidth}>
+                    <View style={styles.halfWidthLeft}>
                         <Text style={styles.label}>Presentation *</Text>
                         <Text style={styles.info}>{batchLot.presentation}</Text>
                     </View>
-                    <View style={styles.halfWidth}>
+                    <View style={styles.halfWidthRight}>
                         <Text style={styles.label}>Form *</Text>
                         <Text style={styles.info}>{batchLot.form}</Text>
                     </View>
                 </View>
 
                 <View style={styles.row}>
-                    <View style={styles.halfWidth}>
+                    <View style={styles.halfWidthLeft}>
                         <Text style={styles.label}>Laboratory *</Text>
                         <Text style={styles.info}>{batchLot.owner}</Text>
                     </View>
-                    <View style={styles.halfWidth}>
+                    <View style={styles.halfWidthRight}>
                         <Text style={styles.label}>Country *</Text>
                         <Text style={styles.info}>{batchLot.country}</Text>
                     </View>
                 </View>
             </View>
 
-            {/* Buttons Section */}
             <View style={styles.buttonsContainer}>
                 <TouchableOpacity style={styles.rejectButton} onPress={handleReject}>
                     <Text style={styles.rejectButtonText}>Reject</Text>
@@ -152,7 +167,6 @@ const PackInspection = ({ route }) => {
                 </TouchableOpacity>
             </View>
 
-            {/* Bottom Navigation Bar */}
             <BottomNavBarInspection currentScreen="Inspect" />
         </View>
     );
@@ -161,40 +175,46 @@ const PackInspection = ({ route }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: '#f9f9f9',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
         paddingVertical: 10,
     },
     header: {
         alignItems: 'center',
-        marginBottom: 10,
+        marginTop: 30,
+        marginRight: 25,
     },
     headerTitle: {
-        fontSize: 18,
+        fontSize: 12,
         fontWeight: 'bold',
-        marginBottom: 5,
+        
+        color: 'red',
     },
     headerSubtitle: {
         fontSize: 14,
-        color: '#666',
+        color: 'red',
     },
     infoContainer: {
         flex: 1,
     },
     label: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 5,
+        color: '#707070',
+        fontSize: 12,
+        marginBottom: 3,
+        marginLeft: 40,
     },
     info: {
-        fontSize: 10,
         borderWidth: 1,
-        borderColor: '#00A651',
-        borderRadius: 10,
-        padding: 8,
-        marginBottom: 5,
-        color: '#000',
+        borderColor: '#00a651',
+        borderRadius: 20,
+        padding: 5,
+        paddingLeft: 10,
+        height: 30,
+        marginBottom: 10,
+        backgroundColor: '#FFFCFC',
+        marginLeft: 35,
+        marginRight: 35,
     },
     sectionHeader: {
         fontSize: 16,
@@ -209,20 +229,25 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         marginBottom: 10,
     },
-    halfWidth: {
+    halfWidthLeft: {
+        width: '48%',
+    },
+    halfWidthRight: {
         width: '48%',
     },
     buttonsContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginTop: 5,
+    marginLeft:50,
+    marginBottom: 60, // Reduced margin
+    flexDirection: 'row', // Align items horizontally (in a row)
+    marginTop:20,
     },
     rejectButton: {
         backgroundColor: '#FF0000',
         paddingVertical: 10,
         borderRadius: 25,
         alignItems: 'center',
-        width: '45%',
+        width: '35%',
+        marginHorizontal:10,
     },
     rejectButtonText: {
         color: '#fff',
@@ -234,47 +259,19 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         borderRadius: 25,
         alignItems: 'center',
-        width: '45%',
+        width: '35%',
+        marginHorizontal:10,
     },
     inspectButtonText: {
         color: '#fff',
         fontSize: 16,
         fontWeight: 'bold',
     },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingLeft: 15,
-    },
-    backButtonText: {
-        fontSize: 16,
-        color: '#000',
-    },
-    profileContainer: {
-        flexDirection: 'column',
-        alignItems: 'center',
-        marginRight: 15,
-        marginTop: 10,
-    },
-    circle: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        borderWidth: 2,
-        borderColor: '#00A651',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 5,
-    },
-    circleText: {
-        fontSize: 16,
-        color: '#00A651',
-        fontWeight: 'bold',
-    },
-    profileText: {
-        fontSize: 10,
-        color: '#000',
-        fontWeight: 'bold',
+    backButtonImage: {
+        width: 41,
+        height: 15,
+        marginLeft: 10,
+        marginTop: 30,
     },
 });
 

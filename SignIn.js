@@ -3,10 +3,13 @@ import { View, TextInput, Text, StyleSheet, Alert, Image, TouchableOpacity } fro
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { FontAwesome5 } from '@expo/vector-icons'; // Import FontAwesome5 for the eye icon
 
 const SignIn = () => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+
     const navigation = useNavigation();
 
     // Customize the navigation header
@@ -51,6 +54,9 @@ const SignIn = () => {
             Alert.alert('Error', 'Failed to sign in');
         }
     };
+    const togglePasswordVisibility = () => {
+        setIsPasswordVisible(!isPasswordVisible);
+      };
 
     return (
         <View style={styles.container}>
@@ -72,12 +78,18 @@ const SignIn = () => {
             
             {/* Password Label and Input */}
             <Text style={styles.label}>Password</Text>
-            <TextInput
-                style={styles.input}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-            />
+      <View>
+        <TextInput
+          style={styles.input}
+          value={password}
+          onChangeText={setPassword}   
+
+          secureTextEntry={!isPasswordVisible}
+        />
+        <TouchableOpacity style={styles.showPasswordButton} onPress={togglePasswordVisibility}>
+          <FontAwesome5 name={isPasswordVisible ? 'eye-slash' : 'eye'} size={20} color="#ccc" />
+        </TouchableOpacity>
+      </View>
             
             {/* Sign In Button */}
             <TouchableOpacity style={styles.button} onPress={handleSignIn}>
@@ -157,6 +169,23 @@ const styles = StyleSheet.create({
         color: '#00a651',
         textAlign: 'center',
     },
+    passwordContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#00a651',
+        paddingLeft: 15,
+        height: 30,
+        borderRadius: 20,
+        marginBottom: 10,
+        marginLeft: 15,
+        marginRight: 15,
+      },
+      showPasswordButton: {
+        position: 'absolute',
+        right: 15,
+        padding: 5,
+      },
 });
 
 export default SignIn;

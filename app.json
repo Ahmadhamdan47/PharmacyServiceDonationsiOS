@@ -19,7 +19,10 @@
     "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/58244e3c-69dd-4e9d-ac67-cffb4a705d19"
-    }
+    },
+    "plugins": [
+      "expo-font"
+    ]
   },
   "name": "MedLeb PS"
 }

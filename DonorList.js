@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, BackHandler } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, BackHandler, Image } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
@@ -17,21 +17,33 @@ const DonorList = ({ navigation }) => {
     useEffect(() => {
         // Set up the header with the user icon and name
         navigation.setOptions({
+            headerTitle: 'List',
             headerLeft: () => (
-                <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
-                    <Text style={styles.backButtonText}>Back</Text>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
+                   
+                    <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
                 </TouchableOpacity>
             ),
             headerRight: () => (
-                <View style={styles.userInfo}>
-                    {/* User Icon */}
-                    <View style={styles.userIconContainer}>
-                        <Text style={styles.userIconText}>{username.charAt(0).toUpperCase()}</Text>
+                <View style={styles.profileContainer}>
+                    <View style={styles.circle}>
+                        <Text style={styles.circleText}>{username.charAt(0).toUpperCase()}</Text>  
                     </View>
-                    {/* Username */}
-                    <Text style={styles.usernameText}>{username}</Text>
+                    <Text style={styles.profileText}>{username}</Text> 
                 </View>
             ),
+            headerTitleAlign: 'center',
+            headerTitleStyle: {
+              marginTop: 30, // Add margin top of 42px to the header title
+              position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
+                backgroundColor: '#f9f9f9',
+                
+            },
+            headerStyle: {
+              height: 100, // Increase the header height to accommodate the margin
+              backgroundColor: '#f9f9f9',
+          },
+            
         });
 
         fetchDonorId();
@@ -56,7 +68,7 @@ const DonorList = ({ navigation }) => {
 
     const fetchDonorId = async () => {
         try {
-            const storedUsername = await AsyncStorage.getItem('username');
+        const storedUsername = await AsyncStorage.getItem('username');
             if (storedUsername) {
                 setUsername(storedUsername); // Set the username state
                 const response = await axios.get(`https://apiv2.medleb.org/donor/byUsername/${storedUsername}`);
@@ -144,15 +156,25 @@ const DonorList = ({ navigation }) => {
                             <View style={styles.cardContent}>
                                 <View style={styles.infoContainer}>
                                     <Text style={styles.infoTitle}>Donation Title:</Text>
-                                    <Text style={styles.infoText}>{donation.DonationPurpose}</Text>
+                                    <Text style={styles.infoText}>{donation.DonationTitle}</Text>
                                     <Text style={styles.infoTitle}>To:</Text>
                                     <Text style={styles.infoText}>{donation.RecipientName}</Text>
                                 </View>
                                 <View style={styles.detailsContainer}>
-                                    <Text style={styles.detailsText}>Date: {donation.DonationDate}</Text>
-                                    <Text style={styles.detailsText}>nb of box(es): {donation.NumberOfBoxes}</Text>
-                                    <Text style={styles.detailsText}>nb of pack(s): {donation.BatchLotTrackings.length}</Text>
-                                </View>
+  <View style={styles.detailItem}>
+    <Text style={styles.detailsText}>Date:</Text>
+    <Text style={styles.detailValue}>{donation.DonationDate}</Text>
+  </View>
+  <View style={styles.detailItem}>
+    <Text style={styles.detailsText}>nb of box(es):</Text>
+    <Text style={styles.detailValue}>{donation.NumberOfBoxes}</Text>
+  </View>
+  <View style={styles.detailItem}>
+    <Text style={styles.detailsText}>nb of pack(s):</Text>
+    <Text style={styles.detailValue}>{donation.BatchLotTrackings.length}</Text>
+  </View>
+</View>
+
                             </View>
                         </TouchableOpacity>
                     ))}
@@ -168,44 +190,62 @@ const DonorList = ({ navigation }) => {
 const styles = StyleSheet.create({
     fullContainer: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: '#f9f9f9',
+        paddingTop:35,
     },
-    userInfo: {
-        alignItems: 'center',
-        marginRight: 10,
-    },
-    userIconContainer: {
-        width: 40, // Increased size of the circle
+    profileContainer: {
+        width: 47,
+        height: 16,
+        backgroundColor: '#f9f9f9',
+        fontSize: 14,
+        fontFamily: 'Roboto Condensed',
+        fontWeight: '400',
+        marginRight:24,
+        marginLeft: 103,
+        
+        position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
+    
+      },
+      circle: {
+        backgroundColor: '#f9f9f9',
+        width: 40,
         height: 40,
         borderRadius: 25,
-        backgroundColor: '#fff', // White inside the circle
         borderWidth: 2,
-        borderColor: '#00A651', // Green border
+        borderColor: '#00A651',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 5, // Space between the circle and the username
-    },
-    userIconText: {
-        color: '#00A651', // Green text
+        marginBottom: 2,
+      },
+      circleText: {
+        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
+    
+        fontSize: 20,
+        color: '#00A651',
         fontWeight: 'bold',
-        fontSize: 20, // Increased font size for the circle text
-    },
-    usernameText: {
+      },
+      profileText: {
+        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
+    
         fontSize: 14,
-        fontWeight: '500',
-        color: '#121212',
-    },
+        color: '#000',
+        fontWeight: '400',
+        textAlign: 'center',
+        
+      },
+      
     scrollViewContainer: {
         paddingBottom: 20,
     },
     cardContainer: {
+        marginTop:20,
         marginHorizontal: 20,
         marginVertical: 10,
         borderWidth: 1,
         borderColor: '#00A651',
         borderRadius: 8,
         padding: 10,
-        backgroundColor: '#fff',
+        backgroundColor: '#FFFCFC',
         position: 'relative',
     },
     statusText: {
@@ -259,6 +299,17 @@ const styles = StyleSheet.create({
         color: '#000',
         fontWeight: 'bold',
     },
+    backButtonImage: {
+        width: 41,  // Adjust the size of the back button image
+        height: 15,
+        marginLeft: 10,
+        marginTop:30,
+      },
+      detailValue: {
+        fontSize: 14,
+        color: '#000', 
+        fontWeight:'bold'     // Make values green or any color you prefer
+      },
 });
 
 export default DonorList;

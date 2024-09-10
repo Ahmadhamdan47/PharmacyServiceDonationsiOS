@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet,Image } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -29,12 +29,10 @@ const Validate = () => {
 
     useEffect(() => {
         navigation.setOptions({
-            headerTitle: () => (
-                <Text style={styles.title}>Validate</Text>
-            ),
+            headerTitle: 'Validate',
             headerLeft: () => (
-                <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Text style={styles.backButton}>Back</Text>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
+                    <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
                 </TouchableOpacity>
             ),
             headerRight: () => (
@@ -46,7 +44,17 @@ const Validate = () => {
                 </View>
             ),
             headerTitleAlign: 'center',
+            headerTitleStyle: {
+                marginTop: 30,
+                position: 'relative',
+                backgroundColor: '#f9f9f9',
+            },
+            headerStyle: {
+                height: 100,
+                backgroundColor: '#f9f9f9',
+            },
         });
+    
     }, [navigation, username]);
 
     const getUsername = async () => {
@@ -137,19 +145,24 @@ const Validate = () => {
         <View style={styles.container}>
             <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
                 {/* Filters */}
-                <View style={styles.filterRow}>
-                    {/* From Date Picker */}
-                    <TouchableOpacity onPress={() => setShowFromDatePicker(true)} style={styles.filterButton}>
-                        <Text style={styles.filterText}>From {fromDate ? fromDate.toISOString().split('T')[0] : ''}</Text>
+                <View style={styles.dateRangeContainer}>
+                    <TouchableOpacity style={styles.dateContainer} onPress={() => setShowFromDatePicker(true)}>
+                        <Text style={styles.dateText}>From</Text>
+                        <Text style={styles.dateValue}>{fromDate ? fromDate.toISOString().split('T')[0] : '01/01/24'}</Text>
                     </TouchableOpacity>
-                    {showFromDatePicker && renderDatePicker('from')}
 
-                    {/* To Date Picker */}
-                    <TouchableOpacity onPress={() => setShowToDatePicker(true)} style={styles.filterButton}>
-                        <Text style={styles.filterText}>To {toDate ? toDate.toISOString().split('T')[0] : ''}</Text>
+                    <View style={styles.dateIcon}>
+                        <Image source={require("./assets/calendar.png")} style={styles.calendarIcon} />
+                    </View>
+
+                    <TouchableOpacity style={styles.dateContainer} onPress={() => setShowToDatePicker(true)}>
+                        <Text style={styles.dateText}>To</Text>
+                        <Text style={styles.dateValue}>{toDate ? toDate.toISOString().split('T')[0] : '01/08/24'}</Text>
                     </TouchableOpacity>
-                    {showToDatePicker && renderDatePicker('to')}
                 </View>
+                {showFromDatePicker && renderDatePicker('from')}
+                {showToDatePicker && renderDatePicker('to')}    
+
 
                 <View style={styles.filterRow}>
                     {/* Donor Dropdown */}
@@ -186,9 +199,9 @@ const Validate = () => {
                 </View>
 
                 {/* Filter Button */}
-                <TouchableOpacity style={styles.filterButton} onPress={filterDonors}>
-                    <Text style={styles.filterButtonText}>Filter</Text>
-                </TouchableOpacity>
+                <TouchableOpacity style={styles.searchButton} onPress={filterDonors}>
+    <Image source={require('./assets/search.png')} style={styles.searchIcon} />
+</TouchableOpacity>
 
                 {/* Results Count */}
                 <Text style={styles.resultCount}>number of result(s): {filteredDonors.length}</Text>
@@ -237,7 +250,7 @@ const styles = StyleSheet.create({
     },
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: '#f9f9f9',
         padding: 20,
     },
     scrollView: {
@@ -245,35 +258,51 @@ const styles = StyleSheet.create({
     },
     contentContainer: {
         paddingBottom: 80,
-        marginTop: 0,
+        marginTop: 40,
+        marginLeft:30,
+        marginRight:30,
     },
     profileContainer: {
-        marginTop:10,
-        flexDirection: 'column',
-        alignItems: 'center',
-        marginLeft: 'auto',
-        marginRight:5,
-    },
-    circle: {
+        width: 47,
+        height: 16,
+        backgroundColor: '#f9f9f9',
+        fontSize: 14,
+        fontFamily: 'Roboto Condensed',
+        fontWeight: '400',
+        marginRight:24,
+        marginLeft: 103,
+        
+        position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
+    
+      },
+      circle: {
+        backgroundColor: '#f9f9f9',
         width: 40,
         height: 40,
-        borderRadius: 20,
+        borderRadius: 25,
         borderWidth: 2,
         borderColor: '#00A651',
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    circleText: {
-        fontSize: 16,
+        marginBottom: 2,
+      },
+      circleText: {
+        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
+    
+        fontSize: 20,
         color: '#00A651',
         fontWeight: 'bold',
-    },
-    profileText: {
-        fontSize: 10,
-        color: '#000',  // Changed to black
-        fontWeight: 'bold',
-    },
-    filterRow: {
+      },
+      profileText: {
+        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
+    
+        fontSize: 14,
+        color: '#000',
+        fontWeight: '400',
+        textAlign: 'center',
+        
+      },
+          filterRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         marginBottom: 10,
@@ -364,6 +393,59 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         marginLeft: 10,
     },
+    backButtonImage: {
+        width: 41,  // Adjust the size of the back button image
+        height: 15,
+        marginLeft: 10,
+        marginTop:30,
+      },
+      dateRangeContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+        borderWidth: 1,
+        borderColor: '#00A651',
+        borderRadius: 20,
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        marginHorizontal: 10,
+        height:39,
+        marginBottom:10,
+    },
+    dateContainer: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    dateText: {
+        fontSize: 14,
+        fontWeight:'bold',
+        color: '#707070',
+    },
+    dateValue: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#000',
+    },
+    dateIcon: {
+        width: 30,
+        height: 30,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    calendarIcon: {
+        width: 35,
+        height: 34,
+        tintColor: '#00A651',
+    },
+    searchButton: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 50, // Optional: for round button
+    },
+    searchIcon: {
+        width: 280,  // Set the width of the search icon
+        height: 30, // Set the height of the search icon
+    },  
 });
 
 export default Validate;

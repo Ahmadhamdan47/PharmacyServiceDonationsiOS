@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
@@ -16,10 +16,10 @@ const DonorDetails = ({ route, navigation }) => {
 
     useEffect(() => {
         navigation.setOptions({
-            headerTitle: () => <Text style={styles.headerTitle}>Validate</Text>,
+            headerTitle: 'Validate',
             headerLeft: () => (
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
-                    <Text style={styles.backButtonText}>Back</Text>
+                    <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
                 </TouchableOpacity>
             ),
             headerRight: () => (
@@ -31,6 +31,15 @@ const DonorDetails = ({ route, navigation }) => {
                 </View>
             ),
             headerTitleAlign: 'center',
+            headerTitleStyle: {
+                marginTop: 30,
+                position: 'relative',
+                backgroundColor: '#f9f9f9',
+            },
+            headerStyle: {
+                height: 100,
+                backgroundColor: '#f9f9f9',
+            },
         });
     }, [navigation, username]);
 
@@ -83,7 +92,7 @@ const DonorDetails = ({ route, navigation }) => {
 
             <View style={styles.buttonContainer}>
                 <TouchableOpacity style={[styles.button, styles.rejectButton]} onPress={() => handleApproval(false)} disabled={isLoading}>
-                    <Text style={styles.buttonText}>Reject</Text>
+                    <Text style={styles.rejectbuttonText}>Reject</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.button, styles.approveButton]} onPress={() => handleApproval(true)} disabled={isLoading}>
                     <Text style={styles.buttonText}>Approve</Text>
@@ -99,25 +108,34 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         padding: 20,
-        backgroundColor: '#fff',
+        backgroundColor: '#f9f9f9',
+        
     },
     label: {
         fontSize: 16,
         marginBottom: 5,
         color: '#A9A9A9',
+        marginLeft:40,
     },
     input: {
         borderWidth: 1,
-        borderColor: '#00A651',
-        padding: 10,
-        marginBottom: 20,
+        borderColor: '#00a651',
         borderRadius: 20,
-        color: '#000',
+        padding: 5,
+        paddingLeft:10,
+        height: 30,  // Set height to 30px
+        marginBottom: 25,
+        backgroundColor: '#FFFCFC',
+        marginLeft:35,
+        marginRight:35,
+  
     },
     buttonContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginTop: 10,
+        marginTop: 50,
+        marginBottom:20,
+        
     },
     button: {
         flex: 1,
@@ -127,13 +145,36 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     rejectButton: {
-        backgroundColor: 'red',
-    },
+        backgroundColor: '#fff',          // White background
+        borderColor: 'red',           // Green border
+        borderWidth: 2,                   // Border width of 2px
+        borderRadius: 20,                 // Same border radius as the original button
+        paddingVertical: 10,              // Same padding as original button
+        paddingHorizontal: 10,            // Same padding as original button
+        width: '35%',                     // Same width as original button
+        alignSelf: 'center',              // Center the button horizontally
+        alignItems: 'center',             // Center the text inside the button
+        // Same margin as original button
+        marginHorizontal: 5, 
+                  },
     approveButton: {
-        backgroundColor: '#00A651',
+        backgroundColor: '#00a651',
+        paddingVertical: 10, // Reduced padding
+        paddingHorizontal: 10, // Reduced padding
+        borderRadius: 20, // Reduced border radius
+        width: '35%',
+        alignSelf: 'center',
+        alignItems: 'center',
+         // Reduced margin
+        marginHorizontal: 5, // Add
     },
     buttonText: {
         color: '#fff',
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    rejectbuttonText: {
+        color: 'red',
         fontSize: 18,
         fontWeight: 'bold',
     },
@@ -153,29 +194,51 @@ const styles = StyleSheet.create({
         marginLeft: 5,
     },
     profileContainer: {
-        alignItems: 'center',
-        marginRight: 10,
-    },
-    circle: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
+        width: 47,
+        height: 16,
+        backgroundColor: '#f9f9f9',
+        fontSize: 14,
+        fontFamily: 'Roboto Condensed',
+        fontWeight: '400',
+        marginRight:24,
+        marginLeft: 103,
+        
+        position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
+    
+      },
+      circle: {
+        backgroundColor: '#f9f9f9',
+        width: 40,
+        height: 40,
+        borderRadius: 25,
         borderWidth: 2,
         borderColor: '#00A651',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 5,
-    },
-    circleText: {
-        fontSize: 16,
+        marginBottom: 2,
+      },
+      circleText: {
+        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
+    
+        fontSize: 20,
         color: '#00A651',
         fontWeight: 'bold',
-    },
-    profileText: {
+      },
+      profileText: {
+        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
+    
         fontSize: 14,
         color: '#000',
+        fontWeight: '400',
         textAlign: 'center',
-    },
+        
+      },
+      backButtonImage: {
+        width: 41,  // Adjust the size of the back button image
+        height: 15,
+        marginLeft: 10,
+        marginTop:30,
+      },
 });
 
 export default DonorDetails;

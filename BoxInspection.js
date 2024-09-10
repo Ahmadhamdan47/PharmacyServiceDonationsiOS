@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, TouchableOpacity, Image } from 'react-native';
 import axios from 'axios';
 import { Table, Row } from 'react-native-table-component';
 import BottomNavBarInspection from './BottomNavBarInspection';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import * as XLSX from 'xlsx';
 
 const BoxInspection = ({ route, navigation }) => {
     const { boxId } = route.params;
@@ -43,6 +46,37 @@ const BoxInspection = ({ route, navigation }) => {
                 Alert.alert('Error', 'Failed to load box details.');
             }
             setLoading(false);
+            navigation.setOptions({
+                headerLeft: () => (
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
+                        <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
+                    </TouchableOpacity>
+                ),
+                headerRight: () => (
+                    <View style={styles.headerRightContainer}>
+                        <TouchableOpacity onPress={exportToExcel} >
+                            <Text style={styles.headerButtonText}>Export</Text>
+                        </TouchableOpacity>
+                        
+                    </View>
+                ),
+                headerTitle: () => (
+                    <View>
+                    <Text style={styles.title}>{donationTitle}-{boxLabel}-{donorName}-{recipientName}</Text>
+                    
+                    </View>
+                ),
+                headerTitleAlign: 'left',
+                headerTitleStyle: {
+                    marginTop: 42, // Add margin top of 42px to the header title
+                    position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
+                    backgroundColor: '#f9f9f9',
+                },
+                headerStyle: {
+                    height: 100, // Increase the header height to accommodate the margin
+                    backgroundColor: '#f9f9f9',
+                },
+            });
         };
 
         fetchBoxDetails();
@@ -151,15 +185,69 @@ const BoxInspection = ({ route, navigation }) => {
         const allIndexes = batchLots.map((_, index) => index);
         setSelectedRows(allIndexes);
     };
-
+    const exportToExcel = async () => {
+        try {
+            // Prepare the data for Excel
+            const wb = XLSX.utils.book_new();
+            const ws_data = [
+                ['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Status'], // Table header
+                ...batchLots.map((lot, index) => [
+                    index + 1,
+                    lot.DrugName || 'N/A',
+                    lot.Presentation || 'N/A',
+                    lot.Form || 'N/A',
+                    lot.Laboratory || 'N/A',
+                    lot.LaboratoryCountry || 'N/A',
+                    lot.GTIN || 'N/A',
+                    lot.BatchNumber || 'N/A',
+                    lot.ExpiryDate || 'N/A',
+                    lot.SerialNumber || 'N/A',
+                    lot.Inspection || 'N/A',
+                ]),
+            ];
+    
+            const ws = XLSX.utils.aoa_to_sheet(ws_data);
+            XLSX.utils.book_append_sheet(wb, ws, 'Batch Lots');
+    
+            // Generate the file
+            const wbout = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
+    
+            // File path for the export
+            const fileName = `${donorName}_${recipientName}_${donationTitle}_${boxLabel}.xlsx`.replace(/[/\\?%*:|"<>]/g, '-'); // Replace illegal characters for file names
+            const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+    
+            // Write the file to the file system
+            await FileSystem.writeAsStringAsync(fileUri, wbout, {
+                encoding: FileSystem.EncodingType.Base64,
+            });
+    
+            // Share the file
+            await Sharing.shareAsync(fileUri, {
+                mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                dialogTitle: 'Share your Excel file',
+                UTI: 'com.microsoft.excel.xlsx',
+            });
+    
+            Alert.alert('Success', 'Excel file created and shared successfully!');
+        } catch (error) {
+            console.error('Error exporting to Excel:', error);
+            Alert.alert('Error', 'Failed to export to Excel.');
+        }
+    };
+    
     return (
         <View style={styles.container}>
             <View style={styles.headerContainer}>
-                <View style={styles.headerTextContainer}>
-                    <Text style={styles.title}>{boxLabel}</Text>
-                    <Text style={styles.subtitle}>{donationTitle}</Text>
-                    <Text style={styles.subtitle}>Donor: {donorName}</Text>
-                    <Text style={styles.subtitle}>Recipient: {recipientName}</Text>
+            <View style={styles.buttonContainer}>
+                    <TouchableOpacity onPress={handleInspect}>
+                        <Text style={styles.inspectText}>Inspect</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleReject}>
+                        <Text style={styles.rejectText}>Reject</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleReport}>
+                        <Text style={styles.reportText}>Report</Text>
+                    </TouchableOpacity>
                 </View>
                 <TouchableOpacity onPress={selectAllRows}>
                     <Text style={styles.selectAllButton}>Select All</Text>
@@ -206,17 +294,7 @@ const BoxInspection = ({ route, navigation }) => {
                 </ScrollView>
             )}
 
-            <View style={styles.buttonContainer}>
-                <TouchableOpacity style={styles.inspectButton} onPress={handleInspect}>
-                    <Text style={styles.buttonText}>Inspect</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.rejectButton} onPress={handleReject}>
-                    <Text style={styles.buttonText}>Reject</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.reportButton} onPress={handleReport}>
-                    <Text style={styles.buttonText}>Report</Text>
-                </TouchableOpacity>
-            </View>
+           
 
             <BottomNavBarInspection currentScreen="PackInspection" />
         </View>
@@ -226,7 +304,7 @@ const BoxInspection = ({ route, navigation }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: '#f9f9f9',
         padding: 10,
     },
     headerContainer: {
@@ -239,9 +317,11 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
     },
-    title: {
-        fontSize: 18,
-        fontWeight: 'bold',
+    backButtonImage: {
+        width: 41,  // Adjust the size of the back button image
+        height: 15,
+        marginLeft: 10,
+        marginTop: 30,
     },
     subtitle: {
         fontSize: 14,
@@ -271,8 +351,26 @@ const styles = StyleSheet.create({
     },
     buttonContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
+        justifyContent: 'space-between',
         marginTop: 20,
+    },
+    inspectText: {
+        color: 'green',
+        fontWeight: 'bold',
+        fontSize: 16,
+        marginHorizontal: 10, // 10px distance from the other buttons
+    },
+    rejectText: {
+        color: 'red',
+        fontWeight: 'bold',
+        fontSize: 16,
+        marginHorizontal: 10, // 10px distance from the other buttons
+    },
+    reportText: {
+        color: 'orange',
+        fontWeight: 'bold',
+        fontSize: 16,
+        marginHorizontal: 10, // 10px distance from the other buttons
     },
     inspectButton: {
         backgroundColor: 'green',
@@ -297,6 +395,27 @@ const styles = StyleSheet.create({
         color: 'green',
         fontWeight: 'bold',
         fontSize: 16,
+        marginTop:20,
+    },
+    headerRightContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginRight: 10,
+        marginTop: 30,
+    },
+    headerButtonText: {
+        fontSize: 14,
+        color: '#00A651',
+       
+        fontWeight: 'bold',
+
+
+    },
+    title: {
+        marginTop: 30,
+        fontSize: 14,
+        fontWeight: 'bold',
     },
 });
 

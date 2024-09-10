@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, TouchableOpacity,Image } from 'react-native';
 import axios from 'axios';
 import { Table, Row, Rows } from 'react-native-table-component';
 import BottomNavBarInspection from './BottomNavBarInspection';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import * as XLSX from 'xlsx';
 
 const BoxDetails = ({ route, navigation }) => {
     const { box } = route.params;
@@ -14,7 +17,46 @@ const BoxDetails = ({ route, navigation }) => {
     useEffect(() => {
         fetchSerialNumbers();
     }, []);
+   
+        navigation.setOptions({
+           
+            headerLeft: () => (
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
+                   
+                    <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
+                </TouchableOpacity>
+            ),
+            headerRight: () => (
+                <View style={styles.headerRightContainer}>
+                    <TouchableOpacity onPress={handleExportAsExcel}>
+                        <Text style={styles.headerButtonText}>Export as XLS</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity >
+                        <Text style={styles.headerButtonText}>Box Qr Code</Text>
+                    </TouchableOpacity>
+                </View>
+            ),
+            headerTitle: () => (
+                <View>
+                <Text style={styles.title}> {box.DonationTitle} - {box.BoxLabel} </Text>
+           
+                </View>
+            ),
+            headerTitleAlign: 'left',
+            headerTitleStyle: {
+              marginTop: 42, // Add margin top of 42px to the header title
+              position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
+                backgroundColor: '#f9f9f9',
+                
+            },
+            headerStyle: {
+              height: 100, // Increase the header height to accommodate the margin
+              backgroundColor: '#f9f9f9',
+          },
+            
+        });
 
+    
     const fetchSerialNumbers = async () => {
         try {
             const response = await axios.get(`https://apiv2.medleb.org/batchserial/byBox/${box.BoxId}`);
@@ -31,14 +73,58 @@ console.log(data);
         }
         setLoading(false);
     };
-
+    const handleExportAsExcel = async () => {
+        // Prepare the data to be exported
+        const dataForExcel = [
+            ['Donor Name', 'Recipient Name', 'Donation Title', 'Box Label'],
+            [box.DonorName, box.RecipientName, box.DonationTitle, box.BoxLabel],
+            [],
+            ['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Status'],
+            ...batchLots.map((lot, index) => [
+                index + 1,
+                lot.DrugName || 'N/A',
+                lot.Presentation || 'N/A',
+                lot.Form || 'N/A',
+                lot.Laboratory || 'N/A',
+                lot.LaboratoryCountry || 'N/A',
+                `'${lot.GTIN || 'N/A'}`,  // GTIN as text (prefix with a single quote to ensure text format in Excel)
+                lot.BatchNumber || 'N/A',
+                lot.ExpiryDate || 'N/A',
+                lot.SerialNumber || 'N/A',
+                lot.Inspection || 'N/A'
+            ])
+        ];
+    
+        // Create a new workbook and sheet
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(dataForExcel);
+    
+        // Append the sheet to the workbook
+        XLSX.utils.book_append_sheet(wb, ws, 'Box Details');
+    
+        // Write the Excel file to a buffer
+        const wbout = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
+    
+        // Create a meaningful file name using DonorName, RecipientName, DonationTitle, and BoxLabel
+        const fileName = `${box.DonorName}_${box.RecipientName}_${box.DonationTitle}_${box.BoxLabel}.xlsx`.replace(/[/\\?%*:|"<>]/g, '-'); // Replace invalid filename characters
+    
+        // Create a temporary file to store the Excel file
+        const uri = `${FileSystem.documentDirectory}${fileName}`;
+    
+        // Write the buffer to the file
+        await FileSystem.writeAsStringAsync(uri, wbout, {
+            encoding: FileSystem.EncodingType.Base64,
+        });
+    
+        // Share the file
+        await Sharing.shareAsync(uri);
+    };
+  
     return (
         <View style={styles.container}>
             <View style={styles.headerContainer}>
                 <View style={styles.headerTextContainer}>
-                    <Text style={styles.title}>Box {box.BoxNumber}</Text>
-                    <Text style={styles.subtitle}>Donor: {box.DonorName}</Text>
-                    <Text style={styles.subtitle}>Recipient: {box.RecipientName}</Text>
+                  
                 </View>
             </View>
 
@@ -78,7 +164,7 @@ console.log(data);
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: '#f9f9f9',
         padding: 10,
     },
     headerContainer: {
@@ -92,7 +178,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     title: {
-        fontSize: 18,
+        marginTop:30,
+        fontSize: 14,
         fontWeight: 'bold',
     },
     subtitle: {
@@ -106,7 +193,7 @@ const styles = StyleSheet.create({
     headText: {
         margin: 6,
         textAlign: 'center',
-        color: '#fff',
+        color: '#f9f9f9',
         fontWeight: 'bold',
         fontSize: 12,
     },
@@ -114,6 +201,25 @@ const styles = StyleSheet.create({
         margin: 6,
         textAlign: 'center',
         fontSize: 10,
+    },
+    backButtonImage: {
+        width: 41,  // Adjust the size of the back button image
+        height: 15,
+        marginLeft: 10,
+        marginTop:30,
+      },
+      headerRightContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginRight: 10,
+        marginTop:30,
+    },
+    headerButtonText: {
+        fontSize: 14,
+        color: '#00A651',
+        marginLeft: 15,
+        fontWeight: 'bold',
     },
 });
 

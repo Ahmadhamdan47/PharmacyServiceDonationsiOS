@@ -43,7 +43,16 @@ const Inspect = () => {
     }, []);
 
     useEffect(() => {
+        
         navigation.setOptions({
+            headerTitle: 'Inspect',
+
+            headerLeft: () => (
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
+                   
+                    <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
+                </TouchableOpacity>
+            ),
             headerRight: () => (
                 <View style={styles.profileContainer}>
                     <View style={styles.circle}>
@@ -53,6 +62,16 @@ const Inspect = () => {
                 </View>
             ),
             headerTitleAlign: 'center',
+            headerTitleStyle: {
+              marginTop: 30, // Add margin top of 42px to the header title
+              position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
+                backgroundColor: '#f9f9f9',
+                
+            },
+            headerStyle: {
+              height: 100, // Increase the header height to accommodate the margin
+              backgroundColor: '#f9f9f9',
+          },
         });
     }, [navigation, username]);
 
@@ -333,12 +352,11 @@ const fetchDonationId = async (boxId) => {
                             {/* Dropdown Button */}
                             <TouchableOpacity style={styles.dropdownButton} onPress={() => setSelectedOption(selectedOption === 'Packs' ? 'Boxes' : 'Packs')}>
                                 <Text style={styles.dropdownButtonText}>{selectedOption}</Text>
-                                <Text style={styles.dropdownArrow}>▼</Text>
                             </TouchableOpacity>
 
                             {/* Scan Barcode Button */}
                             <TouchableOpacity onPress={handleOpenCamera} style={styles.cameraButton}>
-                                <Image source={require("./assets/2d.png")} style={styles.cameraImage} />
+                                <Image source={require("./assets/2dBig.png")} style={styles.cameraImage} />
                             </TouchableOpacity>
                         </>
                     )}
@@ -407,7 +425,7 @@ const createEmptyBatchLot = () => ({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: '#f9f9f9',
     },
     scrollViewContainer: {
         flexGrow: 1,
@@ -416,36 +434,50 @@ const styles = StyleSheet.create({
         paddingVertical: 20,
     },
     profileContainer: {
-        marginTop: 10,
-        flexDirection: 'column',
-        alignItems: 'center',
-        marginLeft: 'auto',
-        marginRight: 5,
-    },
-    circle: {
+        width: 47,
+        height: 16,
+        backgroundColor: '#f9f9f9',
+        fontSize: 14,
+        fontFamily: 'Roboto Condensed',
+        fontWeight: '400',
+        marginRight:24,
+        marginLeft: 103,
+        
+        position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
+    
+      },
+      circle: {
+        backgroundColor: '#f9f9f9',
         width: 40,
         height: 40,
-        borderRadius: 20,
+        borderRadius: 25,
         borderWidth: 2,
         borderColor: '#00A651',
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    circleText: {
-        fontSize: 16,
+        marginBottom: 2,
+      },
+      circleText: {
+        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
+    
+        fontSize: 20,
         color: '#00A651',
         fontWeight: 'bold',
-    },
-    profileText: {
-        fontSize: 10,
+      },
+      profileText: {
+        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
+    
+        fontSize: 14,
         color: '#000',
-        fontWeight: 'bold',
-    },
+        fontWeight: '400',
+        textAlign: 'center',
+        
+      },
     dropdownButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#fff',
+        backgroundColor: '#f9f9f9',
         borderWidth: 1,
         borderColor: '#00A651',
         borderRadius: 20,
@@ -507,6 +539,12 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginHorizontal: 20,
     },
+    backButtonImage: {
+        width: 41,  // Adjust the size of the back button image
+        height: 15,
+        marginLeft: 10,
+        marginTop:30,
+      },
 });
 
 export default Inspect;

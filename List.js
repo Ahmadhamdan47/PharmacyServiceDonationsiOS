@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -31,11 +31,14 @@ const List = () => {
     }, []);
 
     useEffect(() => {
+        
         navigation.setOptions({
             headerTitle: 'List',
+
             headerLeft: () => (
-                <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Text style={styles.backButton}>Back</Text>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
+                   
+                    <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
                 </TouchableOpacity>
             ),
             headerRight: () => (
@@ -46,9 +49,20 @@ const List = () => {
                     <Text style={styles.profileText}>{username}</Text>
                 </View>
             ),
-            headerTitleAlign: 'left',
+            headerTitleAlign: 'center',
+            headerTitleStyle: {
+              marginTop: 30, // Add margin top of 42px to the header title
+              position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
+                backgroundColor: '#f9f9f9',
+                
+            },
+            headerStyle: {
+              height: 100, // Increase the header height to accommodate the margin
+              backgroundColor: '#f9f9f9',
+          },
         });
     }, [navigation, username]);
+
 
     const getUsername = async () => {
         try {
@@ -142,81 +156,105 @@ const List = () => {
         <View style={styles.container}>
             <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
                 {/* First Row: Date Filters */}
-                <View style={styles.filterRow}>
-                    <TouchableOpacity onPress={() => setShowFromDatePicker(true)} style={styles.filterButton}>
-                        <Text style={styles.filterText}>From {fromDate ? fromDate.toISOString().split('T')[0] : ''}</Text>
+                <View style={styles.dateRangeContainer}>
+                    <TouchableOpacity style={styles.dateContainer} onPress={() => setShowFromDatePicker(true)}>
+                        <Text style={styles.dateText}>From</Text>
+                        <Text style={styles.dateValue}>{fromDate ? fromDate.toISOString().split('T')[0] : '01/01/24'}</Text>
                     </TouchableOpacity>
-                    {showFromDatePicker && renderDatePicker('from')}
 
-                    <TouchableOpacity onPress={() => setShowToDatePicker(true)} style={styles.filterButton}>
-                        <Text style={styles.filterText}>To {toDate ? toDate.toISOString().split('T')[0] : ''}</Text>
+                    <View style={styles.dateIcon}>
+                        <Image source={require("./assets/calendar.png")} style={styles.calendarIcon} />
+                    </View>
+
+                    <TouchableOpacity style={styles.dateContainer} onPress={() => setShowToDatePicker(true)}>
+                        <Text style={styles.dateText}>To</Text>
+                        <Text style={styles.dateValue}>{toDate ? toDate.toISOString().split('T')[0] : '01/08/24'}</Text>
                     </TouchableOpacity>
-                    {showToDatePicker && renderDatePicker('to')}
                 </View>
+                {showFromDatePicker && renderDatePicker('from')}
+                {showToDatePicker && renderDatePicker('to')}    
+           
 
                 {/* Second Row: Donor, Recipient, Status */}
+                {/* Donor, Recipient, and Status Fields in a Row */}
                 <View style={styles.filterRow}>
-                    {/* Donor Dropdown */}
-                    <TouchableOpacity onPress={() => setShowDonorPicker(!showDonorPicker)} style={styles.filterButton}>
-                        <Text style={styles.filterText}>{donors.find(d => d.DonorId === donorId)?.DonorName || 'Donor'}</Text>
-                    </TouchableOpacity>
-                    {showDonorPicker && (
-                        <View style={styles.dropdown}>
-                            <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
-                                <TouchableOpacity onPress={() => { setDonorId(''); setShowDonorPicker(false); }}>
-                                    <Text style={styles.dropdownText}>All</Text>
-                                </TouchableOpacity>
-                                {donors.map((d) => (
-                                    <TouchableOpacity key={d.DonorId} onPress={() => { setDonorId(d.DonorId); setShowDonorPicker(false); }}>
-                                        <Text style={styles.dropdownText}>{d.DonorName}</Text>
+                    {/* Donor */}
+                    <View style={styles.filterColumn}>
+                        <Text style={styles.filterLabel}>Donor</Text>
+                        <TouchableOpacity onPress={() => setShowDonorPicker(!showDonorPicker)} style={styles.filterButton}>
+                            <Text style={styles.filterText}>
+                                {donors.find(d => d.DonorId === donorId)?.DonorName || 'Pick▼'}
+                            </Text>
+                        </TouchableOpacity>
+                        {showDonorPicker && (
+                            <View style={styles.dropdown}>
+                                <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
+                                    <TouchableOpacity onPress={() => { setDonorId(''); setShowDonorPicker(false); }}>
+                                        <Text style={styles.dropdownText}>All</Text>
                                     </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-                        </View>
-                    )}
+                                    {donors.map((d) => (
+                                        <TouchableOpacity key={d.DonorId} onPress={() => { setDonorId(d.DonorId); setShowDonorPicker(false); }}>
+                                            <Text style={styles.dropdownText}>{d.DonorName}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        )}
+                    </View>
 
-                    {/* Recipient Dropdown */}
-                    <TouchableOpacity onPress={() => setShowRecipientPicker(!showRecipientPicker)} style={styles.filterButton}>
-                        <Text style={styles.filterText}>{recipients.find(r => r.RecipientId === recipientId)?.RecipientName || 'Recipient'}</Text>
-                    </TouchableOpacity>
-                    {showRecipientPicker && (
-                        <View style={styles.dropdown}>
-                            <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
-                                <TouchableOpacity onPress={() => { setRecipientId(''); setShowRecipientPicker(false); }}>
-                                    <Text style={styles.dropdownText}>All</Text>
-                                </TouchableOpacity>
-                                {recipients.map((r) => (
-                                    <TouchableOpacity key={r.RecipientId} onPress={() => { setRecipientId(r.RecipientId); setShowRecipientPicker(false); }}>
-                                        <Text style={styles.dropdownText}>{r.RecipientName}</Text>
+                    {/* Recipient */}
+                    <View style={styles.filterColumn}>
+                        <Text style={styles.filterLabel}>Recipient</Text>
+                        <TouchableOpacity onPress={() => setShowRecipientPicker(!showRecipientPicker)} style={styles.filterButton}>
+                            <Text style={styles.filterText}>
+                                {recipients.find(r => r.RecipientId === recipientId)?.RecipientName || 'Pick▼'}
+                            </Text>
+                        </TouchableOpacity>
+                        {showRecipientPicker && (
+                            <View style={styles.dropdown}>
+                                <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
+                                    <TouchableOpacity onPress={() => { setRecipientId(''); setShowRecipientPicker(false); }}>
+                                        <Text style={styles.dropdownText}>All</Text>
                                     </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-                        </View>
-                    )}
+                                    {recipients.map((r) => (
+                                        <TouchableOpacity key={r.RecipientId} onPress={() => { setRecipientId(r.RecipientId); setShowRecipientPicker(false); }}>
+                                            <Text style={styles.dropdownText}>{r.RecipientName}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        )}
+                    </View>
 
-                    {/* Status Dropdown */}
-                    <TouchableOpacity onPress={() => setShowStatusPicker(!showStatusPicker)} style={styles.filterButton}>
-                        <Text style={styles.filterText}>{status}</Text>
-                    </TouchableOpacity>
-                    {showStatusPicker && (
-                        <View style={styles.dropdown}>
-                            <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
-                                {['All', 'Pending', 'Approved', 'Inspect'].map((s) => (
-                                    <TouchableOpacity key={s} onPress={() => { setStatus(s); setShowStatusPicker(false); }}>
-                                        <Text style={styles.dropdownText}>{s}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-                        </View>
-                    )}
+                    {/* Status */}
+                    <View style={styles.filterColumn}>
+                        <Text style={styles.filterLabel}>Status</Text>
+                        <TouchableOpacity onPress={() => setShowStatusPicker(!showStatusPicker)} style={styles.filterButton}>
+                            <Text style={styles.filterText}>{status}</Text>
+                        </TouchableOpacity>
+                        {showStatusPicker && (
+                            <View style={styles.dropdown}>
+                                <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
+                                    {['All', 'Pending', 'Approved', 'Inspect'].map((s) => (
+                                        <TouchableOpacity key={s} onPress={() => { setStatus(s); setShowStatusPicker(false); }}>
+                                            <Text style={styles.dropdownText}>{s}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        )}
+                    </View>
                 </View>
 
+
                 {/* Third Row: Filter Button */}
-                <TouchableOpacity style={styles.filterButton} onPress={fetchDonations}>
-                    <Text style={styles.filterButtonText}>Filter</Text>
-                </TouchableOpacity>
+                <TouchableOpacity style={styles.searchButton} onPress={fetchDonations}>
+    <Image source={require('./assets/search.png')} style={styles.searchIcon} />
+</TouchableOpacity>
+
 
                 {/* Results Count */}
+                <Image source={require('./assets/separator-green.png')} style={styles.separator} />
                 <Text style={styles.resultCount}>number of result(s): {donations.length}</Text>
 
                 {/* Donations List */}
@@ -251,7 +289,7 @@ const List = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: '#f9f9f9',
     },
     scrollView: {
         flex: 1,
@@ -259,33 +297,49 @@ const styles = StyleSheet.create({
     contentContainer: {
         paddingBottom: 80,
         marginTop: 40,
+        marginLeft:55,
+        marginRight:55,
     },
     profileContainer: {
-        marginTop:10,
-        flexDirection: 'column',
-        alignItems: 'center',
-        marginLeft: 'auto',
-        marginRight:5,
-    },
-    circle: {
+        width: 47,
+        height: 16,
+        backgroundColor: '#f9f9f9',
+        fontSize: 14,
+        fontFamily: 'Roboto Condensed',
+        fontWeight: '400',
+        marginRight:24,
+        marginLeft: 103,
+        
+        position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
+    
+      },
+      circle: {
+        backgroundColor: '#f9f9f9',
         width: 40,
         height: 40,
-        borderRadius: 20,
+        borderRadius: 25,
         borderWidth: 2,
         borderColor: '#00A651',
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    circleText: {
-        fontSize: 16,
+        marginBottom: 2,
+      },
+      circleText: {
+        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
+    
+        fontSize: 20,
         color: '#00A651',
         fontWeight: 'bold',
-    },
-    profileText: {
-        fontSize: 10,
-        color: '#000',  // Changed to black
-        fontWeight: 'bold',
-    },
+      },
+      profileText: {
+        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
+    
+        fontSize: 14,
+        color: '#000',
+        fontWeight: '400',
+        textAlign: 'center',
+        
+      },
     backButton: {
         fontSize: 16,
         color: '#000',
@@ -296,30 +350,26 @@ const styles = StyleSheet.create({
     filterRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 10,
-    },
-    filterButton: {
-        borderColor: '#00A651',
-        borderWidth: 1,
-        borderRadius: 20,
-        paddingVertical: 8,
+        marginVertical: 10,
         paddingHorizontal: 10,
+        
+    },
+    filterColumn: {
         flex: 1,
         marginHorizontal: 5,
-        alignItems: 'center',
-        position: 'relative',
-        zIndex: 1,
     },
+    
     filterText: {
         fontSize: 14,
-        color: '#00A651',
+        fontWeight: 'bold',
+        color: '#000',
+        textAlign: 'center',
     },
     dropdown: {
         backgroundColor: '#fff',
         borderWidth: 1,
         borderColor: '#ccc',
         borderRadius: 5,
-        marginTop: 5,
         position: 'absolute',
         width: '100%',
         maxHeight: 120,
@@ -331,6 +381,8 @@ const styles = StyleSheet.create({
     dropdownText: {
         fontSize: 14,
         padding: 10,
+        color: '#000',
+
     },
     filterButtonText: {
         color: '#00A651',
@@ -339,8 +391,9 @@ const styles = StyleSheet.create({
     resultCount: {
         textAlign: 'center',
         marginVertical: 10,
-        fontSize: 16,
-        fontWeight: 'bold',
+        fontSize: 10,
+        fontWeight: 'light',
+        color: "#121212"
     },
     card: {
         backgroundColor: '#fff',
@@ -369,6 +422,82 @@ const styles = StyleSheet.create({
         color: '#333',
         marginBottom: 5,
     },
+    backButtonImage: {
+        width: 41,  // Adjust the size of the back button image
+        height: 15,
+        marginLeft: 10,
+        marginTop:30,
+      },
+      dateRangeContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+        borderWidth: 1,
+        borderColor: '#00A651',
+        borderRadius: 20,
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        marginHorizontal: 10,
+        height:39,
+        marginBottom:10,
+    },
+    dateContainer: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    dateText: {
+        fontSize: 14,
+        fontWeight:'bold',
+        color: '#707070',
+    },
+    dateValue: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#000',
+    },
+    dateIcon: {
+        width: 30,
+        height: 30,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    calendarIcon: {
+        width: 35,
+        height: 34,
+        tintColor: '#00A651',
+    },
+    filterContainer: {
+        marginVertical: 20,
+        paddingHorizontal: 10,
+        flexDirection:'row'
+    },
+    filterLabel: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: 'grey',
+        marginBottom: 5,
+        textAlign: 'center',
+    },
+    filterButton: {
+        borderWidth: 1,
+        borderColor: '#00A651',
+        borderRadius: 20,
+        paddingVertical: 8,
+        paddingHorizontal: 15,
+    },
+    searchButton: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 50, // Optional: for round button
+    },
+    searchIcon: {
+        width: 250,  // Set the width of the search icon
+        height: 30, // Set the height of the search icon
+    },  
+    separator:{
+        marginTop:10,
+        
+    }
 });
 
 export default List;

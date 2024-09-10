@@ -1065,7 +1065,7 @@ const Donate = ({ route }) => {
       <Text style={styles.modalTitle}>{newPackCount} Confirm finish</Text>
       <Text style={styles.modalSubtitle}>Are you sure you want to finish the donation</Text>
 
-      <View style={styles.modalButtonContainer}>
+    <View tyle={styles.modalButtonContainer}>
         <TouchableOpacity
           style={[styles.modalButton, styles.addBoxButton]}
           onPress={() => {
@@ -1137,16 +1137,16 @@ const styles = StyleSheet.create({
     marginLeft: 40, // Reduced margin
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#00a651',
-    borderRadius: 20,
-    padding: 5,
-    paddingLeft:10,
-    height: 30,  // Set height to 30px
-    marginBottom: 10,
-    backgroundColor: '#FFFCFC',
-    marginLeft:35,
-    marginRight:35,
+      borderWidth: 1,
+      borderColor: '#00a651',
+      borderRadius: 20,
+      padding: 5,
+      paddingLeft:10,
+      height: 30,  // Set height to 30px
+      marginBottom: 10,
+      backgroundColor: '#FFFCFC',
+      marginLeft:35,
+      marginRight:35,
 
   },
   inputError: {
