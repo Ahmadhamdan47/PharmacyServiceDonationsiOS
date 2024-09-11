@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, BackHandler, Image } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, BackHandler, Image,StatusBar } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
@@ -33,15 +33,12 @@ const DonorList = ({ navigation }) => {
                 </View>
             ),
             headerTitleAlign: 'center',
-            headerTitleStyle: {
-              marginTop: 30, // Add margin top of 42px to the header title
-              position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
-                backgroundColor: '#f9f9f9',
-                
-            },
+           
             headerStyle: {
-              height: 100, // Increase the header height to accommodate the margin
-              backgroundColor: '#f9f9f9',
+                backgroundColor: '#f9f9f9', // Set the background color of the whole navigation bar
+                elevation: 0,            // Remove shadow on Android
+                shadowOpacity: 0,        // Remove shadow on iOS
+                borderBottomWidth: 0, 
           },
             
         });
@@ -144,54 +141,59 @@ const DonorList = ({ navigation }) => {
 
     return (
         <View style={styles.fullContainer}>
+            <StatusBar backgroundColor="#f9f9f9" />
+    
             {loading ? (
                 <ActivityIndicator size="large" color="#0000ff" />
             ) : (
                 <ScrollView contentContainerStyle={styles.scrollViewContainer}>
-                    {donations.map((donation, index) => (
-                        <TouchableOpacity key={index} style={styles.cardContainer} onPress={() => handlePressDonation(donation)}>
-                            <Text style={[styles.statusText, donation.status === 'pending' ? styles.pendingText : styles.approvedText]}>
-                                {donation.status === 'pending' ? 'Pending' : 'Approved'}
-                            </Text>
-                            <View style={styles.cardContent}>
-                                <View style={styles.infoContainer}>
-                                    <Text style={styles.infoTitle}>Donation Title:</Text>
-                                    <Text style={styles.infoText}>{donation.DonationTitle}</Text>
-                                    <Text style={styles.infoTitle}>To:</Text>
-                                    <Text style={styles.infoText}>{donation.RecipientName}</Text>
+                    {donations
+                        .filter(donation => donation.NumberOfBoxes > 0 && donation.BatchLotTrackings.length > 0) // Filter donations
+                        .map((donation, index) => (
+                            <TouchableOpacity key={index} style={styles.cardContainer} onPress={() => handlePressDonation(donation)}>
+                                <Text style={[styles.statusText, donation.status === 'pending' ? styles.pendingText : styles.approvedText]}>
+                                    {donation.status === 'pending' ? 'Pending' : 'Approved'}
+                                </Text>
+                                <View style={styles.cardContent}>
+                                    <View style={styles.infoContainer}>
+                                        <Text style={styles.infoTitle}>Donation Title:</Text>
+                                        <Text style={styles.infoText}>{donation.DonationTitle}</Text>
+                                        <Text style={styles.infoTo}>To:</Text>
+                                        <Text style={styles.infoText}>{donation.RecipientName}</Text>
+                                    </View>
+                                    <View style={styles.detailsContainer}>
+                                        <View style={styles.detailItem}>
+                                            <Text style={styles.detailsText}>Date:</Text>
+                                            <Text style={styles.detailValue}>{donation.DonationDate}</Text>
+                                        </View>
+                                        <View style={styles.detailItem}>
+                                            <Text style={styles.detailsText}>nb of box(es):</Text>
+                                            <Text style={styles.detailValue}>{donation.NumberOfBoxes}</Text>
+                                        </View>
+                                        <View style={styles.detailItem}>
+                                            <Text style={styles.detailsText}>nb of pack(s):</Text>
+                                            <Text style={styles.detailValue}>{donation.BatchLotTrackings.length}</Text>
+                                        </View>
+                                    </View>
                                 </View>
-                                <View style={styles.detailsContainer}>
-  <View style={styles.detailItem}>
-    <Text style={styles.detailsText}>Date:</Text>
-    <Text style={styles.detailValue}>{donation.DonationDate}</Text>
-  </View>
-  <View style={styles.detailItem}>
-    <Text style={styles.detailsText}>nb of box(es):</Text>
-    <Text style={styles.detailValue}>{donation.NumberOfBoxes}</Text>
-  </View>
-  <View style={styles.detailItem}>
-    <Text style={styles.detailsText}>nb of pack(s):</Text>
-    <Text style={styles.detailValue}>{donation.BatchLotTrackings.length}</Text>
-  </View>
-</View>
-
-                            </View>
-                        </TouchableOpacity>
-                    ))}
+                            </TouchableOpacity>
+                        ))}
                 </ScrollView>
             )}
-
+    
             {/* Bottom Navigation Bar */}
-            <BottomNavBar />
+            <BottomNavBar style={{ marginTop: 25 }} />
         </View>
     );
+    
 };
 
 const styles = StyleSheet.create({
     fullContainer: {
         flex: 1,
         backgroundColor: '#f9f9f9',
-        paddingTop:35,
+        paddingTop:10,
+        
     },
     profileContainer: {
         width: 47,
@@ -202,6 +204,7 @@ const styles = StyleSheet.create({
         fontWeight: '400',
         marginRight:24,
         marginLeft: 103,
+        marginBottom:30,
         
         position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
     
@@ -216,6 +219,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 2,
+        marginLeft:5,
       },
       circleText: {
         backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
@@ -223,6 +227,7 @@ const styles = StyleSheet.create({
         fontSize: 20,
         color: '#00A651',
         fontWeight: 'bold',
+        marginBottom:2,
       },
       profileText: {
         backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
@@ -230,34 +235,36 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#000',
         fontWeight: '400',
-        textAlign: 'center',
+        textAlign: 'left',
         
-      },
-      
+      },   
     scrollViewContainer: {
         paddingBottom: 20,
     },
     cardContainer: {
         marginTop:20,
-        marginHorizontal: 20,
+        marginHorizontal: 35,
         marginVertical: 10,
         borderWidth: 1,
         borderColor: '#00A651',
-        borderRadius: 8,
+        borderRadius: 25,
         padding: 10,
         backgroundColor: '#FFFCFC',
         position: 'relative',
+        height:120,
+        
     },
     statusText: {
         position: 'absolute',
-        left: 10,
+        left: 20,
         top: 10,
         fontSize: 14,
         fontStyle: 'italic',
         fontWeight: '700',
         zIndex: 1,
         backgroundColor: '#fff',
-        paddingHorizontal: 5,
+        paddingHorizontal: 10,
+        
     },
     pendingText: {
         color: '#DB7B2B',
@@ -268,7 +275,9 @@ const styles = StyleSheet.create({
     cardContent: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginTop: 20,
+        
+        marginHorizontal:20,
+        
     },
     infoContainer: {
         flex: 1,
@@ -277,6 +286,13 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '300',
         color: '#121212',
+        marginTop:25,
+    },
+    infoTo: {
+        fontSize: 12,
+        fontWeight: '300',
+        color: '#121212',
+       
     },
     infoText: {
         fontSize: 14,
@@ -303,7 +319,7 @@ const styles = StyleSheet.create({
         width: 41,  // Adjust the size of the back button image
         height: 15,
         marginLeft: 10,
-        marginTop:30,
+        
       },
       detailValue: {
         fontSize: 14,

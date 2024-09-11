@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useLayoutEffect} from 'react';
-import { View, Text, TextInput, Image, Keyboard, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TextInput, Image, Keyboard, StyleSheet, TouchableOpacity, Alert, StatusBar, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import axios from 'axios';
 import DropDownPicker from 'react-native-dropdown-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -16,6 +16,7 @@ const AddDonor = () => {
   const [donorName, setDonorName] = useState('');
   const [donorId, setDonorId] = useState(null);
   const navigation = useNavigation();
+  const [keyboardVisible, setKeyboardVisible] = useState(false);  // Track keyboard visibility
 
   useFocusEffect(
     React.useCallback(() => {
@@ -25,18 +26,21 @@ const AddDonor = () => {
   );
 
   useEffect(() => {
-    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => setIsInputFocused(false));
+    // Listen for keyboard show and hide events
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+
     return () => {
-      keyboardDidHideListener.remove();
+        keyboardDidShowListener.remove();
+        keyboardDidHideListener.remove();
     };
-  }, []);
+}, []);
 
   useLayoutEffect(() => {
     navigation.setOptions({
         headerTitle: 'Donate',
         headerLeft: () => (
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
-               
                 <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
             </TouchableOpacity>
         ),
@@ -50,16 +54,17 @@ const AddDonor = () => {
         ),
         headerTitleAlign: 'center',
         headerTitleStyle: {
-          marginTop: 30, // Add margin top of 42px to the header title
-          position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
-            backgroundColor: '#f9f9f9',
-            
+          position: 'relative', 
+          backgroundColor: '#f9f9f9',
+          marginBottom: 20,
         },
         headerStyle: {
-          height: 100, // Increase the header height to accommodate the margin
+          height: 100, 
           backgroundColor: '#f9f9f9',
+          elevation: 0, 
+          shadowOpacity: 0, 
+          borderBottomWidth: 0,  
       },
-        
     });
 }, [navigation, donorName]);
 
@@ -86,7 +91,6 @@ const AddDonor = () => {
         value: recipient.RecipientId
       }));
       setRecipients(recipientsData);
-      setSelectedRecipient(recipientsData[0]?.value);
     } catch (error) {
       console.error("Error fetching recipients:", error);
     }
@@ -95,14 +99,14 @@ const AddDonor = () => {
   const handleContinue = async () => {
     if (!donationTitle.trim()) {
       Alert.alert('Error', 'Donation title is required.');
-      return;  // Prevent further execution
+      return;
     }
-  
+
     if (!donorId) {
       Alert.alert('Error', 'Failed to load donor information.');
       return;
     }
-  
+
     try {
       const response = await axios.post("https://apiv2.medleb.org/donation/add", {
         DonorId: donorId,
@@ -111,20 +115,18 @@ const AddDonor = () => {
         DonationPurpose: donationPurpose,
         DonationDate: new Date().toISOString(),
       });
-  
+
       const donationId = response.data.DonationId;
       const selectedRecipientName = recipients.find(recipient => recipient.value === selectedRecipient).label;
       const donationDate = new Date().toISOString().replace(/:/g, '-');
-      console.log("Donation created successfully with ID:", donationId);
-      
       navigation.navigate('Donate', {
-        donorId: donorId,
+        donorId,
         recipientId: selectedRecipient,
-        donorName: donorName,
+        donorName,
         recipientName: selectedRecipientName,
-        donationPurpose: donationPurpose,
-        donationDate: donationDate,
-        donationId: donationId,
+        donationPurpose,
+        donationDate,
+        donationId,
       });
     } catch (error) {
       console.error("Error creating donation:", error);
@@ -132,62 +134,68 @@ const AddDonor = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.formContainer}>
-        <Text style={styles.label}>Donor</Text>
-        <TextInput
-          style={styles.inputDonor}
-          value={donorName}
-          editable={false}
-        />
-
-        <Text style={styles.label}>Recipient*</Text>
-        <View style={{ zIndex: 10 }}>
-          <DropDownPicker
-            open={recipientOpen}
-            value={selectedRecipient}
-            items={recipients}
-            setOpen={setRecipientOpen}
-            setValue={setSelectedRecipient}
-            setItems={setRecipients}
-            placeholder="Select a recipient"
-            containerStyle={styles.dropdown}
-            onOpen={() => setIsInputFocused(true)}
-            onClose={() => setIsInputFocused(false)}
-            style={styles.picker}
-            dropDownContainerStyle={styles.dropDownContainer}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} // Adjust for iOS vs Android
+    >
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+        <View style={styles.formContainer}>
+          <Text style={styles.label}>Donor</Text>
+          <TextInput
+            style={styles.inputDonor}
+            value={donorName}
+            editable={false}
           />
+          <StatusBar backgroundColor="#f9f9f9" />
+
+          <Text style={styles.label}>Recipient*</Text>
+          <View style={{ zIndex: 10 }}>
+            <DropDownPicker
+              open={recipientOpen}
+              value={selectedRecipient}
+              items={recipients}
+              setOpen={setRecipientOpen}
+              setValue={setSelectedRecipient}
+              setItems={setRecipients}
+              placeholder="Select a recipient"
+              containerStyle={styles.dropdown}
+              onOpen={() => setIsInputFocused(true)}
+              onClose={() => setIsInputFocused(false)}
+              style={styles.picker}
+              dropDownContainerStyle={styles.dropDownContainer}
+            />
+          </View>
+
+          <Text style={styles.label}>Donation Title*</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter Donation Title"
+            value={donationTitle}
+            onChangeText={setDonationTitle}
+            onFocus={() => setIsInputFocused(true)}
+            onBlur={() => setIsInputFocused(false)}
+          />
+
+          <Text style={styles.label}>Purpose</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            placeholder="Enter Donation Purpose"
+            value={donationPurpose}
+            onChangeText={setDonationPurpose}
+            onFocus={() => setIsInputFocused(true)}
+            onBlur={() => setIsInputFocused(false)}
+            multiline
+            numberOfLines={4}
+          />
+
+          <TouchableOpacity style={styles.button} onPress={handleContinue}>
+            <Text style={styles.buttonText}>Continue</Text>
+          </TouchableOpacity>
         </View>
+      </ScrollView>
 
-        <Text style={styles.label}>Donation Title*</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter Donation Title"
-          value={donationTitle}
-          onChangeText={setDonationTitle}
-          onFocus={() => setIsInputFocused(true)}
-          onBlur={() => setIsInputFocused(false)}
-        />
-
-        <Text style={styles.label}>Purpose</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]} // Use the custom text area style
-          placeholder="Enter Donation Purpose"
-          value={donationPurpose}
-          onChangeText={setDonationPurpose}
-          onFocus={() => setIsInputFocused(true)}
-          onBlur={() => setIsInputFocused(false)}
-          multiline={true}
-          numberOfLines={4}
-        />
-
-        <TouchableOpacity style={styles.button} onPress={handleContinue}>
-          <Text style={styles.buttonText}>Continue</Text>
-        </TouchableOpacity>
-      </View>
-
-      {!isInputFocused && <BottomNavBar />}
-    </View>
+      {!keyboardVisible && <BottomNavBar />}  
+    </KeyboardAvoidingView>
   );
 };
 
@@ -195,8 +203,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f9f9f9",
-  paddingTop: 20,  // Adjust padding based on the header height to prevent content overlap
-
   },
   profileContainer: {
     width: 47,
@@ -205,11 +211,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Roboto Condensed',
     fontWeight: '400',
-    marginRight:24,
+    marginRight: 24,
     marginLeft: 103,
-    
-    position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
-
+    marginBottom: 50,
+    position: 'relative',
   },
   circle: {
     backgroundColor: '#f9f9f9',
@@ -221,28 +226,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 2,
+    marginLeft: 5,
   },
   circleText: {
-    backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
-
-    fontSize: 20,
+    backgroundColor: 'transparent',
+    fontSize: 25,
     color: '#00A651',
     fontWeight: 'bold',
-  },
-  profileText: {
-    backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
-
-    fontSize: 14,
-    color: '#000',
-    fontWeight: '400',
-    textAlign: 'center',
-    
+    marginBottom: 2,
   },
   formContainer: {
     paddingHorizontal: 20,
     paddingTop: 120,
     flex: 1,
-    backgroundColor: '#f9f9f9', // Add the background color for consistency
+    backgroundColor: '#f9f9f9',
   },
   label: {
     fontSize: 12,
@@ -256,8 +253,8 @@ const styles = StyleSheet.create({
     borderColor: '#00a651',
     borderRadius: 20,
     padding: 5,
-    paddingLeft:10,
-    height: 30,  // Set height to 30px
+    paddingLeft: 10,
+    height: 35,
     marginBottom: 10,
     backgroundColor: '#f0f0f0',
     color: '#00a651',
@@ -267,41 +264,40 @@ const styles = StyleSheet.create({
     borderColor: '#00a651',
     borderRadius: 20,
     padding: 5,
-    paddingLeft:10,
-    height: 30,  // Set height to 30px
+    paddingLeft: 10,
+    height: 35,
     marginBottom: 10,
     backgroundColor: '#fff',
   },
   textArea: {
-    height: 95, // Set specific height for the text area (293x95)
+    height: 95,
     textAlignVertical: 'top',
-    alignSelf: 'left', // Ensure it's centered within the form
   },
   dropdown: {
     marginBottom: 10,
-    minHeight:30,
+    minHeight: 30,
   },
   picker: {
     borderColor: '#00a651',
     borderWidth: 1,
     borderRadius: 20,
-    minHeight: 30, // Set height to 30px
+    minHeight: 35,
   },
   dropDownContainer: {
     borderColor: '#00a651',
     borderWidth: 1,
     borderRadius: 20,
-    minHeight:30,
+    minHeight: 30,
   },
   button: {
     backgroundColor: '#00a651',
-    width: 100,  // Set specific width for the button (100x35)
-    height: 35,  // Set specific height for the button
+    width: 100,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 20,
     marginTop: 20,
-    alignSelf: 'center',  // Center the button
+    alignSelf: 'center',
   },
   buttonText: {
     color: 'white',
@@ -309,10 +305,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   backButtonImage: {
-    width: 41,  // Adjust the size of the back button image
+    width: 41,
     height: 15,
     marginLeft: 10,
-    marginTop:30,
+    marginBottom: 20,
   },
 });
 

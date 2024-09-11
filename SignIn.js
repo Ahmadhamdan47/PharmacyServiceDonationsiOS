@@ -1,5 +1,5 @@
 import React, { useState, useLayoutEffect } from 'react';
-import { View, TextInput, Text, StyleSheet, Alert, Image, TouchableOpacity } from 'react-native';
+import { View, TextInput, Text, StyleSheet, Alert, Image, TouchableOpacity,StatusBar } from 'react-native';
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,25 +13,27 @@ const SignIn = () => {
     const navigation = useNavigation();
 
     // Customize the navigation header
-    useLayoutEffect(() => {
-        navigation.setOptions({
-            headerTitle: () => (
-                <Image
-                    source={require('./assets/medleblogo.png')}
-                    style={{ width: 166, height: 54 }}
-                />
-            ),
-            headerTitleAlign: 'center',  // Center the logo horizontally
-            headerLeft: () => null,      // Remove the back button
-            headerStyle: {
-                height: 150,             // Adjust the height of the header
-                backgroundColor: '#f9f9f9',
-            },
-            headerTitleStyle: {
-                marginTop: 50,           // Distance from the top (50px)
-            },
-        });
-    }, [navigation]);
+  navigation.setOptions({
+    headerTitle: () => (
+        <Image
+            source={require('./assets/medleblogo.png')}
+            style={{ width: 164, height: 50, marginTop:10, }}
+        />
+    ),
+    headerTitleAlign: 'center',  // Center the logo horizontally
+    headerLeft: () => null,      // Remove the back button
+    headerStyle: {
+        height: 150,             // Adjust the height of the header
+        backgroundColor: '#f9f9f9',
+        elevation: 0,            // Remove shadow on Android
+        shadowOpacity: 0,        // Remove shadow on iOS
+        borderBottomWidth: 0,    // Remove border at the bottom
+    },
+    headerTitleStyle: {
+        marginTop: 50,           // Distance from the top (50px)
+    },
+});
+
 
     const handleSignIn = async () => {
         try {
@@ -59,9 +61,10 @@ const SignIn = () => {
       };
 
     return (
+        
         <View style={styles.container}>
             {/* Title */}
-            <Text style={styles.title}>Welcome to MedLeb</Text>
+            <Text style={styles.title}>Drug Donation To Lebanon</Text>
 
             {/* Paragraph */}
             <Text style={styles.paragraph}>
@@ -100,6 +103,7 @@ const SignIn = () => {
             <Text style={styles.link} onPress={() => navigation.navigate('SignUp')}>
                 Don't have an account? Sign Up
             </Text>
+            <StatusBar backgroundColor="#f9f9f9" />
         </View>
     );
 };
@@ -110,26 +114,28 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         padding: 20,
         backgroundColor: '#f9f9f9',
-        paddingBottom:'100%',
+        paddingBottom:'50%',
+        marginBottom:30,
     },
     title: {
         fontSize: 14,           // Adjust the title font size as needed
         fontWeight: 'bold',     // Title in bold
         textAlign: 'center',
-        marginTop: 47 ,         // 150px from the top border
+        marginTop: 60 ,         // 150px from the top border
         marginBottom: 46,       // 46px space between the title and the logo
         color: '#121212',
     },
     paragraph: {
         fontSize: 14,           // Paragraph font size
         fontWeight: '500',      // Medium weight
-        textAlign: 'center',
-        marginHorizontal: 30,   // Horizontal margin for text width control
-        marginBottom: 110,       // 47px space between paragraph and title
-        width: 298,             // Set specific width
-        height: 54,             // Set specific height
+        textAlign: 'left',
+        marginHorizontal: 10,   // Horizontal margin for text width control
+        marginBottom: 55,       // 47px space between paragraph and title
+        width: 315,             // Set specific width
+        height: 67,             // Set specific height
         alignSelf: 'center',    // Center the paragraph horizontally
-        color: '#555',          // Set paragraph text color
+        color: '#555', 
+        fontStyle:'italic',         // Set paragraph text color
     },
     label: {
         fontSize: 12,
@@ -141,7 +147,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#00a651',
         paddingLeft: 15,
-        height: 30,             // Set height to 30px for inputs
+        height: 35,             // Set height to 30px for inputs
         borderRadius: 20,
         marginBottom: 10,       // Distance between input fields
         marginLeft: 15,         // Align inputs with labels
@@ -151,7 +157,7 @@ const styles = StyleSheet.create({
     },
     button: {
         backgroundColor: '#00a651',
-        height: 30,             // Set button height to 30px
+        height: 35,             // Set button height to 30px
         justifyContent: 'center',// Center button text vertically
         alignItems: 'center',    // Center button text horizontally
         borderRadius: 25,        // Distance between button and last input field
@@ -184,7 +190,7 @@ const styles = StyleSheet.create({
       showPasswordButton: {
         position: 'absolute',
         right: 15,
-        padding: 5,
+        padding: 7,
       },
 });
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet,Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet,Image,BackHandler } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,6 +28,19 @@ const Validate = () => {
     }, []);
 
     useEffect(() => {
+        const backAction = () => {
+            navigation.navigate('Landing'); // Navigate to "Landing" when back button is pressed
+            return true; // Prevent default back button behavior
+        };
+    
+        const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+    
+        return () => {
+            backHandler.remove(); // Clean up the listener when the component is unmounted
+        };
+    }, [navigation]);
+
+    useEffect(() => {
         navigation.setOptions({
             headerTitle: 'Validate',
             headerLeft: () => (
@@ -44,15 +57,12 @@ const Validate = () => {
                 </View>
             ),
             headerTitleAlign: 'center',
-            headerTitleStyle: {
-                marginTop: 30,
-                position: 'relative',
-                backgroundColor: '#f9f9f9',
-            },
             headerStyle: {
-                height: 100,
-                backgroundColor: '#f9f9f9',
-            },
+                backgroundColor: '#f9f9f9', // Set the background color of the whole navigation bar
+                elevation: 0,            // Remove shadow on Android
+                shadowOpacity: 0,        // Remove shadow on iOS
+                borderBottomWidth: 0, 
+          },
         });
     
     }, [navigation, username]);
@@ -208,18 +218,47 @@ const Validate = () => {
 
                 {/* Display Donors */}
                 <ScrollView>
-                    {getPaginatedDonors().map((donor, index) => (
-                         <TouchableOpacity key={index} style={styles.card} onPress={() => handleDonorClick(donor)}>
-                         <Text style={[styles.statusText, { color: getStatusText(donor.IsActive) === 'Validated' ? 'green' : getStatusText(donor.IsActive) === 'Rejected' ? 'red' : 'orange' }]}>
-                             {getStatusText(donor.IsActive)}
-                         </Text>
-                         <Text style={styles.cardText}><Text style={styles.cardLabel}>Donor: </Text><Text style={styles.boldText}>{donor.DonorName}</Text></Text>
-                         <Text style={styles.cardText}>Country: {donor.DonorCountry}</Text>
-                         <Text style={styles.cardText}>Donor Type: {donor.DonorType}</Text>
-                         <Text style={styles.cardText}>Date: {donor.CreatedDate}</Text>
-                     </TouchableOpacity>
-                    ))}
-                </ScrollView>
+    {getPaginatedDonors().map((donor, index) => (
+        <TouchableOpacity 
+            key={index} 
+            style={styles.card} 
+            onPress={() => handleDonorClick(donor)}
+        >
+            {/* Status text */}
+            <Text 
+                style={[styles.statusText, { 
+                    color: getStatusText(donor.IsActive) === 'Validated' ? 'green' : 
+                            getStatusText(donor.IsActive) === 'Rejected' ? 'red' : 'orange' 
+                }]}
+            >
+                {getStatusText(donor.IsActive)}
+            </Text>
+            
+            {/* Card content divided into two columns */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                
+                {/* Left column: Donor and Date */}
+                <View style={{ flex: 1, marginRight: 10 }}>
+                    <Text style={styles.cardLabel}>Donor</Text>
+                    <Text style={[styles.cardText, { marginBottom: 15 }]}>{donor.DonorName}</Text>
+                    
+                    <Text style={styles.cardLabel}>Date</Text>
+                    <Text style={styles.cardText}>{donor.CreatedDate}</Text>
+                </View>
+
+                {/* Right column: Country and Donor Type */}
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={styles.cardLabel}>Country</Text>
+                    <Text style={[styles.cardText, { marginBottom: 15 }]}>{donor.DonorCountry}</Text>
+                    
+                    <Text style={styles.cardLabel}>Donor Type</Text>
+                    <Text style={styles.cardText}>{donor.DonorType}</Text>
+                </View>
+            </View>
+        </TouchableOpacity>
+    ))}
+</ScrollView>
+
 
                 {/* Pagination Controls */}
                 <View style={styles.paginationContainer}>
@@ -269,9 +308,9 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontFamily: 'Roboto Condensed',
         fontWeight: '400',
-        marginRight:24,
+        marginRight:10,
         marginLeft: 103,
-        
+        marginBottom:30,
         position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
     
       },
@@ -344,12 +383,13 @@ const styles = StyleSheet.create({
     resultCount: {
         textAlign: 'center',
         marginVertical: 10,
-        fontSize: 16,
-        fontWeight: 'bold',
+        fontSize: 12,
+        fontWeight: 'light',
+        color: "#121212"
     },
     card: {
         backgroundColor: '#fff',
-        borderRadius: 8,
+        borderRadius: 25,
         padding: 15,
         marginVertical: 10,
         elevation: 2,
@@ -357,6 +397,8 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 1.41,
+        borderColor:'green',
+        borderWidth:1,
     },
     statusText: {
         fontSize: 14,
@@ -397,20 +439,20 @@ const styles = StyleSheet.create({
         width: 41,  // Adjust the size of the back button image
         height: 15,
         marginLeft: 10,
-        marginTop:30,
       },
       dateRangeContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-around',
+       
         borderWidth: 1,
         borderColor: '#00A651',
         borderRadius: 20,
         paddingVertical: 10,
-        paddingHorizontal: 20,
-        marginHorizontal: 10,
-        height:39,
+        paddingHorizontal: 10,
+        height:45,
+        
         marginBottom:10,
+        
     },
     dateContainer: {
         flex: 1,
@@ -440,11 +482,13 @@ const styles = StyleSheet.create({
     searchButton: {
         justifyContent: 'center',
         alignItems: 'center',
-        borderRadius: 50, // Optional: for round button
+        borderRadius: 100, // Optional: for round button
     },
     searchIcon: {
         width: 280,  // Set the width of the search icon
-        height: 30, // Set the height of the search icon
+        height: 35, // Set the height of the search icon
+        borderRadius: 100, // Optional: for round button
+
     },  
 });
 

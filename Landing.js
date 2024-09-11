@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useLayoutEffect } from 'react';
-import { StyleSheet, View, Image, TouchableOpacity, Text, BackHandler, ToastAndroid } from 'react-native';
+import { StyleSheet, View, Image, TouchableOpacity, Text, BackHandler, ToastAndroid,StatusBar } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBar from './BottomNavBar';
@@ -43,13 +43,22 @@ const Landing = () => {
 
   const handleSignOut = async () => {
     try {
-      await AsyncStorage.clear();
-      navigation.navigate('SignIn');
+      // Clear all relevant AsyncStorage data
+      await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('userRole');
+      await AsyncStorage.removeItem('username');
+      await AsyncStorage.removeItem('status'); // If you store donor status
+  
+       // Clear user role
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'SignIn' }],
+      }); // Navigate to SignIn screen
     } catch (error) {
       console.error('Error signing out:', error);
     }
   };
-
+  
   const handleInspect = () => navigation.navigate('Inspect');
   const handleValidate = () => navigation.navigate('Validate');
 
@@ -75,7 +84,11 @@ const Landing = () => {
       headerTitle: '',  // Leave the header title empty
       headerTitleAlign: 'center',
       headerStyle: {
+    
         backgroundColor: '#f9f9f9', // Set the background color of the whole navigation bar
+        elevation: 0,            // Remove shadow on Android
+        shadowOpacity: 0,        // Remove shadow on iOS
+        borderBottomWidth: 0,  
       },
     });
   }, [navigation, username, dropdownVisible]);
@@ -83,6 +96,7 @@ const Landing = () => {
 
   return (
     <View style={styles.container}>
+      <StatusBar backgroundColor="#f9f9f9"/>
       {dropdownVisible && (
         <View style={styles.dropdown}>
           {userRole === 'Admin' && (
@@ -156,6 +170,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     marginRight:24,
     marginLeft: 103,
+    marginBottom:15,
     
     position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
 
@@ -170,13 +185,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 2,
+    marginLeft:5,
   },
   circleText: {
     backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
 
-    fontSize: 20,
+    fontSize: 25,
     color: '#00A651',
     fontWeight: 'bold',
+    marginBottom:2,
   },
   profileText: {
     backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
@@ -184,7 +201,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#000',
     fontWeight: '400',
-    textAlign: 'center',
+    textAlign: 'left',
     
   },
   dropdown: {

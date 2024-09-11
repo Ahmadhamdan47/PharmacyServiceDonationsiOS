@@ -101,22 +101,24 @@ const DonationDetails = ({ route, navigation }) => {
         <View style={styles.container}>
             <Text style={styles.subtitle}>To: {donation.RecipientName}</Text>
             <Text style={styles.subtitle}>Date: {donation.DonationDate}</Text>
-
+    
             {loading ? (
                 <Text>Loading...</Text>
             ) : (
                 <ScrollView style={styles.scrollView}>
-                    {boxes.map((box, index) => (
-                        <TouchableOpacity key={index} style={styles.card} onPress={() => handleBoxPress(box)}>
-                            <View style={styles.cardContent}>
-                                <Text style={styles.cardTitle}>{box.BoxLabel}</Text>
-                                <Text style={styles.cardText}>Number of Packs: {box.NumberOfPacks || 0}</Text>
-                            </View>
-                        </TouchableOpacity>
-                    ))}
+                    {boxes
+                        .filter(box => box.NumberOfPacks > 0) // Filter out boxes with 0 packs
+                        .map((box, index) => (
+                            <TouchableOpacity key={index} style={styles.card} onPress={() => handleBoxPress(box)}>
+                                <View style={styles.cardContent}>
+                                    <Text style={styles.cardTitle}>{box.BoxLabel}</Text>
+                                    <Text style={styles.cardText}>Number of Packs: {box.NumberOfPacks || 0}</Text>
+                                </View>
+                            </TouchableOpacity>
+                        ))}
                 </ScrollView>
             )}
-
+    
             {/* Conditional Bottom Navigation Bar based on user role */}
             {userRole === 'Admin' ? (
                 <BottomNavBarInspection currentScreen="DonationDetails" />
@@ -125,6 +127,7 @@ const DonationDetails = ({ route, navigation }) => {
             )}
         </View>
     );
+    
 };
 
 const styles = StyleSheet.create({

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, StatusBar } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -50,15 +50,12 @@ const List = () => {
                 </View>
             ),
             headerTitleAlign: 'center',
-            headerTitleStyle: {
-              marginTop: 30, // Add margin top of 42px to the header title
-              position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
-                backgroundColor: '#f9f9f9',
-                
-            },
+           
             headerStyle: {
-              height: 100, // Increase the header height to accommodate the margin
-              backgroundColor: '#f9f9f9',
+                backgroundColor: '#f9f9f9', // Set the background color of the whole navigation bar
+                elevation: 0,            // Remove shadow on Android
+                shadowOpacity: 0,        // Remove shadow on iOS
+                borderBottomWidth: 0, 
           },
         });
     }, [navigation, username]);
@@ -154,6 +151,8 @@ const List = () => {
 
     return (
         <View style={styles.container}>
+            <StatusBar backgroundColor="#f9f9f9"/>
+
             <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
                 {/* First Row: Date Filters */}
                 <View style={styles.dateRangeContainer}>
@@ -183,7 +182,7 @@ const List = () => {
                         <Text style={styles.filterLabel}>Donor</Text>
                         <TouchableOpacity onPress={() => setShowDonorPicker(!showDonorPicker)} style={styles.filterButton}>
                             <Text style={styles.filterText}>
-                                {donors.find(d => d.DonorId === donorId)?.DonorName || 'Pick▼'}
+                                {donors.find(d => d.DonorId === donorId)?.DonorName || 'All'}
                             </Text>
                         </TouchableOpacity>
                         {showDonorPicker && (
@@ -207,7 +206,7 @@ const List = () => {
                         <Text style={styles.filterLabel}>Recipient</Text>
                         <TouchableOpacity onPress={() => setShowRecipientPicker(!showRecipientPicker)} style={styles.filterButton}>
                             <Text style={styles.filterText}>
-                                {recipients.find(r => r.RecipientId === recipientId)?.RecipientName || 'Pick▼'}
+                                {recipients.find(r => r.RecipientId === recipientId)?.RecipientName || 'All'}
                             </Text>
                         </TouchableOpacity>
                         {showRecipientPicker && (
@@ -260,22 +259,40 @@ const List = () => {
                 {/* Donations List */}
                 <ScrollView>
                     {donations.map((donation, index) => (
-                        <TouchableOpacity 
-                            key={index} 
-                            style={styles.card} 
-                            onPress={() => navigation.navigate('DonationDetails', { donation })}
-                        >
-                            <View style={styles.cardHeader}>
-                                <Text style={[styles.statusText, { color: getStatusColor(donation.status) }]}>{donation.status}</Text>
-                            </View>
-                            <View style={styles.cardContent}>
-                                <Text style={styles.cardTitle}>Donation Title: {donation.DonationTitle}</Text>
-                                <Text style={styles.cardText}>From: {donation.DonorName}</Text>
-                                <Text style={styles.cardText}>To: {donation.RecipientName}</Text>
-                                <Text style={styles.cardText}>Date: {donation.DonationDate}</Text>
-                                <Text style={styles.cardText}>nb of box(es): {donation.NumberOfBoxes || 0}</Text>
-                            </View>
-                        </TouchableOpacity>
+                     <TouchableOpacity 
+                     key={index} 
+                     style={styles.card} 
+                     onPress={() => navigation.navigate('DonationDetails', { donation })}
+                 >
+                     <View style={styles.cardHeader}>
+                         <Text style={[styles.statusText, { color: getStatusColor(donation.status) }]}>{donation.status}</Text>
+                     </View>
+                     
+                     <View style={styles.cardContent}>
+                         {/* Two columns: left for Donation Title and Date, right for From, To, and Number of boxes */}
+                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                             
+                             {/* Left column */}
+                             <View style={{ flex: 1, marginRight: 10, marginLeft: 10,}}>
+                                 <Text style={[styles.cardTitle, ]}>Donation Title</Text>
+                                 <Text style={[styles.cardText, ]}>{donation.DonationTitle}</Text>
+                                 <Text style={[styles.cardTitle, ]}>Date</Text>
+                                 <Text style={styles.cardText}>{donation.DonationDate}</Text>
+                             </View>
+                 
+                             {/* Right column */}
+                             <View style={{ flex: 1, marginLeft: 10, paddingBottom:20, }}>
+                                 <Text style={[styles.cardTitle, ]}>From</Text>
+                                 <Text style={[styles.cardText, ]}>{donation.DonorName}</Text>
+                                 <Text style={[styles.cardTitle, ]}>To</Text>
+                                 <Text style={[styles.cardText, ]}>{donation.RecipientName}</Text>
+                                 <Text style={[styles.cardTitle,]}>nb of box(es)</Text>
+                                 <Text style={styles.cardText}>{donation.NumberOfBoxes || 0}</Text>
+                             </View>
+                         </View>
+                     </View>
+                 </TouchableOpacity>
+                 
                     ))}
                 </ScrollView>
             </ScrollView>
@@ -297,8 +314,8 @@ const styles = StyleSheet.create({
     contentContainer: {
         paddingBottom: 80,
         marginTop: 40,
-        marginLeft:55,
-        marginRight:55,
+        marginLeft:30,
+        marginRight:30,
     },
     profileContainer: {
         width: 47,
@@ -309,6 +326,7 @@ const styles = StyleSheet.create({
         fontWeight: '400',
         marginRight:24,
         marginLeft: 103,
+        marginBottom:30,
         
         position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
     
@@ -323,6 +341,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 2,
+        marginLeft:5,
       },
       circleText: {
         backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
@@ -330,6 +349,7 @@ const styles = StyleSheet.create({
         fontSize: 20,
         color: '#00A651',
         fontWeight: 'bold',
+        marginBottom:2,
       },
       profileText: {
         backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
@@ -337,10 +357,10 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#000',
         fontWeight: '400',
-        textAlign: 'center',
+        textAlign: 'left',
         
       },
-    backButton: {
+          backButton: {
         fontSize: 16,
         color: '#000',
         fontWeight: 'bold',
@@ -351,11 +371,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         marginVertical: 10,
-        paddingHorizontal: 10,
+        
         
     },
     filterColumn: {
-        flex: 1,
+        flex: 0,
         marginHorizontal: 5,
     },
     
@@ -371,7 +391,7 @@ const styles = StyleSheet.create({
         borderColor: '#ccc',
         borderRadius: 5,
         position: 'absolute',
-        width: '100%',
+        width: 150,
         maxHeight: 120,
         zIndex: 10,
     },
@@ -399,59 +419,62 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderWidth: 1,
         borderColor: '#00A651',
-        borderRadius: 8,
+        borderRadius: 50,
         padding: 15,
         marginVertical: 10,
+        height:140,
+
     },
     statusText: {
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: 'bold',
         textAlign: 'left',
-        marginBottom: 5,
+        marginLeft: 10,
+     
     },
     cardContent: {
-        marginTop: 5,
+     
     },
     cardTitle: {
-        fontSize: 16,
+        fontSize: 12,
         fontWeight: 'bold',
-        marginBottom: 5,
+        
     },
     cardText: {
-        fontSize: 14,
+        fontSize: 12,
         color: '#333',
-        marginBottom: 5,
+        
+     
     },
     backButtonImage: {
         width: 41,  // Adjust the size of the back button image
         height: 15,
         marginLeft: 10,
-        marginTop:30,
+     
       },
       dateRangeContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-around',
+       
         borderWidth: 1,
         borderColor: '#00A651',
         borderRadius: 20,
         paddingVertical: 10,
-        paddingHorizontal: 20,
-        marginHorizontal: 10,
-        height:39,
-        marginBottom:10,
+        paddingHorizontal: 10,
+        height:45,
+        
     },
     dateContainer: {
         flex: 1,
         alignItems: 'center',
     },
     dateText: {
-        fontSize: 14,
+        fontSize: 13,
         fontWeight:'bold',
         color: '#707070',
     },
     dateValue: {
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: 'bold',
         color: '#000',
     },
@@ -462,9 +485,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     calendarIcon: {
-        width: 35,
-        height: 34,
+        width: 45,
+        height: 44,
         tintColor: '#00A651',
+        resizeMode:'contain'
     },
     filterContainer: {
         marginVertical: 20,
@@ -484,16 +508,19 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         paddingVertical: 8,
         paddingHorizontal: 15,
+        minWidth:100,
     },
     searchButton: {
         justifyContent: 'center',
         alignItems: 'center',
         borderRadius: 50, // Optional: for round button
+        
     },
     searchIcon: {
-        width: 250,  // Set the width of the search icon
-        height: 30, // Set the height of the search icon
-    },  
+        width: 320,  // Set the width of the search icon
+        height: 39,   
+        borderRadius: 50,
+     },  
     separator:{
         marginTop:10,
         

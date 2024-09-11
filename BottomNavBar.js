@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-around',
         alignItems: 'center',
-        paddingVertical: 10,
+     
         borderTopWidth: 1,
         borderTopColor: '#f9f9f9',
         backgroundColor: '#f9f9f9',
@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     icon: {
-        width: 60,
+        width: 43,
         height: 60,
         resizeMode: 'contain',
     },

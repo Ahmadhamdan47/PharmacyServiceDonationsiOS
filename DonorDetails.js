@@ -31,16 +31,14 @@ const DonorDetails = ({ route, navigation }) => {
                 </View>
             ),
             headerTitleAlign: 'center',
-            headerTitleStyle: {
-                marginTop: 30,
-                position: 'relative',
-                backgroundColor: '#f9f9f9',
-            },
             headerStyle: {
-                height: 100,
-                backgroundColor: '#f9f9f9',
-            },
+                backgroundColor: '#f9f9f9', // Set the background color of the whole navigation bar
+                elevation: 0,            // Remove shadow on Android
+                shadowOpacity: 0,        // Remove shadow on iOS
+                borderBottomWidth: 0, 
+          },
         });
+    
     }, [navigation, username]);
 
     const getUsername = async () => {
@@ -113,7 +111,8 @@ const styles = StyleSheet.create({
     },
     label: {
         fontSize: 16,
-        marginBottom: 5,
+        marginTop: 5,
+
         color: '#A9A9A9',
         marginLeft:40,
     },
@@ -123,8 +122,9 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         padding: 5,
         paddingLeft:10,
-        height: 30,  // Set height to 30px
-        marginBottom: 25,
+        height: 35,  // Set height to 30px
+        marginBottom: 20,
+        marginTop: 5,
         backgroundColor: '#FFFCFC',
         marginLeft:35,
         marginRight:35,
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     buttonContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginTop: 50,
+        marginTop: 45,
         marginBottom:20,
         
     },
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
       circleText: {
         backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
     
-        fontSize: 20,
+        fontSize: 25,
         color: '#00A651',
         fontWeight: 'bold',
       },

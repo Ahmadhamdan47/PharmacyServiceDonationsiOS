@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, TouchableOpacity,Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, TouchableOpacity,Image, useWindowDimensions } from 'react-native';
 import axios from 'axios';
 import { Table, Row, Rows } from 'react-native-table-component';
-import BottomNavBarInspection from './BottomNavBarInspection';
+import BottomNavBar from './BottomNavBar';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as XLSX from 'xlsx';
@@ -13,6 +13,9 @@ const BoxDetails = ({ route, navigation }) => {
     const [loading, setLoading] = useState(true);
     const [tableHead] = useState(['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Status']);
     const [widthArr] = useState([30, 100, 80, 80, 100, 80, 100, 80, 80, 100, 100]);
+    const { height, width } = useWindowDimensions(); // Get device dimensions
+const isLandscape = width > height; // Determine if the device is in landscape mode
+
 
     useEffect(() => {
         fetchSerialNumbers();
@@ -124,41 +127,47 @@ console.log(data);
         <View style={styles.container}>
             <View style={styles.headerContainer}>
                 <View style={styles.headerTextContainer}>
-                  
                 </View>
             </View>
-
+    
             {loading ? (
                 <ActivityIndicator size="large" color="#0000ff" />
             ) : (
-                <ScrollView horizontal>
-                    <View>
-                        <Table borderStyle={{ borderWidth: 1, borderColor: '#C1C0B9' }}>
-                            <Row data={tableHead} style={styles.head} textStyle={styles.headText} widthArr={widthArr} />
-                            <Rows
-                                data={batchLots.map((lot, index) => [
-                                    index + 1,  // Row index
-                                    lot.DrugName || 'N/A',  // Brand Name
-                                    lot.Presentation || 'N/A',  // Presentation
-                                    lot.Form || 'N/A',  // Form
-                                    lot.Laboratory || 'N/A',  // Laboratory
-                                    lot.LaboratoryCountry || 'N/A',  // Country
-                                    lot.GTIN || 'N/A',  // GTIN
-                                    lot.BatchNumber || 'N/A',  // LOT Number
-                                    lot.ExpiryDate || 'N/A',  // Expiry Date
-                                    lot.SerialNumber || 'N/A',  // Serial Number
-                                    lot.Inspection || 'N/A'  // Status (Inspection)
-                                ])}
-                                textStyle={styles.text}
-                                widthArr={widthArr}
-                            />
-                        </Table>
-                    </View>
+                <ScrollView 
+                    style={styles.verticalScroll} 
+                    contentContainerStyle={styles.scrollContentContainer} // Wrap content for vertical scrolling
+                >
+                    <ScrollView horizontal>
+                        <View>
+                            <Table borderStyle={{ borderWidth: 1, borderColor: '#C1C0B9' }}>
+                                <Row data={tableHead} style={styles.head} textStyle={styles.headText} widthArr={widthArr} />
+                                <Rows
+                                    data={batchLots.map((lot, index) => [
+                                        index + 1,  // Row index
+                                        lot.DrugName || 'N/A',  // Brand Name
+                                        lot.Presentation || 'N/A',  // Presentation
+                                        lot.Form || 'N/A',  // Form
+                                        lot.Laboratory || 'N/A',  // Laboratory
+                                        lot.LaboratoryCountry || 'N/A',  // Country
+                                        lot.GTIN || 'N/A',  // GTIN
+                                        lot.BatchNumber || 'N/A',  // LOT Number
+                                        lot.ExpiryDate || 'N/A',  // Expiry Date
+                                        lot.SerialNumber || 'N/A',  // Serial Number
+                                        lot.Inspection || 'N/A'  // Status (Inspection)
+                                    ])}
+                                    textStyle={styles.text}
+                                    widthArr={widthArr}
+                                />
+                            </Table>
+                        </View>
+                    </ScrollView>
                 </ScrollView>
             )}
-            <BottomNavBarInspection currentScreen="PackInspection" />
+            {/* Conditionally render BottomNavBarInspection based on orientation */}
+            {!isLandscape && <BottomNavBar currentScreen="List" />}
         </View>
     );
+
 };
 
 const styles = StyleSheet.create({

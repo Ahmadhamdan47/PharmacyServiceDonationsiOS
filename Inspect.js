@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, Image, ScrollView, TouchableOpacity, Alert, StyleSheet, Keyboard, BackHandler } from 'react-native';
+import { View, Text, TextInput, Image, ScrollView, TouchableOpacity, Alert, StyleSheet, Keyboard, BackHandler, StatusBar } from 'react-native';
 import { Camera } from 'expo-camera';
 import { BarCodeScanner } from 'expo-barcode-scanner';
 import { CameraType } from 'expo-camera/build/legacy/Camera.types';
@@ -8,7 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomNavBarInspection
 import axios from 'axios';
 
-const Inspect = () => {
+const Inspect = ({ route }) => {
     const navigation = useNavigation();
     const scrollViewRef = useRef(null);
     const [batchLot, setBatchLot] = useState(createEmptyBatchLot());
@@ -41,7 +41,14 @@ const Inspect = () => {
 
         getUsername();
     }, []);
-
+    useEffect(() => {
+        // Reset fields when 'reset' flag is passed
+        if (route.params?.reset) {
+            setBatchLot(createEmptyBatchLot());
+            setIsFieldsVisible(false);  // Hide the fields
+            setIsCheckButtonVisible(false);  // Hide the Check button
+        }
+    }, [route.params?.reset]);
     useEffect(() => {
         
         navigation.setOptions({
@@ -62,16 +69,14 @@ const Inspect = () => {
                 </View>
             ),
             headerTitleAlign: 'center',
-            headerTitleStyle: {
-              marginTop: 30, // Add margin top of 42px to the header title
-              position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
-                backgroundColor: '#f9f9f9',
-                
-            },
+            headerTitleAlign: 'center',
             headerStyle: {
-              height: 100, // Increase the header height to accommodate the margin
-              backgroundColor: '#f9f9f9',
-          },
+          
+              backgroundColor: '#f9f9f9', // Set the background color of the whole navigation bar
+              elevation: 0,            // Remove shadow on Android
+              shadowOpacity: 0,        // Remove shadow on iOS
+              borderBottomWidth: 0,  
+            },
         });
     }, [navigation, username]);
 
@@ -82,7 +87,7 @@ const Inspect = () => {
         );
 
         const backAction = () => {
-            showExitConfirmation();
+            navigation.navigate('Landing');
             return true;
         };
 
@@ -335,6 +340,8 @@ const fetchDonationId = async (boxId) => {
     
     return (
         <View style={styles.container}>
+            <StatusBar backgroundColor="#f9f9f9"/>
+
             {isCameraOpen ? (
                 <BarCodeScanner
                     style={StyleSheet.absoluteFillObject}
@@ -442,6 +449,7 @@ const styles = StyleSheet.create({
         fontWeight: '400',
         marginRight:24,
         marginLeft: 103,
+        marginBottom:30,
         
         position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
     
@@ -456,6 +464,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 2,
+        marginLeft:5,
       },
       circleText: {
         backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
@@ -463,6 +472,7 @@ const styles = StyleSheet.create({
         fontSize: 20,
         color: '#00A651',
         fontWeight: 'bold',
+        marginBottom:2,
       },
       profileText: {
         backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
@@ -470,7 +480,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#000',
         fontWeight: '400',
-        textAlign: 'center',
+        textAlign: 'left',
         
       },
     dropdownButton: {
@@ -484,7 +494,7 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 20,
         marginTop: 10,
-        marginBottom: 20,
+        marginBottom: 100,
     },
     dropdownButtonText: {
         fontSize: 16,
@@ -503,20 +513,21 @@ const styles = StyleSheet.create({
     inputField: {
         borderColor: '#00A651',
         borderWidth: 1,
-        borderRadius: 5,
+        borderRadius: 25,
         padding: 10,
         marginBottom: 10,
+        height:35,
     },
     cameraButton: {
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 10,
         overflow: 'visible',
     },
     cameraImage: {
         width: 200,
         height: 200,
         resizeMode: 'contain',
-        marginBottom: 150,
+        marginBottom: 130,
     },
     checkButton: {
         backgroundColor: '#00A651',
@@ -543,7 +554,7 @@ const styles = StyleSheet.create({
         width: 41,  // Adjust the size of the back button image
         height: 15,
         marginLeft: 10,
-        marginTop:30,
+     
       },
 });
 

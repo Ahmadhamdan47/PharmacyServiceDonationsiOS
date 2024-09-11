@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Dimensions, Keyboard, BackHandler, Modal } from 'react-native';
+import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Dimensions, Keyboard, BackHandler, Modal, StatusBar } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Camera } from 'expo-camera';
 import { BarCodeScanner } from 'expo-barcode-scanner';
@@ -48,6 +48,8 @@ const BatchLotForm = React.forwardRef(({ form, index, handleFieldChange, drugIte
 
   return (
     <View ref={ref} key={index} style={styles.formContainer}>
+      <StatusBar backgroundColor="#f9f9f9"/>
+
       {index > 0 && (
         <View style={styles.newDrugSeparator}>
           <Text style={styles.newDrugTitle}>New Drug</Text>
@@ -106,10 +108,11 @@ const BatchLotForm = React.forwardRef(({ form, index, handleFieldChange, drugIte
       />
       {validationErrors[index]?.serialNumber && <Text style={styles.errorMessage}>{validationErrors[index].serialNumber}</Text>}
 
-      <View style={styles.separator} />
-      <View style={styles.detailsContainer}>
-        <Text style={styles.header}>Medication Details</Text>
-      </View>
+      <View style={styles.medicationDetailsContainer}>
+    <View style={styles.line} />
+    <Text style={styles.detailsText}>Medication Details</Text>
+    <View style={styles.line} />
+</View>
 
       <FieldLabel label="Drug Name" />
       <DropDownPicker
@@ -262,26 +265,23 @@ const Donate = ({ route }) => {
     useEffect(() => {
       navigation.setOptions({
         headerLeft: () => (
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
+          <TouchableOpacity onPress={() => navigation.navigate('Landing')} style={styles.backButtonContainer}>
              
               <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
           </TouchableOpacity>
       ),
-        headerRight: () => (
-          <View style={styles.packContainer}>
-          <Text style={styles.packText}>Packs :</Text>  
-          <Text style={styles.packText}>{packCounter}</Text>  
-        </View>
-        
-        ),
+       
         headerTitleAlign: 'center',
         headerTitle: 'Donate',
         headerStyle: {
            // Increase the header height to accommodate the margin
           backgroundColor: '#f9f9f9',
+          elevation: 0,            // Remove shadow on Android
+          shadowOpacity: 0,        // Remove shadow on iOS
+          borderBottomWidth: 0,  
       },
       });
-    }, [navigation, username, packCounter]);  // Add packCounter to dependencies
+    }, [navigation, username]);  // Add packCounter to dependencies
   
   const { donorId, recipientId, donationPurpose, donationId } = route.params || {};
   const navigation = useNavigation();
@@ -306,7 +306,16 @@ const Donate = ({ route }) => {
   const [finishModalVisible, setFinishModalVisible] = useState(false);
   const [newPackCount, setNewPackCount] = useState(0);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
-
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={styles.packContainer}>
+          <Text style={styles.packText}>{packCounter}</Text>
+          <Text style={styles.packText2}>Pack(s)</Text>
+        </View>
+      ),
+    });
+  }, [navigation, packCounter]); 
   useEffect(() => {
     (async () => {
       const { status } = await Camera.requestCameraPermissionsAsync();
@@ -340,6 +349,7 @@ const Donate = ({ route }) => {
     createFirstBox();
   }, [donationId]);
 
+
   useEffect(() => {
     const keyboardDidHideListener = Keyboard.addListener(
       'keyboardDidHide',
@@ -363,7 +373,7 @@ const Donate = ({ route }) => {
   const showExitConfirmation = () => {
     Alert.alert(
       'Confirm Exit',
-      'Are you sure you want to go back?',
+      'Are you sure you want to cancel the Donation?',
       [
         {
           text: 'Cancel',
@@ -371,7 +381,7 @@ const Donate = ({ route }) => {
         },
         {
           text: 'Yes',
-          onPress: () => navigation.goBack(),
+          onPress: () => navigation.navigate('Landing'),
         },
       ],
       { cancelable: false }
@@ -852,10 +862,12 @@ const Donate = ({ route }) => {
 
 
             <View style={styles.detailsContainer}>
-            <Image
-    source={require('./assets/medicationdetails.png')}
-    style={styles.detailsImage}
-  />
+            <View style={styles.medicationDetailsContainer}>
+    <View style={styles.line} />
+    <Text style={styles.detailsText}>Medication Details</Text>
+    <View style={styles.line} />
+</View>
+
               <DropDownPicker
                 open={batchLots[0].open}
                 value={batchLots[0].drugName}
@@ -1062,16 +1074,15 @@ const Donate = ({ route }) => {
 >
   <View style={styles.modalBackground}>
     <View style={styles.modalContainer}>
-      <Text style={styles.modalTitle}>{newPackCount} Confirm finish</Text>
-      <Text style={styles.modalSubtitle}>Are you sure you want to finish the donation</Text>
+      <Text style={styles.modalTitle}>Confirm finish</Text>
+      <Text style={styles.modalSubtitle}>Are you sure you want to finish the donation?</Text>
 
-    <View tyle={styles.modalButtonContainer}>
+      <View style={styles.modalButtonContainer}>
         <TouchableOpacity
           style={[styles.modalButton, styles.addBoxButton]}
           onPress={() => {
             setConfirmModalVisible(false);     
             navigation.navigate('DonorList');
-
           }}
         >
           <Text style={styles.AddBoxButtonText}>Yes</Text>
@@ -1080,8 +1091,7 @@ const Donate = ({ route }) => {
         <TouchableOpacity
           style={[styles.modalButton, styles.finishButton]}
           onPress={() => {
-            setFinishModalVisible(false);
-           
+            setConfirmModalVisible(false);
           }}
         >
           <Text style={styles.modalButtonText}>Cancel</Text>
@@ -1142,8 +1152,8 @@ const styles = StyleSheet.create({
       borderRadius: 20,
       padding: 5,
       paddingLeft:10,
-      height: 30,  // Set height to 30px
-      marginBottom: 10,
+      height: 35,  // Set height to 30px
+      marginBottom: 5,
       backgroundColor: '#FFFCFC',
       marginLeft:35,
       marginRight:35,
@@ -1175,9 +1185,10 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     marginLeft:75,
-    marginBottom: 60, // Reduced margin
+    marginBottom: 65, // Reduced margin
     flexDirection: 'row', // Align items horizontally (in a row)
     marginTop:20,
+    
   },
   button: {
     backgroundColor: '#00a651',
@@ -1189,7 +1200,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 10, // Reduced margin
     marginHorizontal: 5, // Add space between buttons
-
+    
   },
   buttonText: {
     color: 'white',
@@ -1265,12 +1276,17 @@ const styles = StyleSheet.create({
   },
   packContainer: {
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: 15,
     flexDirection: 'column', // Ensure items are stacked vertically
 
   },
   packText: {
-    fontSize: 14,
+    fontSize: 18,
+    color: 'red',
+    fontWeight: 'bold',
+  },
+  packText2: {
+    fontSize: 12,
     color: 'red',
     fontWeight: 'bold',
   },
@@ -1282,7 +1298,7 @@ const styles = StyleSheet.create({
   },
    detailsImage: {
     width: 291,  // Adjust the width as needed
-    height: 15, // Adjust the height as needed
+    height: 19, // Adjust the height as needed
     resizeMode: 'contain',  // Ensure the image maintains its aspect ratio
     marginBottom: 10, // Add space between the image and the next elements
     marginLeft:45,
@@ -1326,7 +1342,6 @@ const styles = StyleSheet.create({
   },
   modalButtonContainer: {
     flexDirection: 'row',
-    
     width: '100%',
 
   },
@@ -1372,6 +1387,26 @@ color:'#ffff'
     marginRight: 35,
       // Smaller font size for short fields
   },
+  medicationDetailsContainer: {
+    flexDirection: 'row', // Arrange the line and text horizontally
+    alignItems: 'center', // Aligns the text vertically in the center of the lines
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  line: {
+    flex: 1, // Ensures the line stretches to the available width
+    height: 1, // The height of the line
+    backgroundColor: '#000', // The color of the line
+    marginHorizontal: 10, // Adds space between the text and the lines
+  },
+  detailsText: {
+    fontSize: 16, // Adjust for text size
+    fontWeight: 'bold', // Make the text bold
+    textAlign: 'center',
+    color: '#000', // Ensures the text is black
+     // Adjusts the space between characters
+  },
+
 });
 
 export default Donate;
