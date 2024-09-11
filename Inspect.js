@@ -7,6 +7,8 @@ import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomNavBarInspection
 import axios from 'axios';
+import * as Font from 'expo-font';
+
 
 const Inspect = ({ route }) => {
     const navigation = useNavigation();
@@ -21,7 +23,20 @@ const Inspect = ({ route }) => {
     const [selectedOption, setSelectedOption] = useState('Packs'); // Default to 'Packs'
     const [isFieldsVisible, setIsFieldsVisible] = useState(false); // Show fields after a successful scan
     const [isCheckButtonVisible, setIsCheckButtonVisible] = useState(false); // Show Check button after scanning
-
+    const [isFontLoaded, setIsFontLoaded] = useState(false);
+    const fetchFonts = async () => {
+      await Font.loadAsync({
+        'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
+        'RobotoCondensed-Medium': require('./assets/fonts/RobotoCondensed-Medium.ttf'),
+        'RobotoCondensed-Regular': require('./assets/fonts/RobotoCondensed-Regular.ttf'),
+      });
+      setIsFontLoaded(true);
+    };
+  
+    useEffect(() => {
+      fetchFonts(); // Load fonts on component mount
+    }, []);
+  
     useEffect(() => {
         (async () => {
             const { status } = await Camera.requestCameraPermissionsAsync();
@@ -69,7 +84,9 @@ const Inspect = ({ route }) => {
                 </View>
             ),
             headerTitleAlign: 'center',
-            headerTitleAlign: 'center',
+            headerTitleStyle: 
+            {    fontFamily: 'RobotoCondensed-Bold',
+            },
             headerStyle: {
           
               backgroundColor: '#f9f9f9', // Set the background color of the whole navigation bar
@@ -445,8 +462,7 @@ const styles = StyleSheet.create({
         height: 16,
         backgroundColor: '#f9f9f9',
         fontSize: 14,
-        fontFamily: 'Roboto Condensed',
-        fontWeight: '400',
+        fontFamily: 'RobotoCondensed-Bold',
         marginRight:24,
         marginLeft: 103,
         marginBottom:30,
@@ -471,7 +487,7 @@ const styles = StyleSheet.create({
     
         fontSize: 20,
         color: '#00A651',
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold',
         marginBottom:2,
       },
       profileText: {
@@ -479,7 +495,7 @@ const styles = StyleSheet.create({
     
         fontSize: 14,
         color: '#000',
-        fontWeight: '400',
+        fontFamily: 'RobotoCondensed-Bold',
         textAlign: 'left',
         
       },
@@ -499,7 +515,7 @@ const styles = StyleSheet.create({
     dropdownButtonText: {
         fontSize: 16,
         color: '#00A651',
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold',
     },
     dropdownArrow: {
         marginLeft: 10,
@@ -517,6 +533,8 @@ const styles = StyleSheet.create({
         padding: 10,
         marginBottom: 10,
         height:35,
+        fontFamily: 'RobotoCondensed-Bold',
+
     },
     cameraButton: {
         alignItems: 'center',
@@ -537,7 +555,7 @@ const styles = StyleSheet.create({
     },
     checkButtonText: {
         color: '#fff',
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold',
         textAlign: 'center',
     },
     inspectionMessageContainer: {

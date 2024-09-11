@@ -6,6 +6,7 @@ import BottomNavBarInspection from './BottomNavBarInspection';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as XLSX from 'xlsx';
+import * as Font from 'expo-font';
 
 const BoxInspection = ({ route, navigation }) => {
     const { boxId } = route.params;
@@ -20,7 +21,20 @@ const BoxInspection = ({ route, navigation }) => {
     const [widthArr] = useState([30, 100, 80, 80, 100, 80, 100, 80, 80, 100, 100]);
     const { height, width } = useWindowDimensions(); // Get device dimensions
 const isLandscape = width > height; // Determine if the device is in landscape mode
-
+const [isFontLoaded, setIsFontLoaded] = useState(false);
+    const fetchFonts = async () => {
+      await Font.loadAsync({
+        'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
+        'RobotoCondensed-Medium': require('./assets/fonts/RobotoCondensed-Medium.ttf'),
+        'RobotoCondensed-Regular': require('./assets/fonts/RobotoCondensed-Regular.ttf'),
+      });
+      setIsFontLoaded(true);
+    };
+  
+    useEffect(() => {
+      fetchFonts(); // Load fonts on component mount
+    }, []);
+  
 useEffect(() => {
     const fetchBoxDetails = async () => {
         try {
@@ -334,13 +348,15 @@ const styles = StyleSheet.create({
         margin: 6,
         textAlign: 'center',
         color: '#fff',
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold', 
         fontSize: 12,
     },
     text: {
         margin: 6,
         textAlign: 'center',
         fontSize: 10,
+        fontFamily: 'RobotoCondensed-Regular', 
+
     },
     row: {
         backgroundColor: '#fff',
@@ -355,19 +371,19 @@ const styles = StyleSheet.create({
     },
     inspectText: {
         color: 'green',
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold', 
         fontSize: 16,
         marginHorizontal: 10, // 10px distance from the other buttons
     },
     rejectText: {
         color: 'red',
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold', 
         fontSize: 16,
         marginHorizontal: 10, // 10px distance from the other buttons
     },
     reportText: {
         color: 'orange',
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold', 
         fontSize: 16,
         marginHorizontal: 10, // 10px distance from the other buttons
     },
@@ -392,7 +408,7 @@ const styles = StyleSheet.create({
     },
     selectAllButton: {
         color: 'green',
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold', 
         fontSize: 16,
         marginTop:20,
     },
@@ -407,14 +423,14 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#00A651',
        
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold', 
 
 
     },
     title: {
         marginTop: 30,
         fontSize: 14,
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold', 
     },
 });
 

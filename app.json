@@ -9,7 +9,8 @@
     },
     "version": "3.0.12",
     "android": {
-      "package": "com.anonymous.PharmacyServiceDonations"
+      "package": "com.anonymous.PharmacyServiceDonations",
+      "icon": "./assets/icon/android-icon.png" 
     },
     "extra": {
       "eas": {

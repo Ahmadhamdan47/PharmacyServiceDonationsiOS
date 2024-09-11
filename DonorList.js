@@ -7,13 +7,27 @@ import * as Sharing from 'expo-sharing';
 import XLSX from 'xlsx';
 import { useNavigation, useFocusEffect } from '@react-navigation/native'; // Import useNavigation and useFocusEffect
 import BottomNavBar from './BottomNavBar'; // Import BottomNavBar
+import * as Font from 'expo-font';
 
 const DonorList = ({ navigation }) => {
     const [donations, setDonations] = useState([]);
     const [loading, setLoading] = useState(false);
     const [donorId, setDonorId] = useState(null);
     const [username, setUsername] = useState('');
-
+    const [isFontLoaded, setIsFontLoaded] = useState(false);
+    const fetchFonts = async () => {
+      await Font.loadAsync({
+        'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
+        'RobotoCondensed-Medium': require('./assets/fonts/RobotoCondensed-Medium.ttf'),
+        'RobotoCondensed-Regular': require('./assets/fonts/RobotoCondensed-Regular.ttf'),
+      });
+      setIsFontLoaded(true);
+    };
+  
+    useEffect(() => {
+      fetchFonts(); // Load fonts on component mount
+    }, []);
+    
     useEffect(() => {
         // Set up the header with the user icon and name
         navigation.setOptions({
@@ -33,7 +47,9 @@ const DonorList = ({ navigation }) => {
                 </View>
             ),
             headerTitleAlign: 'center',
-           
+           headerTitleStyle:{
+            fontFamily: 'RobotoCondensed-Bold',
+           },
             headerStyle: {
                 backgroundColor: '#f9f9f9', // Set the background color of the whole navigation bar
                 elevation: 0,            // Remove shadow on Android
@@ -200,8 +216,7 @@ const styles = StyleSheet.create({
         height: 16,
         backgroundColor: '#f9f9f9',
         fontSize: 14,
-        fontFamily: 'Roboto Condensed',
-        fontWeight: '400',
+        fontFamily: 'RobotoCondensed-Bold',
         marginRight:24,
         marginLeft: 103,
         marginBottom:30,
@@ -226,7 +241,7 @@ const styles = StyleSheet.create({
     
         fontSize: 20,
         color: '#00A651',
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold',
         marginBottom:2,
       },
       profileText: {
@@ -234,7 +249,7 @@ const styles = StyleSheet.create({
     
         fontSize: 14,
         color: '#000',
-        fontWeight: '400',
+        fontFamily: 'RobotoCondensed-Bold',
         textAlign: 'left',
         
       },   
@@ -260,7 +275,7 @@ const styles = StyleSheet.create({
         top: 10,
         fontSize: 14,
         fontStyle: 'italic',
-        fontWeight: '700',
+        fontFamily: 'RobotoCondensed-Bold',
         zIndex: 1,
         backgroundColor: '#fff',
         paddingHorizontal: 10,
@@ -284,27 +299,27 @@ const styles = StyleSheet.create({
     },
     infoTitle: {
         fontSize: 12,
-        fontWeight: '300',
+        fontFamily: 'RobotoCondensed-Regular',
         color: '#121212',
         marginTop:25,
     },
     infoTo: {
         fontSize: 12,
-        fontWeight: '300',
-        color: '#121212',
+        fontFamily: 'RobotoCondensed-Regular',
+                color: '#121212',
        
     },
     infoText: {
         fontSize: 14,
-        fontWeight: '500',
-        color: '#121212',
+        fontFamily: 'RobotoCondensed-Bold',
+                color: '#121212',
     },
     detailsContainer: {
         alignItems: 'flex-end',
     },
     detailsText: {
         fontSize: 12,
-        fontWeight: '300',
+        fontFamily: 'RobotoCondensed-Regular',
         color: '#121212',
     },
     backButton: {
@@ -313,8 +328,7 @@ const styles = StyleSheet.create({
     backButtonText: {
         fontSize: 16,
         color: '#000',
-        fontWeight: 'bold',
-    },
+        fontFamily: 'RobotoCondensed-Bold',    },
     backButtonImage: {
         width: 41,  // Adjust the size of the back button image
         height: 15,
@@ -324,8 +338,7 @@ const styles = StyleSheet.create({
       detailValue: {
         fontSize: 14,
         color: '#000', 
-        fontWeight:'bold'     // Make values green or any color you prefer
-      },
+        fontFamily: 'RobotoCondensed-Bold',      },
 });
 
 export default DonorList;

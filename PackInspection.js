@@ -4,6 +4,7 @@ import axios from 'axios';
 import BottomNavBarInspection from './BottomNavBarInspection';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Font from 'expo-font';
 
 const PackInspection = ({ route }) => {
     const { batchLot } = route.params;
@@ -12,7 +13,20 @@ const PackInspection = ({ route }) => {
     const [recipientName, setRecipientName] = useState('');
     const [username, setUsername] = useState('');
     const navigation = useNavigation();
-
+    const [isFontLoaded, setIsFontLoaded] = useState(false);
+    const fetchFonts = async () => {
+      await Font.loadAsync({
+        'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
+        'RobotoCondensed-Medium': require('./assets/fonts/RobotoCondensed-Medium.ttf'),
+        'RobotoCondensed-Regular': require('./assets/fonts/RobotoCondensed-Regular.ttf'),
+      });
+      setIsFontLoaded(true);
+    };
+  
+    useEffect(() => {
+      fetchFonts(); // Load fonts on component mount
+    }, []);
+  
     useEffect(() => {
         const fetchDonationDetails = async () => {
             try {
@@ -90,7 +104,7 @@ const PackInspection = ({ route }) => {
           },
           headerTitleStyle: {
             fontSize: 16,
-            fontWeight:'bold',  // Set the desired font size here
+            fontFamily: 'RobotoCondensed-Bold',
             marginRight:12,
         },
         });
@@ -251,7 +265,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: 12,
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold',
         
         color: 'red',
         textAlign:'right'
@@ -269,6 +283,8 @@ const styles = StyleSheet.create({
         fontSize: 12,
         marginBottom: 3,
         marginLeft: 40,
+        fontFamily: 'RobotoCondensed-Medium',
+
     },
     info: {
         borderWidth: 1,
@@ -282,10 +298,12 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFCFC',
         marginLeft: 35,
         marginRight: 35,
+        fontFamily: 'RobotoCondensed-Bold',
+
     },
     sectionHeader: {
         fontSize: 16,
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold',
         color: '#000',
         marginVertical: 10,
         textAlign: 'center',
@@ -321,7 +339,7 @@ const styles = StyleSheet.create({
     rejectButtonText: {
         color: 'red',
         fontSize: 16,
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold',
     },
     inspectButton: {
         backgroundColor: '#00A651',
@@ -334,7 +352,7 @@ const styles = StyleSheet.create({
     inspectButtonText: {
         color: '#fff',
         fontSize: 16,
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold',
     },
     backButtonImage: {
         width: 41,
@@ -363,7 +381,7 @@ const styles = StyleSheet.create({
       },
       detailsText: {
         fontSize: 16, // Adjust for text size
-        fontWeight: 'bold', // Make the text bold
+        fontFamily: 'RobotoCondensed-Bold',
         textAlign: 'center',
         color: '#000', // Ensures the text is black
          // Adjusts the space between characters

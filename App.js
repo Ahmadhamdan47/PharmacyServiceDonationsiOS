@@ -27,12 +27,14 @@ const App = () => {
   const navigationRef = React.useRef();  // To navigate from anywhere
 
   // Set up Axios interceptor to handle 404 errors
+   // Load custom fonts
+
+  // Set up Axios interceptor to handle 404 errors
   useEffect(() => {
     const interceptor = axios.interceptors.response.use(
       response => response,  // Return the response if it's successful
       async (error) => {
         if (error.response && error.response.status === 404) {
-          // If a 404 error occurs, clear the session and navigate to SignIn
           await AsyncStorage.clear();  // Clear the AsyncStorage session
           setIsLoggedIn(false);  // Set the login state to false
 
@@ -43,7 +45,7 @@ const App = () => {
             });
           }
 
-          return Promise.reject(error);  // Still return the error to handle it locally if needed
+          return Promise.reject(error);  // Return the error to handle it locally if needed
         }
         return Promise.reject(error);
       }
@@ -59,7 +61,7 @@ const App = () => {
     try {
       const response = await axios.get('https://apiv2.medleb.org/donor/byUsername', {
         headers: { Authorization: `Bearer ${token}` },
-        timeout: 2000,  // 5-second timeout
+        timeout: 2000,  // 2-second timeout
       });
 
       const donorData = response.data;
@@ -87,11 +89,9 @@ const App = () => {
           setUserRole(role);
 
           if (role === 'Donor') {
-            // For donors, fetch their data
-            await fetchDonorData(token);
+            await fetchDonorData(token);  // For donors, fetch their data
           } else {
-            // Admin or other roles, assume logged in
-            setIsLoggedIn(true);
+            setIsLoggedIn(true);  // Admin or other roles, assume logged in
           }
         } else {
           setIsLoggedIn(false);  // If no token is found, set to not logged in
@@ -104,6 +104,8 @@ const App = () => {
 
     checkLoginStatus();  // Always check login status on app load or refresh
   }, []);
+
+  // Only return after the fonts are loaded
 
   return (
     <NavigationContainer ref={navigationRef}>

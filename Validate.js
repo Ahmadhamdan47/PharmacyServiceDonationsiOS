@@ -4,6 +4,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
+import * as Font from 'expo-font';
 
 const Validate = () => {
     const [donors, setDonors] = useState([]);
@@ -21,7 +22,20 @@ const Validate = () => {
     const itemsPerPage = 10;
     const scrollViewRef = useRef(null);
     const navigation = useNavigation();
-
+    const [isFontLoaded, setIsFontLoaded] = useState(false);
+    const fetchFonts = async () => {
+      await Font.loadAsync({
+        'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
+        'RobotoCondensed-Medium': require('./assets/fonts/RobotoCondensed-Medium.ttf'),
+        'RobotoCondensed-Regular': require('./assets/fonts/RobotoCondensed-Regular.ttf'),
+      });
+      setIsFontLoaded(true);
+    };
+  
+    useEffect(() => {
+      fetchFonts(); // Load fonts on component mount
+    }, []);
+  
     useEffect(() => {
         fetchDonors();
         getUsername();
@@ -284,8 +298,8 @@ const Validate = () => {
 const styles = StyleSheet.create({
     title: {
         fontSize: 20,
-        fontWeight: 'bold',
-        marginRight: 25,
+        fontFamily: 'RobotoCondensed-Bold',
+                marginRight: 25,
     },
     container: {
         flex: 1,
@@ -306,8 +320,6 @@ const styles = StyleSheet.create({
         height: 16,
         backgroundColor: '#f9f9f9',
         fontSize: 14,
-        fontFamily: 'Roboto Condensed',
-        fontWeight: '400',
         marginRight:10,
         marginLeft: 103,
         marginBottom:30,
@@ -334,10 +346,10 @@ const styles = StyleSheet.create({
       },
       profileText: {
         backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
-    
+                
+        fontFamily: 'RobotoCondensed-Bold',    
         fontSize: 14,
         color: '#000',
-        fontWeight: '400',
         textAlign: 'center',
         
       },
@@ -361,6 +373,7 @@ const styles = StyleSheet.create({
     filterText: {
         fontSize: 14,
         color: '#00A651',
+        fontFamily: 'RobotoCondensed-Bold',
     },
     dropdown: {
         backgroundColor: '#fff',
@@ -379,13 +392,14 @@ const styles = StyleSheet.create({
     dropdownText: {
         fontSize: 14,
         padding: 10,
+        fontFamily: 'RobotoCondensed-Bold',
     },
     resultCount: {
         textAlign: 'center',
         marginVertical: 10,
         fontSize: 12,
-        fontWeight: 'light',
-        color: "#121212"
+        fontFamily: 'RobotoCondensed-Regular',     
+           color: "#121212"
     },
     card: {
         backgroundColor: '#fff',
@@ -402,19 +416,20 @@ const styles = StyleSheet.create({
     },
     statusText: {
         fontSize: 14,
-        fontWeight: 'bold',
-        marginBottom: 5,
+        fontFamily: 'RobotoCondensed-Bold',
+                marginBottom: 5,
     },
     cardText: {
         fontSize: 14,
         color: '#333',
+        fontFamily: 'RobotoCondensed-Medium',
     },
     cardLabel: {
-        fontWeight: 'bold',
-    },
+        fontFamily: 'RobotoCondensed-Bold',   
+     },
     boldText: {
-        fontWeight: 'bold',
-    },
+        fontFamily: 'RobotoCondensed-Bold',
+        },
     paginationContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -424,8 +439,8 @@ const styles = StyleSheet.create({
     paginationText: {
         fontSize: 16,
         color: '#00A651',
-        fontWeight: 'bold',
-    },
+        fontFamily: 'RobotoCondensed-Bold', 
+       },
     disabledText: {
         color: '#ccc',
     },
@@ -460,12 +475,12 @@ const styles = StyleSheet.create({
     },
     dateText: {
         fontSize: 14,
-        fontWeight:'bold',
+        fontFamily: 'RobotoCondensed-Bold', 
         color: '#707070',
     },
     dateValue: {
         fontSize: 14,
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold', 
         color: '#000',
     },
     dateIcon: {

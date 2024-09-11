@@ -12,6 +12,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import XLSX from 'xlsx';
 import BottomNavBar from './BottomNavBar'; // Import BottomNavBar
+import * as Font from 'expo-font';
 
 const createEmptyBatchLot = () => ({
   gtin: '',
@@ -174,6 +175,7 @@ const BatchLotForm = React.forwardRef(({ form, index, handleFieldChange, drugIte
           width: '90%', // Matches the GTIN input width
           alignSelf: 'center',
           zIndex: 1000, // Ensures dropdown appears above other elements
+          
         }}
       />
       {validationErrors[index]?.drugName && <Text style={styles.errorMessage}>{validationErrors[index].drugName}</Text>}
@@ -273,12 +275,19 @@ const Donate = ({ route }) => {
        
         headerTitleAlign: 'center',
         headerTitle: 'Donate',
+        headerTitleStyle: {
+         
+          fontFamily: 'RobotoCondensed-Bold',
+
+        },
         headerStyle: {
            // Increase the header height to accommodate the margin
           backgroundColor: '#f9f9f9',
           elevation: 0,            // Remove shadow on Android
           shadowOpacity: 0,        // Remove shadow on iOS
-          borderBottomWidth: 0,  
+          borderBottomWidth: 0, 
+          
+           
       },
       });
     }, [navigation, username]);  // Add packCounter to dependencies
@@ -306,6 +315,20 @@ const Donate = ({ route }) => {
   const [finishModalVisible, setFinishModalVisible] = useState(false);
   const [newPackCount, setNewPackCount] = useState(0);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [isFontLoaded, setIsFontLoaded] = useState(false);
+  const fetchFonts = async () => {
+    await Font.loadAsync({
+      'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
+      'RobotoCondensed-Medium': require('./assets/fonts/RobotoCondensed-Medium.ttf'),
+      'RobotoCondensed-Regular': require('./assets/fonts/RobotoCondensed-Regular.ttf'),
+    });
+    setIsFontLoaded(true);
+  };
+
+  useEffect(() => {
+    fetchFonts(); // Load fonts on component mount
+  }, []);
+
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
@@ -1145,6 +1168,8 @@ const styles = StyleSheet.create({
     fontSize: 12, // Reduced font size
     marginBottom: 3, // Reduced margin
     marginLeft: 40, // Reduced margin
+    fontFamily: 'RobotoCondensed-Bold',
+
   },
   input: {
       borderWidth: 1,
@@ -1157,6 +1182,8 @@ const styles = StyleSheet.create({
       backgroundColor: '#FFFCFC',
       marginLeft:35,
       marginRight:35,
+      fontFamily: 'RobotoCondensed-Medium',
+
 
   },
   inputError: {
@@ -1179,7 +1206,7 @@ const styles = StyleSheet.create({
   header: {
     fontSize: 14, // Reduced font size
     color: '#000',
-    fontWeight: 'bold',
+    fontFamily: 'RobotoCondensed-Bold',
     marginBottom: 8, // Reduced margin
     alignSelf: 'center',
   },
@@ -1204,7 +1231,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: 'white',
-    fontWeight: 'bold',
+    fontFamily: 'RobotoCondensed-Bold',
     fontSize: 16, // Reduced font size
   },
    addMoreButton: {
@@ -1222,7 +1249,7 @@ const styles = StyleSheet.create({
   },
   addMoreButtonText: {
     color: '#00a651',                 // Green text color
-    fontWeight: 'bold',               // Bold text
+    fontFamily: 'RobotoCondensed-Bold',
     fontSize: 16,                     // Same font size as original button
   },
   newDrugSeparator: {
@@ -1232,7 +1259,7 @@ const styles = StyleSheet.create({
   newDrugTitle: {
     color: '#00a651',
     fontSize: 14, // Reduced font size
-    fontWeight: 'bold',
+    fontFamily: 'RobotoCondensed-Bold',
     marginLeft:35,
     backgroundColor:'#f9f9f9'
   },
@@ -1272,7 +1299,7 @@ const styles = StyleSheet.create({
   profileText: {
     fontSize: 12, // Reduced font size
     color: '#000',
-    fontWeight: 'bold',
+    fontFamily: 'RobotoCondensed-Bold',
   },
   packContainer: {
     alignItems: 'center',
@@ -1283,12 +1310,14 @@ const styles = StyleSheet.create({
   packText: {
     fontSize: 18,
     color: 'red',
-    fontWeight: 'bold',
+    fontFamily: 'RobotoCondensed-Bold',
+
   },
   packText2: {
     fontSize: 12,
     color: 'red',
-    fontWeight: 'bold',
+    fontFamily: 'RobotoCondensed-Bold',
+
   },
   backButtonImage: {
     width: 41,  // Adjust the size of the back button image
@@ -1328,7 +1357,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     color: '#fff',
     fontSize: 24,
-    fontWeight: 'bold',
+    fontFamily: 'RobotoCondensed-Bold',
     textAlign: 'center',
     marginBottom: 10,
     marginTop:50,
@@ -1336,7 +1365,7 @@ const styles = StyleSheet.create({
   modalSubtitle: {
     color: '#fff',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: 'RobotoCondensed-Bold',
     textAlign: 'center',
     marginBottom: 55,
   },
@@ -1368,7 +1397,7 @@ const styles = StyleSheet.create({
   },
   modalButtonText: {
     color: '#00a651',
-    fontWeight: 'bold',
+    fontFamily: 'RobotoCondensed-Bold',
   },
   AddBoxButtonText:{
 color:'#ffff'
@@ -1401,7 +1430,7 @@ color:'#ffff'
   },
   detailsText: {
     fontSize: 16, // Adjust for text size
-    fontWeight: 'bold', // Make the text bold
+    fontFamily: 'RobotoCondensed-Bold',
     textAlign: 'center',
     color: '#000', // Ensures the text is black
      // Adjusts the space between characters

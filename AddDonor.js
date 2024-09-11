@@ -5,6 +5,7 @@ import DropDownPicker from 'react-native-dropdown-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import BottomNavBar from './BottomNavBar';  // Import BottomNavBar
+import * as Font from 'expo-font';
 
 const AddDonor = () => {
   const [recipients, setRecipients] = useState([]);
@@ -17,7 +18,19 @@ const AddDonor = () => {
   const [donorId, setDonorId] = useState(null);
   const navigation = useNavigation();
   const [keyboardVisible, setKeyboardVisible] = useState(false);  // Track keyboard visibility
+  const [isFontLoaded, setIsFontLoaded] = useState(false);
+  const fetchFonts = async () => {
+    await Font.loadAsync({
+      'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
+      'RobotoCondensed-Medium': require('./assets/fonts/RobotoCondensed-Medium.ttf'),
+      'RobotoCondensed-Regular': require('./assets/fonts/RobotoCondensed-Regular.ttf'),
+    });
+    setIsFontLoaded(true);
+  };
 
+  useEffect(() => {
+    fetchFonts(); // Load fonts on component mount
+  }, []);
   useFocusEffect(
     React.useCallback(() => {
       fetchDonorNameAndId();
@@ -57,6 +70,8 @@ const AddDonor = () => {
           position: 'relative', 
           backgroundColor: '#f9f9f9',
           marginBottom: 20,
+          fontFamily: 'RobotoCondensed-Bold',
+
         },
         headerStyle: {
           height: 100, 
@@ -209,8 +224,7 @@ const styles = StyleSheet.create({
     height: 16,
     backgroundColor: '#f9f9f9',
     fontSize: 14,
-    fontFamily: 'Roboto Condensed',
-    fontWeight: '400',
+    fontFamily: 'RobotoCondensed-Bold',
     marginRight: 24,
     marginLeft: 103,
     marginBottom: 50,
@@ -235,6 +249,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 2,
   },
+  profileText:{
+    fontFamily: 'RobotoCondensed-Bold',
+
+  },
   formContainer: {
     paddingHorizontal: 20,
     paddingTop: 120,
@@ -242,8 +260,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9f9f9',
   },
   label: {
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontFamily: 'RobotoCondensed-Bold',
     marginBottom: 5,
     marginLeft: 10,
     color: "#A9A9A9",
@@ -258,6 +276,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: '#f0f0f0',
     color: '#00a651',
+    fontFamily: 'RobotoCondensed-Bold',
+
   },
   input: {
     borderWidth: 1,
@@ -268,6 +288,8 @@ const styles = StyleSheet.create({
     height: 35,
     marginBottom: 10,
     backgroundColor: '#fff',
+    fontFamily: 'RobotoCondensed-Regular',
+
   },
   textArea: {
     height: 95,
@@ -276,18 +298,23 @@ const styles = StyleSheet.create({
   dropdown: {
     marginBottom: 10,
     minHeight: 30,
+    
   },
   picker: {
     borderColor: '#00a651',
     borderWidth: 1,
     borderRadius: 20,
     minHeight: 35,
+    
+    
   },
   dropDownContainer: {
     borderColor: '#00a651',
     borderWidth: 1,
     borderRadius: 20,
     minHeight: 30,
+    
+    
   },
   button: {
     backgroundColor: '#00a651',
@@ -301,7 +328,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: 'white',
-    fontWeight: 'bold',
+    fontFamily: 'RobotoCondensed-Bold',
     fontSize: 14,
   },
   backButtonImage: {

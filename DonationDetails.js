@@ -11,7 +11,20 @@ const DonationDetails = ({ route, navigation }) => {
     const [loading, setLoading] = useState(false);
     const [userRole, setUserRole] = useState('');  // State to store user role
     const [username, setUsername] = useState('');
-
+    const [isFontLoaded, setIsFontLoaded] = useState(false);
+    const fetchFonts = async () => {
+      await Font.loadAsync({
+        'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
+        'RobotoCondensed-Medium': require('./assets/fonts/RobotoCondensed-Medium.ttf'),
+        'RobotoCondensed-Regular': require('./assets/fonts/RobotoCondensed-Regular.ttf'),
+      });
+      setIsFontLoaded(true);
+    };
+  
+    useEffect(() => {
+      fetchFonts(); // Load fonts on component mount
+    }, []);
+  
     useEffect(() => {
         fetchUserRole();
         fetchUsername();  // Fetch the username from AsyncStorage
@@ -39,6 +52,8 @@ const DonationDetails = ({ route, navigation }) => {
           marginTop: 30, // Add margin top of 42px to the header title
           position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
             backgroundColor: '#f9f9f9',
+            fontFamily: 'RobotoCondensed-Bold',
+
             
         },
         headerStyle: {
@@ -138,14 +153,14 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: 24,
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold',
         marginBottom: 10,
     },
     subtitle: {
         fontSize: 18,
         marginBottom: 5,
         marginLeft:30,
-        fontWeight:'bold'
+        fontFamily: 'RobotoCondensed-Medium',
     },
     scrollView: {
         marginTop: 20,
@@ -166,17 +181,19 @@ const styles = StyleSheet.create({
     },
     cardTitle: {
         fontSize: 16,
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold',
     },
     cardText: {
         fontSize: 14,
+        fontFamily: 'RobotoCondensed-Regular',
+
     },
     profileContainer: {
         width: 47,
         height: 16,
         backgroundColor: '#f9f9f9',
         fontSize: 14,
-        fontFamily: 'Roboto Condensed',
+        fontFamily: 'RobotoCondensed-Bold',
         fontWeight: '400',
         marginRight:24,
         marginLeft: 103,
@@ -204,7 +221,8 @@ const styles = StyleSheet.create({
       },
       profileText: {
         backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
-    
+        fontFamily: 'RobotoCondensed-Bold',
+
         fontSize: 14,
         color: '#000',
         fontWeight: '400',

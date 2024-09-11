@@ -6,6 +6,7 @@ import BottomNavBar from './BottomNavBar';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as XLSX from 'xlsx';
+import * as Font from 'expo-font';
 
 const BoxDetails = ({ route, navigation }) => {
     const { box } = route.params;
@@ -15,7 +16,20 @@ const BoxDetails = ({ route, navigation }) => {
     const [widthArr] = useState([30, 100, 80, 80, 100, 80, 100, 80, 80, 100, 100]);
     const { height, width } = useWindowDimensions(); // Get device dimensions
 const isLandscape = width > height; // Determine if the device is in landscape mode
-
+const [isFontLoaded, setIsFontLoaded] = useState(false);
+    const fetchFonts = async () => {
+      await Font.loadAsync({
+        'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
+        'RobotoCondensed-Medium': require('./assets/fonts/RobotoCondensed-Medium.ttf'),
+        'RobotoCondensed-Regular': require('./assets/fonts/RobotoCondensed-Regular.ttf'),
+      });
+      setIsFontLoaded(true);
+    };
+  
+    useEffect(() => {
+      fetchFonts(); // Load fonts on component mount
+    }, []);
+  
 
     useEffect(() => {
         fetchSerialNumbers();
@@ -189,7 +203,7 @@ const styles = StyleSheet.create({
     title: {
         marginTop:30,
         fontSize: 14,
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold',
     },
     subtitle: {
         fontSize: 14,
@@ -203,13 +217,15 @@ const styles = StyleSheet.create({
         margin: 6,
         textAlign: 'center',
         color: '#f9f9f9',
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold',
         fontSize: 12,
     },
     text: {
         margin: 6,
         textAlign: 'center',
         fontSize: 10,
+        fontFamily: 'RobotoCondensed-Regular',
+
     },
     backButtonImage: {
         width: 41,  // Adjust the size of the back button image
@@ -228,7 +244,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#00A651',
         marginLeft: 15,
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold',
     },
 });
 

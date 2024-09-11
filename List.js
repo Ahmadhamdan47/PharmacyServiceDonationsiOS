@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
 import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomNavBarInspection
+import * as Font from 'expo-font';
 
 const List = () => {
     const [donations, setDonations] = useState([]);
@@ -23,7 +24,20 @@ const List = () => {
     const [username, setUsername] = useState('');
     const scrollViewRef = useRef(null);
     const navigation = useNavigation();
-
+    const [isFontLoaded, setIsFontLoaded] = useState(false);
+    const fetchFonts = async () => {
+      await Font.loadAsync({
+        'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
+        'RobotoCondensed-Medium': require('./assets/fonts/RobotoCondensed-Medium.ttf'),
+        'RobotoCondensed-Regular': require('./assets/fonts/RobotoCondensed-Regular.ttf'),
+      });
+      setIsFontLoaded(true);
+    };
+  
+    useEffect(() => {
+      fetchFonts(); // Load fonts on component mount
+    }, []);
+  
     useEffect(() => {
         fetchDonors();
         fetchRecipients();
@@ -353,7 +367,8 @@ const styles = StyleSheet.create({
       },
       profileText: {
         backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
-    
+        fontFamily: 'RobotoCondensed-Bold',
+
         fontSize: 14,
         color: '#000',
         fontWeight: '400',
@@ -381,7 +396,7 @@ const styles = StyleSheet.create({
     
     filterText: {
         fontSize: 14,
-        fontWeight: 'bold',
+        fontFamily: 'RobotoCondensed-Bold',
         color: '#000',
         textAlign: 'center',
     },
@@ -402,18 +417,21 @@ const styles = StyleSheet.create({
         fontSize: 14,
         padding: 10,
         color: '#000',
+        fontFamily: 'RobotoCondensed-Bold',
 
     },
     filterButtonText: {
         color: '#00A651',
         fontSize: 16,
+        fontFamily: 'RobotoCondensed-Bold',
     },
     resultCount: {
         textAlign: 'center',
         marginVertical: 10,
         fontSize: 10,
         fontWeight: 'light',
-        color: "#121212"
+        color: "#121212",
+        fontFamily: 'RobotoCondensed-Regular',
     },
     card: {
         backgroundColor: '#fff',
@@ -437,12 +455,12 @@ const styles = StyleSheet.create({
     },
     cardTitle: {
         fontSize: 12,
-        fontWeight: 'bold',
-        
+        fontFamily: 'RobotoCondensed-Bold',        
     },
     cardText: {
         fontSize: 12,
         color: '#333',
+        fontFamily: 'RobotoCondensed-Regular',
         
      
     },
@@ -470,13 +488,11 @@ const styles = StyleSheet.create({
     },
     dateText: {
         fontSize: 13,
-        fontWeight:'bold',
-        color: '#707070',
+        fontFamily: 'RobotoCondensed-Bold',        color: '#707070',
     },
     dateValue: {
         fontSize: 13,
-        fontWeight: 'bold',
-        color: '#000',
+        fontFamily: 'RobotoCondensed-Bold',        color: '#000',
     },
     dateIcon: {
         width: 30,
