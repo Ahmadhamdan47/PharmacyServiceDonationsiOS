@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, Text, StyleSheet, Alert, Image, TouchableOpacity, StatusBar } from 'react-native';
+import { View, TextInput, Text, StyleSheet, Alert, Image, TouchableOpacity, StatusBar, KeyboardAvoidingView, Platform } from 'react-native';
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,7 +15,6 @@ const SignIn = () => {
   const navigation = useNavigation();
 
   // Load custom fonts
-
   const fetchFonts = async () => {
     await Font.loadAsync({
       'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
@@ -23,12 +22,13 @@ const SignIn = () => {
       'RobotoCondensed-Regular': require('./assets/fonts/RobotoCondensed-Regular.ttf'),
     });
     setIsFontLoaded(true);
-    console.log('font loaded:',isFontLoaded)
+    console.log('font loaded:', isFontLoaded)
   };
 
   useEffect(() => {
     fetchFonts(); // Load fonts on component mount
   }, []);
+
   // Customize the navigation header
   useEffect(() => {
     navigation.setOptions({
@@ -51,8 +51,6 @@ const SignIn = () => {
         marginTop: 50,           // Distance from the top (50px)
       },
     });
-
-    
   }, [navigation]);
 
   const handleSignIn = async () => {
@@ -80,9 +78,15 @@ const SignIn = () => {
   const togglePasswordVisibility = () => {
     setIsPasswordVisible(!isPasswordVisible);
   };
- 
+
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 250 : 0} // Adjust the offset based on your layout
+    >
+      <StatusBar backgroundColor="#f9f9f9" />
+
       {/* Title */}
       <Text style={styles.title}>Drug Donation To Lebanon</Text>
 
@@ -122,8 +126,7 @@ const SignIn = () => {
       <Text style={styles.link} onPress={() => navigation.navigate('SignUp')}>
         Don't have an account? Sign Up
       </Text>
-      <StatusBar backgroundColor="#f9f9f9" />
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -143,8 +146,8 @@ const styles = StyleSheet.create({
     color: '#121212',
   },
   paragraph: {
-    fontFamily:'RobotoCondensed-Medium',
-    fontSize: 14,
+    fontFamily: 'RobotoCondensed-Medium',
+    fontSize: 12,
     fontWeight: '500',
     textAlign: 'left',
     marginHorizontal: 10,
@@ -157,7 +160,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: 'RobotoCondensed-Bold',
-
     fontSize: 12,
     marginBottom: 5,
     color: "#A9A9A9",
@@ -174,7 +176,7 @@ const styles = StyleSheet.create({
     marginRight: 15,
     fontSize: 12,
   },
-  button: {
+button: {
     backgroundColor: '#00a651',
     height: 35,
     justifyContent: 'center',
@@ -190,7 +192,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   link: {
-  
     fontFamily: 'RobotoCondensed-Regular',
     marginTop: 20,
     color: '#00a651',
