@@ -137,13 +137,16 @@ useEffect(() => {
                     break;
                 }
     
-                // Call the API to inspect each selected pack using batchSerialNumberId
-                const response = await axios.put(`https://apiv2.medleb.org/batchserial/inspect/${batchLot.BatchSerialNumberId}`);
+                // Call the API to inspect each selected pack using batchSerialNumberId and include the inspectedBy parameter
+                const response = await axios.put(`https://apiv2.medleb.org/batchserial/inspect/${batchLot.BatchSerialNumberId}`, {
+                    inspectedBy: 'Box' // Adding inspectedBy parameter
+                });
                 
                 if (response.data.message) {
                     Alert.alert('Notice', response.data.message); 
                 } else {
                     batchLot.Inspection = 'inspected';
+                    batchLot.inspectedBy = 'Box'; // Set locally for immediate UI update
                 }
             }
     
@@ -159,6 +162,7 @@ useEffect(() => {
             Alert.alert('Error', 'Failed to inspect selected packs.');
         }
     };
+    
     
     const handleReject = async () => {
         try {
@@ -260,7 +264,22 @@ useEffect(() => {
     
     return (
         <View style={styles.container}>
-            {/* Rest of the code remains the same... */}
+              <View style={styles.headerContainer}>
+            <View style={styles.buttonContainer}>
+                    <TouchableOpacity onPress={handleInspect}>
+                        <Text style={styles.inspectText}>Inspect</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleReject}>
+                        <Text style={styles.rejectText}>Reject</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleReport}>
+                        <Text style={styles.reportText}>Report</Text>
+                    </TouchableOpacity>
+                </View>
+                <TouchableOpacity onPress={selectAllRows}>
+                    <Text style={styles.selectAllButton}>Select All</Text>
+                </TouchableOpacity>
+            </View>
     
             {loading ? (
                 <ActivityIndicator size="large" color="#0000ff" />
@@ -274,33 +293,38 @@ useEffect(() => {
                             <Table borderStyle={{ borderWidth: 1, borderColor: '#C1C0B9' }}>
                                 <Row data={tableHead} style={styles.head} textStyle={styles.headText} widthArr={widthArr} />
                                 {batchLots.map((lot, index) => (
-                                    <TouchableOpacity
-                                        key={index}
-                                        onPress={() => toggleSelectRow(index)}
-                                        style={[
-                                            styles.row,
-                                            selectedRows.includes(index) && styles.selectedRow
-                                        ]}
-                                    >
-                                        <Row
-                                            data={[
-                                                index + 1,
-                                                lot.DrugName || 'N/A',
-                                                lot.Presentation || 'N/A',
-                                                lot.Form || 'N/A',
-                                                lot.Laboratory || 'N/A',
-                                                lot.LaboratoryCountry || 'N/A',
-                                                lot.GTIN || 'N/A',
-                                                lot.BatchNumber || 'N/A',
-                                                lot.ExpiryDate || 'N/A',
-                                                lot.SerialNumber || 'N/A',
-                                                lot.Inspection || 'N/A'
-                                            ]}
-                                            widthArr={widthArr}
-                                            textStyle={styles.text}
-                                        />
-                                    </TouchableOpacity>
-                                ))}
+    <TouchableOpacity
+        key={index}
+        onPress={() => toggleSelectRow(index)}
+        style={[
+            styles.row,
+            selectedRows.includes(index) && styles.selectedRow
+        ]}
+    >
+        <Row
+            data={[
+                index + 1,
+                lot.DrugName || 'N/A',
+                lot.Presentation || 'N/A',
+                lot.Form || 'N/A',
+                lot.Laboratory || 'N/A',
+                lot.LaboratoryCountry || 'N/A',
+                lot.GTIN || 'N/A',
+                lot.BatchNumber || 'N/A',
+                lot.ExpiryDate || 'N/A',
+                lot.SerialNumber || 'N/A',
+                lot.Inspection === 'inspected' ? (
+                    <Image 
+                        source={lot.inspectedBy === 'Pack' ? require('./assets/checkGreen.png') : require('./assets/checkWhite.png')} 
+                        style={{ width: 11, height: 11, alignSelf:"center" }} 
+                    />
+                ) : lot.Inspection || 'N/A'
+            ]}
+            widthArr={widthArr}
+            textStyle={styles.text}
+        />
+    </TouchableOpacity>
+))}
                             </Table>
                         </View>
                     </ScrollView>

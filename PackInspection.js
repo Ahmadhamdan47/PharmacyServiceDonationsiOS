@@ -112,7 +112,9 @@ const PackInspection = ({ route }) => {
 
     const handleInspect = async () => {
         try {
-            const response = await axios.put(`https://apiv2.medleb.org/batchserial/inspect/${batchLot.serialNumberId}`);
+            const response = await axios.put(`https://apiv2.medleb.org/batchserial/inspect/${batchLot.serialNumberId}`, {
+                inspectedBy: 'Pack'  // Adding inspectedBy parameter
+            });
             if (response.status === 200) {
                 Alert.alert('Success', 'Pack marked as inspected.', [
                     {

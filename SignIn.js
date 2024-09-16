@@ -88,7 +88,7 @@ const SignIn = () => {
 
       {/* Paragraph */}
       <Text style={styles.paragraph}>
-        This application is developed for the Pharmacy Service at the Ministry of Public Health, to manage the drug donation procedure to Lebanon.
+        This application is developed to be used by the Pharmacy Service at the Ministry of Public Health, to manage the drug donation procedure to Lebanon.
       </Text>
 
       {/* Username Label and Input */}

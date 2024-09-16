@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, TouchableOpacity,Image, useWindowDimensions } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, TouchableOpacity, Image, useWindowDimensions } from 'react-native';
 import axios from 'axios';
 import { Table, Row, Rows } from 'react-native-table-component';
 import BottomNavBar from './BottomNavBar';
@@ -7,6 +7,8 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as XLSX from 'xlsx';
 import * as Font from 'expo-font';
+import QRCode from 'react-native-qrcode-svg';
+import ViewShot from "react-native-view-shot"; // Import view-shot to capture QR code
 
 const BoxDetails = ({ route, navigation }) => {
     const { box } = route.params;
@@ -15,74 +17,70 @@ const BoxDetails = ({ route, navigation }) => {
     const [tableHead] = useState(['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Status']);
     const [widthArr] = useState([30, 100, 80, 80, 100, 80, 100, 80, 80, 100, 100]);
     const { height, width } = useWindowDimensions(); // Get device dimensions
-const isLandscape = width > height; // Determine if the device is in landscape mode
-const [isFontLoaded, setIsFontLoaded] = useState(false);
+    const isLandscape = width > height; // Determine if the device is in landscape mode
+    const [isFontLoaded, setIsFontLoaded] = useState(false);
+    const [isQrCodeVisible, setIsQrCodeVisible] = useState(false); // Start with the QR code hidden
+    const qrCodeRef = useRef(); // Reference for capturing QR code
+
     const fetchFonts = async () => {
-      await Font.loadAsync({
-        'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
-        'RobotoCondensed-Medium': require('./assets/fonts/RobotoCondensed-Medium.ttf'),
-        'RobotoCondensed-Regular': require('./assets/fonts/RobotoCondensed-Regular.ttf'),
-      });
-      setIsFontLoaded(true);
+        await Font.loadAsync({
+            'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
+            'RobotoCondensed-Medium': require('./assets/fonts/RobotoCondensed-Medium.ttf'),
+            'RobotoCondensed-Regular': require('./assets/fonts/RobotoCondensed-Regular.ttf'),
+        });
+        setIsFontLoaded(true);
     };
-  
+
     useEffect(() => {
-      fetchFonts(); // Load fonts on component mount
+        fetchFonts(); // Load fonts on component mount
     }, []);
-  
 
     useEffect(() => {
         fetchSerialNumbers();
     }, []);
-   
-        navigation.setOptions({
-           
-            headerLeft: () => (
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
-                   
-                    <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
-                </TouchableOpacity>
-            ),
-            headerRight: () => (
-                <View style={styles.headerRightContainer}>
-                    <TouchableOpacity onPress={handleExportAsExcel}>
-                        <Text style={styles.headerButtonText}>Export as XLS</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity >
-                        <Text style={styles.headerButtonText}>Box Qr Code</Text>
-                    </TouchableOpacity>
-                </View>
-            ),
-            headerTitle: () => (
-                <View>
-                <Text style={styles.title}> {box.DonationTitle} - {box.BoxLabel} </Text>
-           
-                </View>
-            ),
-            headerTitleAlign: 'left',
-            headerTitleStyle: {
-              marginTop: 42, // Add margin top of 42px to the header title
-              position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
-                backgroundColor: '#f9f9f9',
-                
-            },
-            headerStyle: {
-              height: 100, // Increase the header height to accommodate the margin
-              backgroundColor: '#f9f9f9',
-          },
-            
-        });
 
-    
+    navigation.setOptions({
+        headerLeft: () => (
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
+                <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
+            </TouchableOpacity>
+        ),
+        headerRight: () => (
+            <View style={styles.headerRightContainer}>
+                <TouchableOpacity onPress={handleQrCodeShare}>
+                    <Text style={styles.headerButtonText}>Box QR Code</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleExportAsExcel}>
+                    <Text style={styles.headerButtonText}>Export as XLS</Text>
+                </TouchableOpacity>
+            </View>
+        ),
+        headerTitle: () => (
+            <View>
+                <Text style={styles.title}> {box.DonationTitle} - {box.BoxLabel} </Text>
+            </View>
+        ),
+        headerTitleAlign: 'left',
+        headerTitleStyle: {
+            marginTop: 42,
+            position: 'relative',
+            backgroundColor: '#f9f9f9',
+        },
+        headerStyle: {
+            height: 100,
+            backgroundColor: '#f9f9f9',
+        },
+    });
+
     const fetchSerialNumbers = async () => {
         try {
             const response = await axios.get(`https://apiv2.medleb.org/batchserial/byBox/${box.BoxId}`);
-            const data = response.data.data; // Ensure you access the 'data' property correctly
-console.log(data);
+            const data = response.data.data;
+            console.log(data);
             if (Array.isArray(data)) {
-                setBatchLots(data); // Correctly set the array of batch lots
+                setBatchLots(data);
             } else {
-                setBatchLots([]);  // Fallback to an empty array if the response is not an array
+                setBatchLots([]);
             }
         } catch (error) {
             console.error('Error fetching serial numbers:', error);
@@ -90,8 +88,8 @@ console.log(data);
         }
         setLoading(false);
     };
+
     const handleExportAsExcel = async () => {
-        // Prepare the data to be exported
         const dataForExcel = [
             ['Donor Name', 'Recipient Name', 'Donation Title', 'Box Label'],
             [box.DonorName, box.RecipientName, box.DonationTitle, box.BoxLabel],
@@ -104,52 +102,60 @@ console.log(data);
                 lot.Form || 'N/A',
                 lot.Laboratory || 'N/A',
                 lot.LaboratoryCountry || 'N/A',
-                `'${lot.GTIN || 'N/A'}`,  // GTIN as text (prefix with a single quote to ensure text format in Excel)
+                `'${lot.GTIN || 'N/A'}`,
                 lot.BatchNumber || 'N/A',
                 lot.ExpiryDate || 'N/A',
                 lot.SerialNumber || 'N/A',
                 lot.Inspection || 'N/A'
             ])
         ];
-    
-        // Create a new workbook and sheet
+
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet(dataForExcel);
-    
-        // Append the sheet to the workbook
         XLSX.utils.book_append_sheet(wb, ws, 'Box Details');
-    
-        // Write the Excel file to a buffer
+
         const wbout = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
-    
-        // Create a meaningful file name using DonorName, RecipientName, DonationTitle, and BoxLabel
-        const fileName = `${box.DonorName}_${box.RecipientName}_${box.DonationTitle}_${box.BoxLabel}.xlsx`.replace(/[/\\?%*:|"<>]/g, '-'); // Replace invalid filename characters
-    
-        // Create a temporary file to store the Excel file
+        const fileName = `${box.DonorName}_${box.RecipientName}_${box.DonationTitle}_${box.BoxLabel}.xlsx`.replace(/[/\\?%*:|"<>]/g, '-');
         const uri = `${FileSystem.documentDirectory}${fileName}`;
-    
-        // Write the buffer to the file
         await FileSystem.writeAsStringAsync(uri, wbout, {
             encoding: FileSystem.EncodingType.Base64,
         });
-    
-        // Share the file
         await Sharing.shareAsync(uri);
     };
-  
+
+    const handleQrCodeShare = async () => {
+        setIsQrCodeVisible(true); // Make QR code visible
+
+        // Wait a moment to ensure QR code is rendered
+        setTimeout(async () => {
+            try {
+                // Capture the QR code as an image
+                const uri = await qrCodeRef.current.capture();
+
+                // Share the captured image
+                await Sharing.shareAsync(uri);
+            } catch (error) {
+                console.error('Error sharing QR code:', error);
+                Alert.alert('Error', 'Failed to share QR code.');
+            }
+
+            setIsQrCodeVisible(false); // Hide the QR code again after sharing
+        }, 500); // 500ms delay to ensure the QR code is rendered
+    };
+
     return (
         <View style={styles.container}>
             <View style={styles.headerContainer}>
                 <View style={styles.headerTextContainer}>
                 </View>
             </View>
-    
+
             {loading ? (
                 <ActivityIndicator size="large" color="#0000ff" />
             ) : (
-                <ScrollView 
-                    style={styles.verticalScroll} 
-                    contentContainerStyle={styles.scrollContentContainer} // Wrap content for vertical scrolling
+                <ScrollView
+                    style={styles.verticalScroll}
+                    contentContainerStyle={styles.scrollContentContainer}
                 >
                     <ScrollView horizontal>
                         <View>
@@ -157,17 +163,22 @@ console.log(data);
                                 <Row data={tableHead} style={styles.head} textStyle={styles.headText} widthArr={widthArr} />
                                 <Rows
                                     data={batchLots.map((lot, index) => [
-                                        index + 1,  // Row index
-                                        lot.DrugName || 'N/A',  // Brand Name
-                                        lot.Presentation || 'N/A',  // Presentation
-                                        lot.Form || 'N/A',  // Form
-                                        lot.Laboratory || 'N/A',  // Laboratory
-                                        lot.LaboratoryCountry || 'N/A',  // Country
-                                        lot.GTIN || 'N/A',  // GTIN
-                                        lot.BatchNumber || 'N/A',  // LOT Number
-                                        lot.ExpiryDate || 'N/A',  // Expiry Date
-                                        lot.SerialNumber || 'N/A',  // Serial Number
-                                        lot.Inspection || 'N/A'  // Status (Inspection)
+                                        index + 1,
+                                        lot.DrugName || 'N/A',
+                                        lot.Presentation || 'N/A',
+                                        lot.Form || 'N/A',
+                                        lot.Laboratory || 'N/A',
+                                        lot.LaboratoryCountry || 'N/A',
+                                        lot.GTIN || 'N/A',
+                                        lot.BatchNumber || 'N/A',
+                                        lot.ExpiryDate || 'N/A',
+                                        lot.SerialNumber || 'N/A',
+                                        lot.Inspection === 'inspected' ? (
+                                            <Image
+                                                source={lot.inspectedBy === 'Pack' ? require('./assets/checkGreen.png') : require('./assets/checkWhite.png')}
+                                                style={{ width: 11, height: 11, alignSelf: 'center' }}
+                                            />
+                                        ) : lot.Inspection || 'N/A'
                                     ])}
                                     textStyle={styles.text}
                                     widthArr={widthArr}
@@ -175,13 +186,27 @@ console.log(data);
                             </Table>
                         </View>
                     </ScrollView>
+
+                    {isQrCodeVisible && (
+                        <View style={styles.qrCodeContainer}>
+                            <ViewShot ref={qrCodeRef} options={{ format: "png", quality: 0.9 }}>
+                                <QRCode value={box.BoxId.toString()} size={150} />
+                                <View style={styles.qrCodeInfo}>
+                                <Text style={styles.qrCodeText}>Donation Title: {box.DonationTitle}</Text>
+                                <Text style={styles.qrCodeText}>Box Number: {box.BoxLabel}</Text>
+                                <Text style={styles.qrCodeText}>Donor: {box.DonorName}</Text>
+                                <Text style={styles.qrCodeText}>Recipient: {box.RecipientName}</Text>
+                            </View>
+                            </ViewShot>
+
+                          
+                        </View>
+                    )}
                 </ScrollView>
             )}
-            {/* Conditionally render BottomNavBarInspection based on orientation */}
             {!isLandscape && <BottomNavBar currentScreen="List" />}
         </View>
     );
-
 };
 
 const styles = StyleSheet.create({
@@ -201,7 +226,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     title: {
-        marginTop:30,
+        marginTop: 30,
         fontSize: 14,
         fontFamily: 'RobotoCondensed-Bold',
     },
@@ -225,20 +250,33 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         fontSize: 10,
         fontFamily: 'RobotoCondensed-Regular',
-
+    },
+    qrCodeContainer: {
+        marginTop: 20,
+        alignItems: 'center',
+    },
+    qrCodeInfo: {
+        marginTop: 10,
+        alignItems: 'center',
+    },
+    qrCodeText: {
+        fontSize: 14,
+        fontFamily: 'RobotoCondensed-Bold',
+        marginBottom: 5,
+        color:'#fff'
     },
     backButtonImage: {
-        width: 41,  // Adjust the size of the back button image
+        width: 41,
         height: 15,
         marginLeft: 10,
-        marginTop:30,
-      },
-      headerRightContainer: {
+        marginTop: 30,
+    },
+    headerRightContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         marginRight: 10,
-        marginTop:30,
+        marginTop: 30,
     },
     headerButtonText: {
         fontSize: 14,

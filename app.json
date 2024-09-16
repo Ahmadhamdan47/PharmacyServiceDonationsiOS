@@ -2,6 +2,10 @@
   "expo": {
     "name": "MedLeb PS",
     "slug": "PharmacyServiceDonations",
+    "splash":{
+      "backgroundColor": "#ffffff"
+
+    },
     "ios": {
       "bundleIdentifier": "com.anonymous.PharmacyServiceDonations",
       "icon": "./assets/icon/ios-icon.png",
