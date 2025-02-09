@@ -18,25 +18,23 @@ import PackInspection from './PackInspection';
 import BoxInspection from './BoxInspection';
 import Validate from './Validate';
 import DonorDetails from './DonorDetails';
+import RecipientLanding from './RecipientLanding';  // Recipient landing screen
 
 const Stack = createStackNavigator();
 
 const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState('');
-  const navigationRef = React.useRef();  // To navigate from anywhere
-
-  // Set up Axios interceptor to handle 404 errors
-   // Load custom fonts
+  const navigationRef = React.useRef();  // To navigate programmatically
 
   // Set up Axios interceptor to handle 404 errors
   useEffect(() => {
     const interceptor = axios.interceptors.response.use(
-      response => response,  // Return the response if it's successful
+      response => response,
       async (error) => {
         if (error.response && error.response.status === 404) {
-          await AsyncStorage.clear();  // Clear the AsyncStorage session
-          setIsLoggedIn(false);  // Set the login state to false
+          await AsyncStorage.clear();  // Clear AsyncStorage session
+          setIsLoggedIn(false);  // Reset login state
 
           if (navigationRef.current) {
             navigationRef.current.reset({
@@ -45,7 +43,7 @@ const App = () => {
             });
           }
 
-          return Promise.reject(error);  // Return the error to handle it locally if needed
+          return Promise.reject(error);
         }
         return Promise.reject(error);
       }
@@ -56,45 +54,76 @@ const App = () => {
     };
   }, []);
 
+  // Fetch recipient data
+  const fetchRecipientData = async (token, recipientId) => {
+    try {
+      const response = await axios.get(`https://apiv2.medleb.org/recipient/byId/${recipientId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.data) {
+        const recipientData = response.data;
+
+        await AsyncStorage.setItem('recipientName', recipientData.name);
+        await AsyncStorage.setItem('recipientEmail', recipientData.email);
+        await AsyncStorage.setItem('recipientPhone', recipientData.phoneNumber);
+        await AsyncStorage.setItem('recipientAddress', recipientData.address);
+      }
+    } catch (error) {
+      console.error('Error fetching recipient data:', error);
+    }
+  };
+
   // Fetch donor data
   const fetchDonorData = async (token) => {
     try {
       const response = await axios.get('https://apiv2.medleb.org/donor/byUsername', {
         headers: { Authorization: `Bearer ${token}` },
-        timeout: 2000,  // 2-second timeout
+        timeout: 2000,
       });
 
       const donorData = response.data;
       if (donorData && donorData.IsActive) {
         await AsyncStorage.setItem('status', 'true');
-        setIsLoggedIn(true); // Donor is active, log in
+        setIsLoggedIn(true);
       } else {
         await AsyncStorage.setItem('status', 'false');
-        setIsLoggedIn(false); // Donor not active, log out
+        setIsLoggedIn(false);
       }
     } catch (error) {
       console.error('Error fetching donor data:', error);
-      setIsLoggedIn(false);  // Log out on error
+      setIsLoggedIn(false);
     }
   };
 
-  // Check login status on app load or refresh
+  // Check login status when the app loads
   useEffect(() => {
     const checkLoginStatus = async () => {
       try {
         const token = await AsyncStorage.getItem('token');
         const role = await AsyncStorage.getItem('userRole');
+        const recipientId = await AsyncStorage.getItem('recipientId');
 
         if (token && role) {
           setUserRole(role);
 
-          if (role === 'Donor') {
-            await fetchDonorData(token);  // For donors, fetch their data
+          if (role === 'Recipient' && recipientId) {
+            await fetchRecipientData(token, recipientId);
+            setIsLoggedIn(true);
+
+            // Navigate to RecipientLanding
+            navigationRef.current?.reset({
+              index: 0,
+              routes: [{ name: 'RecipientLanding' }],
+            });
+
+          } else if (role === 'Donor') {
+            await fetchDonorData(token);
           } else {
-            setIsLoggedIn(true);  // Admin or other roles, assume logged in
+            setIsLoggedIn(true);
           }
         } else {
-          setIsLoggedIn(false);  // If no token is found, set to not logged in
+          setIsLoggedIn(false);
         }
       } catch (error) {
         console.error('Error checking login state:', error);
@@ -102,15 +131,14 @@ const App = () => {
       }
     };
 
-    checkLoginStatus();  // Always check login status on app load or refresh
+    checkLoginStatus();
   }, []);
-
-  // Only return after the fonts are loaded
 
   return (
     <NavigationContainer ref={navigationRef}>
-      <Stack.Navigator initialRouteName={isLoggedIn ? 'Landing' : 'SignIn'}>
+      <Stack.Navigator initialRouteName={isLoggedIn ? (userRole === 'Recipient' ? 'RecipientLanding' : 'Landing') : 'SignIn'}>
         <Stack.Screen name="Landing" component={Landing} options={{ title: 'Home' }} />
+        <Stack.Screen name="RecipientLanding" component={RecipientLanding} options={{ title: 'Recipient Home' }} />
         <Stack.Screen name="SignIn" component={SignIn} options={{ title: 'Sign In' }} />
         <Stack.Screen name="SignUp" component={SignUp} options={{ title: 'Sign Up' }} />
         <Stack.Screen name="AddDonor" component={AddDonor} options={{ title: 'Donate' }} />
