@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, Text, StyleSheet, Alert, Image, TouchableOpacity, StatusBar } from 'react-native';
+import { View, TextInput, Text, StyleSheet, Alert, Image, TouchableOpacity, StatusBar, KeyboardAvoidingView, Platform } from 'react-native';
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -22,6 +22,7 @@ const SignIn = () => {
       'RobotoCondensed-Regular': require('./assets/fonts/RobotoCondensed-Regular.ttf'),
     });
     setIsFontLoaded(true);
+    console.log('font loaded:', isFontLoaded)
   };
 
   useEffect(() => {
@@ -117,7 +118,14 @@ const SignIn = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 250 : 0} // Adjust the offset based on your layout
+    >
+      <StatusBar backgroundColor="#f9f9f9" />
+
+      {/* Title */}
       <Text style={styles.title}>Drug Donation To Lebanon</Text>
 
       <Text style={styles.paragraph}>
@@ -151,8 +159,7 @@ const SignIn = () => {
       <Text style={styles.link} onPress={() => navigation.navigate('SignUp')}>
         Don't have an account? Sign Up
       </Text>
-      <StatusBar backgroundColor="#f9f9f9" />
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -173,7 +180,7 @@ const styles = StyleSheet.create({
   },
   paragraph: {
     fontFamily: 'RobotoCondensed-Medium',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
     textAlign: 'left',
     marginHorizontal: 10,
@@ -202,7 +209,7 @@ const styles = StyleSheet.create({
     marginRight: 15,
     fontSize: 12,
   },
-  button: {
+button: {
     backgroundColor: '#00a651',
     height: 35,
     justifyContent: 'center',
