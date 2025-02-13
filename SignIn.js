@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, Text, StyleSheet, Alert, Image, TouchableOpacity, StatusBar, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, TextInput, Text, StyleSheet, Alert, Image, TouchableOpacity, StatusBar } from 'react-native';
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,6 +15,7 @@ const SignIn = () => {
   const navigation = useNavigation();
 
   // Load custom fonts
+
   const fetchFonts = async () => {
     await Font.loadAsync({
       'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
@@ -22,13 +23,12 @@ const SignIn = () => {
       'RobotoCondensed-Regular': require('./assets/fonts/RobotoCondensed-Regular.ttf'),
     });
     setIsFontLoaded(true);
-    console.log('font loaded:', isFontLoaded)
+    console.log('font loaded:',isFontLoaded)
   };
 
   useEffect(() => {
-    fetchFonts();
+    fetchFonts(); // Load fonts on component mount
   }, []);
-
   // Customize the navigation header
   useEffect(() => {
     navigation.setOptions({
@@ -38,27 +38,28 @@ const SignIn = () => {
           style={{ width: 164, height: 50, marginTop: 10 }}
         />
       ),
-      headerTitleAlign: 'center',
-      headerLeft: () => null, 
+      headerTitleAlign: 'center',  // Center the logo horizontally
+      headerLeft: () => null,      // Remove the back button
       headerStyle: {
-        height: 150, 
+        height: 150,             // Adjust the height of the header
         backgroundColor: '#f9f9f9',
-        elevation: 0, 
-        shadowOpacity: 0,
-        borderBottomWidth: 0,
+        elevation: 0,            // Remove shadow on Android
+        shadowOpacity: 0,        // Remove shadow on iOS
+        borderBottomWidth: 0,    // Remove border at the bottom
       },
       headerTitleStyle: {
-        marginTop: 50,
+        marginTop: 50,           // Distance from the top (50px)
       },
     });
+
+    
   }, [navigation]);
 
   const handleSignIn = async () => {
     try {
       const response = await axios.post('https://apiv2.medleb.org/users/login', { username, password });
-
       if (response.data.token) {
-        const { token, role, recipientId } = response.data;
+        const { token, role } = response.data;
 
         // Store the token, username, and user role
         await AsyncStorage.setItem('token', token);
@@ -66,24 +67,7 @@ const SignIn = () => {
         await AsyncStorage.setItem('userRole', role);
         await AsyncStorage.setItem('pinSet', 'true');
 
-        if (role === 'Recipient' && recipientId) {
-          await AsyncStorage.setItem('recipientId', recipientId.toString());
-
-          // Fetch recipient data
-          await fetchRecipientData(token, recipientId);
-
-          // Redirect to RecipientLanding
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'RecipientLanding' }],
-          });
-        } else {
-          // Default landing for other roles
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'Landing' }],
-          });
-        }
+        navigation.navigate('Landing'); // Navigate to the unified Landing screen
       } else {
         Alert.alert('Error', 'Invalid credentials');
       }
@@ -93,45 +77,21 @@ const SignIn = () => {
     }
   };
 
-  const fetchRecipientData = async (token, recipientId) => {
-    try {
-      const response = await axios.get(`https://apiv2.medleb.org/recipient/byId/${recipientId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (response.data) {
-        const recipientData = response.data;
-
-        await AsyncStorage.setItem('recipientName', recipientData.name);
-        await AsyncStorage.setItem('recipientEmail', recipientData.email);
-        await AsyncStorage.setItem('recipientPhone', recipientData.phoneNumber);
-        await AsyncStorage.setItem('recipientAddress', recipientData.address);
-      }
-    } catch (error) {
-      console.error('Error fetching recipient data:', error);
-      Alert.alert('Error', 'Failed to fetch recipient data.');
-    }
-  };
-
   const togglePasswordVisibility = () => {
     setIsPasswordVisible(!isPasswordVisible);
   };
-
+ 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 250 : 0} // Adjust the offset based on your layout
-    >
-      <StatusBar backgroundColor="#f9f9f9" />
-
+    <View style={styles.container}>
       {/* Title */}
       <Text style={styles.title}>Drug Donation To Lebanon</Text>
 
+      {/* Paragraph */}
       <Text style={styles.paragraph}>
-        This application is developed to be used by the Pharmacy Service at the Ministry of Public Health, to manage the drug donation procedure to Lebanon.
+        This application is developed for the Pharmacy Service at the Ministry of Public Health, to manage the drug donation procedure to Lebanon.
       </Text>
 
+      {/* Username Label and Input */}
       <Text style={styles.label}>Username</Text>
       <TextInput
         style={styles.input}
@@ -139,6 +99,7 @@ const SignIn = () => {
         onChangeText={setUsername}
       />
 
+      {/* Password Label and Input */}
       <Text style={styles.label}>Password</Text>
       <View>
         <TextInput
@@ -152,14 +113,17 @@ const SignIn = () => {
         </TouchableOpacity>
       </View>
 
+      {/* Sign In Button */}
       <TouchableOpacity style={styles.button} onPress={handleSignIn}>
         <Text style={styles.buttonText}>Sign In</Text>
       </TouchableOpacity>
 
+      {/* Sign Up Link */}
       <Text style={styles.link} onPress={() => navigation.navigate('SignUp')}>
         Don't have an account? Sign Up
       </Text>
-    </KeyboardAvoidingView>
+      <StatusBar backgroundColor="#f9f9f9" />
+    </View>
   );
 };
 
@@ -179,8 +143,8 @@ const styles = StyleSheet.create({
     color: '#121212',
   },
   paragraph: {
-    fontFamily: 'RobotoCondensed-Medium',
-    fontSize: 12,
+    fontFamily:'RobotoCondensed-Medium',
+    fontSize: 14,
     fontWeight: '500',
     textAlign: 'left',
     marginHorizontal: 10,
@@ -193,6 +157,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: 'RobotoCondensed-Bold',
+
     fontSize: 12,
     marginBottom: 5,
     color: "#A9A9A9",
@@ -209,7 +174,7 @@ const styles = StyleSheet.create({
     marginRight: 15,
     fontSize: 12,
   },
-button: {
+  button: {
     backgroundColor: '#00a651',
     height: 35,
     justifyContent: 'center',
@@ -225,6 +190,7 @@ button: {
     fontSize: 16,
   },
   link: {
+  
     fontFamily: 'RobotoCondensed-Regular',
     marginTop: 20,
     color: '#00a651',

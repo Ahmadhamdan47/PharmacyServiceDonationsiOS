@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useLayoutEffect } from 'react';
-import { StyleSheet, View, Image, TouchableOpacity, Text, BackHandler, ToastAndroid,StatusBar } from 'react-native';
+import { StyleSheet, View, Image, TouchableOpacity, Text, BackHandler, ToastAndroid, StatusBar } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBar from './BottomNavBar';
 import BottomNavBarInspection from './BottomNavBarInspection';
+import BottomNavBarRecipient from './BottomNavBarRecipient'; // Import the new BottomNavBar for Recipient
 import * as Font from 'expo-font';
 
 const Landing = () => {
@@ -13,6 +14,7 @@ const Landing = () => {
   const [backPressedOnce, setBackPressedOnce] = useState(false);
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [isFontLoaded, setIsFontLoaded] = useState(false);
+
   const fetchFonts = async () => {
     await Font.loadAsync({
       'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
@@ -25,7 +27,7 @@ const Landing = () => {
   useEffect(() => {
     fetchFonts(); // Load fonts on component mount
   }, []);
- 
+
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -62,8 +64,8 @@ const Landing = () => {
       await AsyncStorage.removeItem('userRole');
       await AsyncStorage.removeItem('username');
       await AsyncStorage.removeItem('status'); // If you store donor status
-  
-       // Clear user role
+
+      // Clear user role
       navigation.reset({
         index: 0,
         routes: [{ name: 'SignIn' }],
@@ -72,9 +74,10 @@ const Landing = () => {
       console.error('Error signing out:', error);
     }
   };
-  
+
   const handleInspect = () => navigation.navigate('Inspect');
   const handleValidate = () => navigation.navigate('Validate');
+  const handleAgreements = () => navigation.navigate('Agreements'); // New function for Agreements
 
   const toggleDropdown = () => setDropdownVisible(!dropdownVisible);
 
@@ -98,19 +101,17 @@ const Landing = () => {
       headerTitle: '',  // Leave the header title empty
       headerTitleAlign: 'center',
       headerStyle: {
-    
         backgroundColor: '#f9f9f9', // Set the background color of the whole navigation bar
         elevation: 0,            // Remove shadow on Android
         shadowOpacity: 0,        // Remove shadow on iOS
-        borderBottomWidth: 0,  
+        borderBottomWidth: 0,
       },
     });
   }, [navigation, username, dropdownVisible]);
-  
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor="#f9f9f9"/>
+      <StatusBar backgroundColor="#f9f9f9" />
       {dropdownVisible && (
         <View style={styles.dropdown}>
           {userRole === 'Admin' && (
@@ -121,7 +122,6 @@ const Landing = () => {
           <TouchableOpacity onPress={handleSignOut} style={styles.dropdownItem}>
             <Text style={styles.dropdownItemText}>Sign Out</Text>
           </TouchableOpacity>
-          
         </View>
       )}
 
@@ -136,9 +136,17 @@ const Landing = () => {
                 <Image source={require("./assets/list.png")} style={styles.buttonImage} />
               </TouchableOpacity>
             </>
+          ) : userRole === 'Recipient' ? (
+            <>
+              <TouchableOpacity onPress={() => navigation.navigate('RecipientList')} style={styles.buttonWrapper}>
+                <Image source={require("./assets/list.png")} style={styles.buttonImage} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleAgreements} style={styles.buttonWrapper}>
+                <Image source={require("./assets/agreements.png")} style={styles.buttonImage} />
+              </TouchableOpacity>
+            </>
           ) : (
             <>
-
               <TouchableOpacity onPress={handleInspect} style={styles.buttonWrapper}>
                 <Image source={require("./assets/Inspection.png")} style={styles.buttonImage} />
               </TouchableOpacity>
@@ -150,7 +158,7 @@ const Landing = () => {
         </View>
       </View>
 
-      {userRole === 'Donor' ? <BottomNavBar /> : <BottomNavBarInspection currentScreen="Landing" />}
+      {userRole === 'Donor' ? <BottomNavBar /> : userRole === 'Recipient' ? <BottomNavBarRecipient currentScreen="Landing" /> : <BottomNavBarInspection currentScreen="Landing" />}
     </View>
   );
 };
@@ -161,14 +169,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#f9f9f9",
   },
   containerLeft: {
- 
     marginLeft: 20,
     marginTop: 49,
     width: 200,
     height: 108,
     backgroundColor: '#f9f9f9',
-    marginRight:103,
-   
+    marginRight: 103,
   },
   logo: {
     width: 166,
@@ -182,14 +188,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Roboto Condensed',
     fontWeight: '400',
-    marginRight:24,
+    marginRight: 24,
     marginLeft: 103,
-    marginBottom:15,
-    
+    marginBottom: 15,
     position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
-
   },
-
   circle: {
     backgroundColor: '#f9f9f9',
     width: 40,
@@ -200,24 +203,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 2,
-    marginLeft:5,
+    marginLeft: 5,
   },
   circleText: {
     backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
-
     fontSize: 25,
     color: '#00A651',
     fontWeight: 'bold',
-    marginBottom:2,
+    marginBottom: 2,
   },
   profileText: {
     backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
     fontFamily: 'RobotoCondensed-Bold',
-
     fontSize: 14,
     color: '#000',
     textAlign: 'left',
-    
   },
   dropdown: {
     position: 'absolute',
@@ -231,9 +231,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3,
-     
   },
-
   dropdownItem: {
     paddingVertical: 10,
   },
@@ -268,7 +266,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: 'Roboto Condensed',
   },
-  
 });
 
 export default Landing;
