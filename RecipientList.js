@@ -57,7 +57,6 @@ const RecipientList = () => {
           },
         });
     }, [navigation, username]);
-
     useEffect(() => {
         fetchFonts(); // Load fonts on component mount
     }, []);
@@ -239,18 +238,159 @@ const styles = StyleSheet.create({
     contentContainer: {
         paddingBottom: 80,
         marginTop: 40,
-        marginLeft: 30,
-        marginRight: 30,
+        marginLeft:30,
+        marginRight:30,
     },
-    dateRangeContainer: {
+    profileContainer: {
+        width: 47,
+        height: 16,
+        backgroundColor: '#f9f9f9',
+        fontSize: 14,
+        fontFamily: 'Roboto Condensed',
+        fontWeight: '400',
+        marginRight:24,
+        marginLeft: 103,
+        marginBottom:30,
+        
+        position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
+    
+      },
+      circle: {
+        backgroundColor: '#f9f9f9',
+        width: 40,
+        height: 40,
+        borderRadius: 25,
+        borderWidth: 2,
+        borderColor: '#00A651',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 2,
+        marginLeft:5,
+      },
+      circleText: {
+        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
+    
+        fontSize: 20,
+        color: '#00A651',
+        fontWeight: 'bold',
+        marginBottom:2,
+      },
+      profileText: {
+        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
+        fontFamily: 'RobotoCondensed-Bold',
+
+        fontSize: 14,
+        color: '#000',
+        fontWeight: '400',
+        textAlign: 'left',
+        
+      },
+          backButton: {
+        fontSize: 16,
+        color: '#000',
+        fontWeight: 'bold',
+        marginLeft: 10,
+        paddingRight: 100,
+    },
+    filterRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginVertical: 10,
+        
+        
+    },
+    filterColumn: {
+        flex: 0,
+        marginHorizontal: 5,
+    },
+    
+    filterText: {
+        fontSize: 14,
+        fontFamily: 'RobotoCondensed-Bold',
+        color: '#000',
+        textAlign: 'center',
+    },
+    dropdown: {
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 5,
+        position: 'absolute',
+        width: 150,
+        maxHeight: 120,
+        zIndex: 10,
+    },
+    dropdownScroll: {
+        maxHeight: 120,
+    },
+    dropdownText: {
+        fontSize: 14,
+        padding: 10,
+        color: '#000',
+        fontFamily: 'RobotoCondensed-Bold',
+
+    },
+    filterButtonText: {
+        color: '#00A651',
+        fontSize: 16,
+        fontFamily: 'RobotoCondensed-Bold',
+    },
+    resultCount: {
+        textAlign: 'center',
+        marginVertical: 10,
+        fontSize: 10,
+        fontWeight: 'light',
+        color: "#121212",
+        fontFamily: 'RobotoCondensed-Regular',
+    },
+    card: {
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#00A651',
+        borderRadius: 50,
+        padding: 15,
+        marginVertical: 10,
+        height:140,
+
+    },
+    statusText: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        textAlign: 'left',
+        marginLeft: 10,
+     
+    },
+    cardContent: {
+     
+    },
+    cardTitle: {
+        fontSize: 12,
+        fontFamily: 'RobotoCondensed-Bold',        
+    },
+    cardText: {
+        fontSize: 12,
+        color: '#333',
+        fontFamily: 'RobotoCondensed-Regular',
+        
+     
+    },
+    backButtonImage: {
+        width: 41,  // Adjust the size of the back button image
+        height: 15,
+        marginLeft: 10,
+     
+      },
+      dateRangeContainer: {
         flexDirection: 'row',
         alignItems: 'center',
+       
         borderWidth: 1,
         borderColor: '#00A651',
         borderRadius: 20,
         paddingVertical: 10,
         paddingHorizontal: 10,
-        height: 45,
+        height:45,
+        
     },
     dateContainer: {
         flex: 1,
@@ -258,13 +398,11 @@ const styles = StyleSheet.create({
     },
     dateText: {
         fontSize: 13,
-        fontFamily: 'RobotoCondensed-Bold',
-        color: '#707070',
+        fontFamily: 'RobotoCondensed-Bold',        color: '#707070',
     },
     dateValue: {
         fontSize: 13,
-        fontFamily: 'RobotoCondensed-Bold',
-        color: '#000',
+        fontFamily: 'RobotoCondensed-Bold',        color: '#000',
     },
     dateIcon: {
         width: 30,
@@ -276,57 +414,42 @@ const styles = StyleSheet.create({
         width: 45,
         height: 44,
         tintColor: '#00A651',
-        resizeMode: 'contain',
+        resizeMode:'contain'
+    },
+    filterContainer: {
+        marginVertical: 20,
+        paddingHorizontal: 10,
+        flexDirection:'row'
+    },
+    filterLabel: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: 'grey',
+        marginBottom: 5,
+        textAlign: 'center',
+    },
+    filterButton: {
+        borderWidth: 1,
+        borderColor: '#00A651',
+        borderRadius: 20,
+        paddingVertical: 8,
+        paddingHorizontal: 15,
+        minWidth:100,
     },
     searchButton: {
         justifyContent: 'center',
         alignItems: 'center',
-        borderRadius: 50,
+        borderRadius: 50, // Optional: for round button
+        
     },
     searchIcon: {
-        width: 320,
-        height: 39,
+        width: 320,  // Set the width of the search icon
+        height: 39,   
         borderRadius: 50,
-    },
-    separator: {
-        marginTop: 10,
-    },
-    resultCount: {
-        textAlign: 'center',
-        marginVertical: 10,
-        fontSize: 10,
-        fontWeight: 'light',
-        color: '#121212',
-        fontFamily: 'RobotoCondensed-Regular',
-    },
-    card: {
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#00A651',
-        borderRadius: 50,
-        padding: 15,
-        marginVertical: 10,
-        height: 140,
-    },
-    statusText: {
-        fontSize: 14,
-        fontWeight: 'bold',
-        textAlign: 'left',
-        marginLeft: 10,
-    },
-    cardContent: {
-        flex: 1,
-    },
-    cardTitle: {
-        fontSize: 12,
-        fontFamily: 'RobotoCondensed-Bold',
-    },
-    cardText: {
-        fontSize: 12,
-        color: '#333',
-        fontFamily: 'RobotoCondensed-Regular',
-    },
-    
+     },  
+    separator:{
+        marginTop:10,
+        
+    }
 });
-
 export default RecipientList;
