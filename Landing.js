@@ -6,14 +6,17 @@ import BottomNavBar from './BottomNavBar';
 import BottomNavBarInspection from './BottomNavBarInspection';
 import BottomNavBarRecipient from './BottomNavBarRecipient'; // Import the new BottomNavBar for Recipient
 import * as Font from 'expo-font';
+import axios from 'axios'; // Import axios
 
 const Landing = () => {
   const navigation = useNavigation();
   const [username, setUsername] = useState('');
   const [userRole, setUserRole] = useState('');
+  const [userId, setUserId] = useState(''); // Add userId state
   const [backPressedOnce, setBackPressedOnce] = useState(false);
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [isFontLoaded, setIsFontLoaded] = useState(false);
+  const [pendingAgreement, setPendingAgreement] = useState(false); // Add state for pending agreement
 
   const fetchFonts = async () => {
     await Font.loadAsync({
@@ -33,8 +36,10 @@ const Landing = () => {
       try {
         const storedUsername = await AsyncStorage.getItem('username');
         const role = await AsyncStorage.getItem('userRole');
+        const id = await AsyncStorage.getItem('userId'); // Fetch userId from AsyncStorage
         if (storedUsername) setUsername(storedUsername);
         if (role) setUserRole(role);
+        if (id) setUserId(id); // Set userId state
       } catch (error) {
         console.error('Failed to load username or user role:', error);
       }
@@ -57,13 +62,82 @@ const Landing = () => {
     return () => backHandler.remove();
   }, [backPressedOnce]);
 
+  useEffect(() => {
+    const checkRecipientAgreement = async () => {
+      try {
+        // console.log('Checking recipient agreement...');
+        const response = await axios.get('https://apiv2.medleb.org/RecipientAgreements/all');
+        const agreements = response.data.data; // Access the nested data property
+        // console.log('Fetched agreements data:', agreements);
+
+        if (!Array.isArray(agreements)) {
+          throw new Error('Invalid agreements data');
+        }
+
+        let isPartOfAgreement = false;
+
+        if (userRole === 'Donor') {
+          const donorResponse = await axios.get('https://apiv2.medleb.org/donor/all');
+          const donors = donorResponse.data;
+          // console.log('Fetched donors data:', donors);
+
+          if (!Array.isArray(donors)) {
+            throw new Error('Invalid donors data');
+          }
+
+          const donor = donors.find(d => d.DonorName === username);
+          // console.log('Donor:', donor);
+
+          if (donor) {
+            isPartOfAgreement = agreements.some(agreement => agreement.DonorId === donor.DonorId && agreement.Agreed_Upon === 'pending');
+            if (isPartOfAgreement) {
+              setPendingAgreement(true);
+            }
+          }
+        } else if (userRole === 'Recipient') {
+          const recipientResponse = await axios.get('https://apiv2.medleb.org/recipient/all');
+          const recipients = recipientResponse.data;
+          // console.log('Fetched recipients data:', recipients);
+
+          if (!Array.isArray(recipients)) {
+            throw new Error('Invalid recipients data');
+          }
+
+          const recipient = recipients.find(r => r.name === username);
+          // console.log('Recipient:', recipient);
+
+          if (recipient) {
+            isPartOfAgreement = agreements.some(agreement => agreement.RecipientId === recipient.id && agreement.Agreed_Upon === 'pending');
+            if (isPartOfAgreement) {
+              setPendingAgreement(true);
+            }
+          }
+        }
+
+        // if (isPartOfAgreement) {
+        //   console.log('Agreement Status: You are part of a recipient agreement.');
+        //   Alert.alert('Agreement Status', 'You are part of a recipient agreement.');
+        // } else {
+        //   console.log('Agreement Status: You are not part of any recipient agreement.');
+        //   Alert.alert('Agreement Status', 'You are not part of any recipient agreement.');
+        // }
+      } catch (error) {
+        console.error('Error checking recipient agreement:', error);
+      }
+    };
+
+    if (username && userRole) {
+      checkRecipientAgreement();
+    }
+  }, [username, userRole]);
+
   const handleSignOut = async () => {
     try {
       // Clear all relevant AsyncStorage data
       await AsyncStorage.removeItem('token');
       await AsyncStorage.removeItem('userRole');
       await AsyncStorage.removeItem('username');
-      await AsyncStorage.removeItem('status'); // If you store donor status
+      await AsyncStorage.removeItem('userId'); // Remove userId from AsyncStorage
 
       // Clear user role
       navigation.reset({
@@ -77,7 +151,13 @@ const Landing = () => {
 
   const handleInspect = () => navigation.navigate('Inspect');
   const handleValidate = () => navigation.navigate('Validate');
-  const handleAgreements = () => navigation.navigate('Agreements'); // New function for Agreements
+  const handleAgreements = () => {
+    if (userRole === 'Donor') {
+      navigation.navigate('DonorAgreements');
+    } else if (userRole === 'Recipient') {
+      navigation.navigate('RecipientAgreements');
+    }
+  }; // Updated function for Agreements
 
   const toggleDropdown = () => setDropdownVisible(!dropdownVisible);
 
@@ -92,6 +172,11 @@ const Landing = () => {
         <TouchableOpacity onPress={toggleDropdown} style={styles.profileContainer}>
           <View style={styles.circle}>
             <Text style={styles.circleText}>{username.charAt(0).toUpperCase()}</Text>
+            {userRole === 'Donor' && pendingAgreement && (
+              <View style={styles.pendingBadge}>
+                <Text style={styles.pendingBadgeText}>1</Text>
+              </View>
+            )}
           </View>
           {!dropdownVisible && ( // Conditionally render the username when dropdown is not visible
             <Text style={styles.profileText}>{username}</Text>
@@ -107,7 +192,7 @@ const Landing = () => {
         borderBottomWidth: 0,
       },
     });
-  }, [navigation, username, dropdownVisible]);
+  }, [navigation, username, dropdownVisible, pendingAgreement]);
 
   return (
     <View style={styles.container}>
@@ -117,6 +202,11 @@ const Landing = () => {
           {userRole === 'Admin' && (
             <TouchableOpacity onPress={handleValidate} style={styles.dropdownItem}>
               <Text style={styles.dropdownItemText}>Validate</Text>
+            </TouchableOpacity>
+          )}
+          {userRole === 'Donor' && (
+            <TouchableOpacity onPress={handleAgreements} style={styles.dropdownItem}>
+              <Text style={styles.dropdownItemText}>Agreements</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={handleSignOut} style={styles.dropdownItem}>
@@ -143,6 +233,11 @@ const Landing = () => {
               </TouchableOpacity>
               <TouchableOpacity onPress={handleAgreements} style={styles.buttonWrapper}>
                 <Image source={require("./assets/agreements.png")} style={styles.buttonImage} />
+                {pendingAgreement && (
+                  <View style={styles.pendingBadge}>
+                    <Text style={styles.pendingBadgeText}>1</Text>
+                  </View>
+                )}
               </TouchableOpacity>
             </>
           ) : (
@@ -265,6 +360,22 @@ const styles = StyleSheet.create({
     color: '#121212',
     textAlign: 'center',
     fontFamily: 'Roboto Condensed',
+  },
+  pendingBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#00A651',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pendingBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });
 

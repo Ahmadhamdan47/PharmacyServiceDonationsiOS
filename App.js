@@ -19,6 +19,9 @@ import BoxInspection from './BoxInspection';
 import Validate from './Validate';
 import DonorDetails from './DonorDetails';
 import RecipientList from './RecipientList'; // Import RecipientList
+import DonorAgreements from './DonorAgreements';
+import AgreementDetails from './AgreementDetails';
+import RecipientAgreement from './RecipientAgreements';
 const Stack = createStackNavigator();
 
 const App = () => {
@@ -125,6 +128,9 @@ const App = () => {
         <Stack.Screen name="BoxInspection" component={BoxInspection} options={{ title: 'Box Inspection' }} />
         <Stack.Screen name="Validate" component={Validate} options={{ title: 'Validate' }} />
         <Stack.Screen name="DonorDetails" component={DonorDetails} options={{ title: 'Donor Details' }} />
+        <Stack.Screen name="DonorAgreements" component={DonorAgreements} options={{ title: 'Donor Agreements' }} />
+        <Stack.Screen name="AgreementDetails" component={AgreementDetails} options={{ title: 'Agreement Details' }} />
+        <Stack.Screen name="RecipientAgreements" component={RecipientAgreement} options={{ title: 'Recipient Agreement' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
