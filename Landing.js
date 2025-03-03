@@ -17,6 +17,7 @@ const Landing = () => {
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [isFontLoaded, setIsFontLoaded] = useState(false);
   const [pendingAgreement, setPendingAgreement] = useState(false); // Add state for pending agreement
+  const [pendingAgreementCount, setPendingAgreementCount] = useState(0); // Add state for pending agreement count
 
   const fetchFonts = async () => {
     await Font.loadAsync({
@@ -65,62 +66,75 @@ const Landing = () => {
   useEffect(() => {
     const checkRecipientAgreement = async () => {
       try {
-        // console.log('Checking recipient agreement...');
         const response = await axios.get('https://apiv2.medleb.org/RecipientAgreements/all');
         const agreements = response.data.data; // Access the nested data property
-        // console.log('Fetched agreements data:', agreements);
 
         if (!Array.isArray(agreements)) {
           throw new Error('Invalid agreements data');
         }
 
         let isPartOfAgreement = false;
+        let pendingCount = 0;
 
         if (userRole === 'Donor') {
           const donorResponse = await axios.get('https://apiv2.medleb.org/donor/all');
           const donors = donorResponse.data;
-          // console.log('Fetched donors data:', donors);
 
           if (!Array.isArray(donors)) {
             throw new Error('Invalid donors data');
           }
 
           const donor = donors.find(d => d.DonorName === username);
-          // console.log('Donor:', donor);
 
           if (donor) {
             isPartOfAgreement = agreements.some(agreement => agreement.DonorId === donor.DonorId && agreement.Agreed_Upon === 'pending');
+            pendingCount = agreements.filter(agreement => agreement.DonorId === donor.DonorId && agreement.Agreed_Upon === 'pending').length;
             if (isPartOfAgreement) {
               setPendingAgreement(true);
+              setPendingAgreementCount(pendingCount);
             }
           }
         } else if (userRole === 'Recipient') {
+          console.log('Checking agreements for recipient');
           const recipientResponse = await axios.get('https://apiv2.medleb.org/recipient/all');
           const recipients = recipientResponse.data;
-          // console.log('Fetched recipients data:', recipients);
 
           if (!Array.isArray(recipients)) {
             throw new Error('Invalid recipients data');
           }
 
-          const recipient = recipients.find(r => r.name === username);
-          // console.log('Recipient:', recipient);
+          const recipient = recipients.find(r => 
+            r.name === username || 
+            r.RecipientName === username || 
+            r.recipientName === username ||
+            r.Name === username ||
+            r.username === username
+          );
+          
+          console.log('Recipient found:', recipient);
+          console.log('Current username:', username);
+        
 
           if (recipient) {
-            isPartOfAgreement = agreements.some(agreement => agreement.RecipientId === recipient.id && agreement.Agreed_Upon === 'pending');
+            console.log('Recipient:', agreements, recipient.RecipientId);
+            isPartOfAgreement = agreements.some(
+              agreement => agreement.RecipientId === recipient.RecipientId && agreement.Agreed_Upon === 'pending'
+            );
+          
+            pendingCount = agreements.filter(
+              agreement => agreement.RecipientId === recipient.RecipientId && agreement.Agreed_Upon === 'pending'
+            ).length; // Change recipient.id to recipient.RecipientId
+          
             if (isPartOfAgreement) {
               setPendingAgreement(true);
+              setPendingAgreementCount(pendingCount);
+            } else {
+              setPendingAgreement(false); // Ensure badge hides when no pending agreements exist
+              setPendingAgreementCount(0);
             }
           }
+          
         }
-
-        // if (isPartOfAgreement) {
-        //   console.log('Agreement Status: You are part of a recipient agreement.');
-        //   Alert.alert('Agreement Status', 'You are part of a recipient agreement.');
-        // } else {
-        //   console.log('Agreement Status: You are not part of any recipient agreement.');
-        //   Alert.alert('Agreement Status', 'You are not part of any recipient agreement.');
-        // }
       } catch (error) {
         console.error('Error checking recipient agreement:', error);
       }
@@ -164,35 +178,35 @@ const Landing = () => {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerLeft: () => (
-        <View style={styles.containerLeft}>
-          <Image source={require("./assets/medleblogo.png")} style={styles.logo} />
-        </View>
+      <View style={styles.containerLeft}>
+        <Image source={require("./assets/medleblogo.png")} style={styles.logo} />
+      </View>
       ),
       headerRight: () => (
-        <TouchableOpacity onPress={toggleDropdown} style={styles.profileContainer}>
-          <View style={styles.circle}>
-            <Text style={styles.circleText}>{username.charAt(0).toUpperCase()}</Text>
-            {userRole === 'Donor' && pendingAgreement && (
-              <View style={styles.pendingBadge}>
-                <Text style={styles.pendingBadgeText}>1</Text>
-              </View>
-            )}
+      <TouchableOpacity onPress={toggleDropdown} style={styles.profileContainer}>
+        <View style={styles.circle}>
+        <Text style={styles.circleText}>{username.charAt(0).toUpperCase()}</Text>
+        {userRole === 'Donor' && pendingAgreement && (
+          <View style={styles.pendingBadge}>
+          <Text style={styles.pendingBadgeText}>{pendingAgreementCount}</Text>
           </View>
-          {!dropdownVisible && ( // Conditionally render the username when dropdown is not visible
-            <Text style={styles.profileText}>{username}</Text>
-          )}
-        </TouchableOpacity>
+        )}
+        </View>
+        {!dropdownVisible && ( // Conditionally render the username when dropdown is not visible
+        <Text style={styles.profileText}>{username}</Text>
+        )}
+      </TouchableOpacity>
       ),
       headerTitle: '',  // Leave the header title empty
       headerTitleAlign: 'center',
       headerStyle: {
-        backgroundColor: '#f9f9f9', // Set the background color of the whole navigation bar
-        elevation: 0,            // Remove shadow on Android
-        shadowOpacity: 0,        // Remove shadow on iOS
-        borderBottomWidth: 0,
+      backgroundColor: '#f9f9f9', // Set the background color of the whole navigation bar
+      elevation: 0,            // Remove shadow on Android
+      shadowOpacity: 0,        // Remove shadow on iOS
+      borderBottomWidth: 0,
       },
     });
-  }, [navigation, username, dropdownVisible, pendingAgreement]);
+  }, [navigation, username, dropdownVisible, pendingAgreement, pendingAgreementCount]);
 
   return (
     <View style={styles.container}>
@@ -235,7 +249,7 @@ const Landing = () => {
                 <Image source={require("./assets/agreements.png")} style={styles.buttonImage} />
                 {pendingAgreement && (
                   <View style={styles.pendingBadge}>
-                    <Text style={styles.pendingBadgeText}>1</Text>
+                    <Text style={styles.pendingBadgeText}>{pendingAgreementCount}</Text>
                   </View>
                 )}
               </TouchableOpacity>
