@@ -371,7 +371,11 @@ const SignUp = () => {
                             setItems={setItems}
                             placeholder="Select Donor Type"
                             placeholderStyle={styles.placeholder}
+<<<<<<< HEAD
                             style={styles.dropdownInput }
+=======
+                            style={styles.input}
+>>>>>>> 2c17bcbc2f9294663fa9f922974886a98acccf2e
                             containerStyle={styles.dropdownContainer}
                             dropDownContainerStyle={styles.dropdownMenuContainer}
                         />
@@ -422,7 +426,11 @@ const SignUp = () => {
                     placeholderStyle={styles.placeholder}
                     searchable={true}
                     searchPlaceholder="Search country..."
+<<<<<<< HEAD
                     style={styles.dropdownInput}
+=======
+                    style={styles.input}
+>>>>>>> 2c17bcbc2f9294663fa9f922974886a98acccf2e
                     containerStyle={styles.dropdownContainer}
                     dropDownContainerStyle={styles.dropdownMenuContainer}
                 />
@@ -468,7 +476,11 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         justifyContent: 'center',
+<<<<<<< HEAD
         padding: 30,
+=======
+        padding: 20,
+>>>>>>> 2c17bcbc2f9294663fa9f922974886a98acccf2e
         backgroundColor: '#f9f9f9',
     },
     label: {
@@ -482,6 +494,7 @@ const styles = StyleSheet.create({
         borderColor: '#00a651',
         padding: 5,
         paddingLeft: 10,
+<<<<<<< HEAD
         marginBottom: 10,
         borderRadius: 20,
         height: 40,
@@ -491,23 +504,35 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#00a651',
         paddingLeft: 10,
+=======
+>>>>>>> 2c17bcbc2f9294663fa9f922974886a98acccf2e
         marginBottom: 20,
         borderRadius: 20,
         height: 40,
         backgroundColor: '#f9f9f9',
+<<<<<<< HEAD
         minHeight: 40,
         maxHeight: 40,
+=======
+>>>>>>> 2c17bcbc2f9294663fa9f922974886a98acccf2e
     },
     placeholder: {
         color: '#A9A9A9',
     },
     dropdownContainer: {
+<<<<<<< HEAD
         marginBottom: 10,
+=======
+        marginBottom: 20,
+>>>>>>> 2c17bcbc2f9294663fa9f922974886a98acccf2e
         height: 40,
     },
     dropdownMenuContainer: {
         borderColor: '#00a651',
+<<<<<<< HEAD
         borderRadius: 20,
+=======
+>>>>>>> 2c17bcbc2f9294663fa9f922974886a98acccf2e
     },
     button: {
         backgroundColor: '#00a651',

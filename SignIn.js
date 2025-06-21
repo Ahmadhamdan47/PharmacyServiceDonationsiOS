@@ -273,7 +273,12 @@ const SignIn = () => {
 
       {/* Paragraph */}
       <Text style={styles.paragraph}>
+<<<<<<< HEAD
         This application is developed to manage efficiently the medication donation from all over the world to Lebanon. By facilitating the means of donation and recieving.
+=======
+        This application is developed for the Pharmacy Service at the Ministry of Public Health, to manage the drug
+        donation procedure to Lebanon.
+>>>>>>> 2c17bcbc2f9294663fa9f922974886a98acccf2e
       </Text>
 
       {isLocked ? (
@@ -369,7 +374,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     marginBottom: 60,
     width: 315,
+<<<<<<< HEAD
     height: 70,
+=======
+    height: 67,
+>>>>>>> 2c17bcbc2f9294663fa9f922974886a98acccf2e
     alignSelf: "center",
     color: "#555",
     fontStyle: "italic",
