@@ -1,333 +1,365 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Dimensions, Keyboard, BackHandler, Modal, StatusBar } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Camera } from 'expo-camera';
-import { BarCodeScanner } from 'expo-barcode-scanner';
-import { CameraType } from 'expo-camera/build/legacy/Camera.types';
-import axios from 'axios';
-import DropDownPicker from 'react-native-dropdown-picker';
-import Icon from 'react-native-vector-icons/FontAwesome';
-import { useNavigation } from '@react-navigation/native';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import XLSX from 'xlsx';
-import BottomNavBar from './BottomNavBar'; // Import BottomNavBar
-import * as Font from 'expo-font';
+"use client"
+
+import React, { useState, useEffect, useRef } from "react"
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  Image,
+  Keyboard,
+  BackHandler,
+  Modal,
+  StatusBar,
+} from "react-native"
+import AsyncStorage from "@react-native-async-storage/async-storage"
+import { Camera } from "expo-camera"
+import { BarCodeScanner } from "expo-barcode-scanner"
+import { CameraType } from "expo-camera/build/legacy/Camera.types"
+import axios from "axios"
+import DropDownPicker from "react-native-dropdown-picker"
+import Icon from "react-native-vector-icons/FontAwesome"
+import { useNavigation } from "@react-navigation/native"
+import * as FileSystem from "expo-file-system"
+import * as Sharing from "expo-sharing"
+import XLSX from "xlsx"
+import BottomNavBar from "./BottomNavBar" // Import BottomNavBar
+import * as Font from "expo-font"
 
 const createEmptyBatchLot = () => ({
-  gtin: '',
-  lotNumber: '',
-  expiryDate: '',
-  serialNumber: '',
-  drugName: '',
-  presentation: '',
-  form: '',
-  owner: '',
-  country: '',
+  gtin: "",
+  lotNumber: "",
+  expiryDate: "",
+  serialNumber: "",
+  drugName: "",
+  presentation: "",
+  form: "",
+  owner: "",
+  country: "",
   open: false,
   drugValid: null,
-  drugValidationMessage: '',
+  drugValidationMessage: "",
   donationDate: new Date().toISOString(),
-});
+})
 
-const FieldLabel = ({ label }) => (
-  <Text style={styles.fieldLabel}>{label}</Text>
-);
+const FieldLabel = ({ label }) => <Text style={styles.fieldLabel}>{label}</Text>
 
-const BatchLotForm = React.forwardRef(({ form, index, handleFieldChange, drugItems, checkDrugNameInAPI, openCamera, fetchDrugNames, setIsInputFocused, setIsDropDownOpen, validationErrors }, ref) => {
-  const inputRefs = {
-    gtin: useRef(null),
-    lotNumber: useRef(null),
-    expiryDate: useRef(null),
-    serialNumber: useRef(null),
-    drugName: useRef(null),
-    presentation: useRef(null),
-    form: useRef(null),
-    owner: useRef(null),
-    country: useRef(null),
-  };
+const BatchLotForm = React.forwardRef(
+  (
+    {
+      form,
+      index,
+      handleFieldChange,
+      drugItems,
+      checkDrugNameInAPI,
+      openCamera,
+      fetchDrugNames,
+      setIsInputFocused,
+      setIsDropDownOpen,
+      validationErrors,
+    },
+    ref,
+  ) => {
+    const inputRefs = {
+      gtin: useRef(null),
+      lotNumber: useRef(null),
+      expiryDate: useRef(null),
+      serialNumber: useRef(null),
+      drugName: useRef(null),
+      presentation: useRef(null),
+      form: useRef(null),
+      owner: useRef(null),
+      country: useRef(null),
+    }
 
-  return (
-    <View ref={ref} key={index} style={styles.formContainer}>
-      <StatusBar backgroundColor="#f9f9f9"/>
+    return (
+      <View ref={ref} key={index} style={styles.formContainer}>
+        <StatusBar backgroundColor="#f9f9f9" />
 
-      {index > 0 && (
-        <View style={styles.newDrugSeparator}>
-          <Text style={styles.newDrugTitle}>New Drug</Text>
+        {index > 0 && (
+          <View style={styles.newDrugSeparator}>
+            <Text style={styles.newDrugTitle}>New Drug</Text>
+          </View>
+        )}
+        <FieldLabel label="GTIN" />
+        <View style={styles.barcodeInputContainer}>
+          <TextInput
+            ref={inputRefs.gtin}
+            style={[styles.input, validationErrors[index]?.gtin ? styles.inputError : null]}
+            placeholder="GTIN"
+            value={form.gtin}
+            onChangeText={(text) => handleFieldChange(index, "gtin", text)}
+            onFocus={() => setIsInputFocused(true)}
+            onBlur={() => setIsInputFocused(false)}
+          />
+          <TouchableOpacity onPress={() => openCamera(index)} style={styles.barcodeIcon}>
+            <Image source={require("./assets/2d.png")} style={styles.barcodeImage} />
+          </TouchableOpacity>
         </View>
-      )}
-      <FieldLabel label="GTIN" />
-      <View style={styles.barcodeInputContainer}>
+        {validationErrors[index]?.gtin && <Text style={styles.errorMessage}>{validationErrors[index].gtin}</Text>}
+
+        <FieldLabel label="Batch Lot Number" />
         <TextInput
-          ref={inputRefs.gtin}
-          style={[styles.input, validationErrors[index]?.gtin ? styles.inputError : null]}
-          placeholder="GTIN"
-          value={form.gtin}
-          onChangeText={text => handleFieldChange(index, 'gtin', text)}
+          ref={inputRefs.lotNumber}
+          style={[styles.input, validationErrors[index]?.lotNumber ? styles.inputError : null]}
+          placeholder="Batch Lot Number"
+          value={form.lotNumber}
+          onChangeText={(text) => handleFieldChange(index, "lotNumber", text)}
           onFocus={() => setIsInputFocused(true)}
           onBlur={() => setIsInputFocused(false)}
         />
-        <TouchableOpacity onPress={() => openCamera(index)} style={styles.barcodeIcon}>
-          <Image source={require("./assets/2d.png")} style={styles.barcodeImage} />
-        </TouchableOpacity>
-      </View>
-      {validationErrors[index]?.gtin && <Text style={styles.errorMessage}>{validationErrors[index].gtin}</Text>}
+        {validationErrors[index]?.lotNumber && (
+          <Text style={styles.errorMessage}>{validationErrors[index].lotNumber}</Text>
+        )}
 
-      <FieldLabel label="Batch Lot Number" />
-      <TextInput
-        ref={inputRefs.lotNumber}
-        style={[styles.input, validationErrors[index]?.lotNumber ? styles.inputError : null]}
-        placeholder="Batch Lot Number"
-        value={form.lotNumber}
-        onChangeText={text => handleFieldChange(index, 'lotNumber', text)}
-        onFocus={() => setIsInputFocused(true)}
-        onBlur={() => setIsInputFocused(false)}
-      />
-      {validationErrors[index]?.lotNumber && <Text style={styles.errorMessage}>{validationErrors[index].lotNumber}</Text>}
+        <FieldLabel label="Expiry Date" />
+        <TextInput
+          ref={inputRefs.expiryDate}
+          style={[styles.input, validationErrors[index]?.expiryDate ? styles.inputError : null]}
+          placeholder="Expiry Date"
+          value={form.expiryDate}
+          onChangeText={(text) => handleFieldChange(index, "expiryDate", text)}
+          onFocus={() => setIsInputFocused(true)}
+          onBlur={() => setIsInputFocused(false)}
+        />
+        {validationErrors[index]?.expiryDate && (
+          <Text style={styles.errorMessage}>{validationErrors[index].expiryDate}</Text>
+        )}
 
-      <FieldLabel label="Expiry Date" />
-      <TextInput
-        ref={inputRefs.expiryDate}
-        style={[styles.input, validationErrors[index]?.expiryDate ? styles.inputError : null]}
-        placeholder="Expiry Date"
-        value={form.expiryDate}
-        onChangeText={text => handleFieldChange(index, 'expiryDate', text)}
-        onFocus={() => setIsInputFocused(true)}
-        onBlur={() => setIsInputFocused(false)}
-      />
-      {validationErrors[index]?.expiryDate && <Text style={styles.errorMessage}>{validationErrors[index].expiryDate}</Text>}
+        <FieldLabel label="Serial Number" />
+        <TextInput
+          ref={inputRefs.serialNumber}
+          style={[styles.input, validationErrors[index]?.serialNumber ? styles.inputError : null]}
+          placeholder="Serial Number"
+          value={form.serialNumber}
+          onChangeText={(text) => handleFieldChange(index, "serialNumber", text)}
+          onFocus={() => setIsInputFocused(true)}
+          onBlur={() => setIsInputFocused(false)}
+        />
+        {validationErrors[index]?.serialNumber && (
+          <Text style={styles.errorMessage}>{validationErrors[index].serialNumber}</Text>
+        )}
+        {form.isSerialNumberGenerated && <Text style={styles.generatedMessage}>Generated by the system</Text>}
 
-      <FieldLabel label="Serial Number" />
-      <TextInput
-        ref={inputRefs.serialNumber}
-        style={[styles.input, validationErrors[index]?.serialNumber ? styles.inputError : null]}
-        placeholder="Serial Number"
-        value={form.serialNumber}
-        onChangeText={text => handleFieldChange(index, 'serialNumber', text)}
-        onFocus={() => setIsInputFocused(true)}
-        onBlur={() => setIsInputFocused(false)}
-      />
-      {validationErrors[index]?.serialNumber && <Text style={styles.errorMessage}>{validationErrors[index].serialNumber}</Text>}
+        <View style={styles.medicationDetailsContainer}>
+          <View style={styles.line} />
+          <Text style={styles.detailsText}>Medication Details</Text>
+          <View style={styles.line} />
+        </View>
 
-      <View style={styles.medicationDetailsContainer}>
-    <View style={styles.line} />
-    <Text style={styles.detailsText}>Medication Details</Text>
-    <View style={styles.line} />
-</View>
+        <FieldLabel label="Drug Name" />
+        <DropDownPicker
+          ref={inputRefs.drugName}
+          open={form.open}
+          value={form.drugName}
+          items={drugItems}
+          setOpen={(open) => {
+            handleFieldChange(index, "open", open)
+            setIsDropDownOpen(open)
+          }}
+          setValue={(callback) => {
+            const originalValue = callback(form.drugName)
+            handleFieldChange(index, "drugName", originalValue)
+            handleFieldChange(index, "drugValid", null)
 
-      <FieldLabel label="Drug Name" />
-      <DropDownPicker
-        ref={inputRefs.drugName}
-        open={form.open}
-        value={form.drugName}
-        items={drugItems}
-        setOpen={(open) => {
-          handleFieldChange(index, 'open', open);
-          setIsDropDownOpen(open);
-        }}
-        setValue={(callback) => {
-          const originalValue = callback(form.drugName);
-          handleFieldChange(index, 'drugName', originalValue);
-          handleFieldChange(index, 'drugValid', null);
+            const selectedDrug = drugItems.find((item) => item.value === originalValue)
+            if (selectedDrug) {
+              handleFieldChange(index, "form", selectedDrug.drug.pharmaceuticalForm)
+              handleFieldChange(index, "presentation", selectedDrug.drug.presentationLabel)
 
-          const selectedDrug = drugItems.find(item => item.value === originalValue);
-          if (selectedDrug) {
-            handleFieldChange(index, 'form', selectedDrug.drug.pharmaceuticalForm);
-            handleFieldChange(index, 'presentation', selectedDrug.drug.presentationLabel);
-
-            const owner = selectedDrug.drug.owner;
-            const countryMatch = owner.match(/\(([^)]+)\)/);
-            if (countryMatch) {
-              handleFieldChange(index, 'owner', owner.replace(countryMatch[0], '').trim());
-              handleFieldChange(index, 'country', countryMatch[1]);
-            } else {
-              handleFieldChange(index, 'owner', owner.trim());
-              handleFieldChange(index, 'country', 'France');
+              const owner = selectedDrug.drug.owner
+              const countryMatch = owner.match(/$$([^)]+)$$/)
+              if (countryMatch) {
+                handleFieldChange(index, "owner", owner.replace(countryMatch[0], "").trim())
+                handleFieldChange(index, "country", countryMatch[1])
+              } else {
+                handleFieldChange(index, "owner", owner.trim())
+                handleFieldChange(index, "country", "France")
+              }
             }
-          }
-        }}
-        onChangeSearchText={(text) => {
-          fetchDrugNames(text);
-        }}
-        setItems={() => {}}
-        searchable={true}
-        placeholder="Select a drug"
-        searchPlaceholder="Search..."
-        arrowIconStyle={{ display: 'none' }}
-        style={{
-          borderWidth: 1,
-          borderColor: '#00a651',
-          borderRadius: 20,
-          padding: 5,
-          paddingLeft:10,
-          minHeight: 30,  // Set height to 30px
-          marginBottom: 10,
-          backgroundColor: '#FFFCFC',
-          marginLeft:35,
-          marginRight:35,
-          width:325,
-        }}
-        dropDownContainerStyle={{
-          backgroundColor: "#FFFCFC",
-          borderWidth: 1,
-          borderColor: '#00a651',
-          borderRadius: 10,
-          width: '90%', // Matches the GTIN input width
-          alignSelf: 'center',
-          zIndex: 1000, // Ensures dropdown appears above other elements
-          
-        }}
-      />
-      {validationErrors[index]?.drugName && <Text style={styles.errorMessage}>{validationErrors[index].drugName}</Text>}
-      {form.drugValid && <Icon name="check" size={30} color="green" style={{ marginLeft: 270 }} />}
-      {form.drugValid === false && <Text style={{ color: 'red' }}>{form.drugValidationMessage}</Text>}
+          }}
+          onChangeSearchText={(text) => {
+            fetchDrugNames(text)
+          }}
+          setItems={() => {}}
+          searchable={true}
+          placeholder="Select a drug"
+          searchPlaceholder="Search..."
+          arrowIconStyle={{ display: "none" }}
+          style={{
+            borderWidth: 1,
+            borderColor: "#00a651",
+            borderRadius: 20,
+            padding: 5,
+            paddingLeft: 10,
+            minHeight: 30, // Set height to 30px
+            marginBottom: 10,
+            backgroundColor: "#FFFCFC",
+            marginLeft: 35,
+            marginRight: 35,
+            width: 325,
+          }}
+          dropDownContainerStyle={{
+            backgroundColor: "#FFFCFC",
+            borderWidth: 1,
+            borderColor: "#00a651",
+            borderRadius: 10,
+            width: "90%", // Matches the GTIN input width
+            alignSelf: "center",
+            zIndex: 1000, // Ensures dropdown appears above other elements
+          }}
+        />
+        {validationErrors[index]?.drugName && (
+          <Text style={styles.errorMessage}>{validationErrors[index].drugName}</Text>
+        )}
+        {form.drugValid && <Icon name="check" size={30} color="green" style={{ marginLeft: 270 }} />}
+        {form.drugValid === false && <Text style={{ color: "red" }}>{form.drugValidationMessage}</Text>}
 
-      <View style={styles.row}>
-        <View style={styles.halfWidth}>
-          <FieldLabel label="Presentation *" />
-          <TextInput
-            style={[
-              styles.input, 
-              { fontSize: 12 } // Override the font size here directly
-            ]}
-            placeholder="Presentation"
-            value={form.presentation}
-            onChangeText={text => handleFieldChange(index, 'presentation', text)}
-            onFocus={() => setIsInputFocused(true)}
-            onBlur={() => setIsInputFocused(false)}
-          />
+        <View style={styles.row}>
+          <View style={styles.halfWidth}>
+            <FieldLabel label="Presentation *" />
+            <TextInput
+              style={[
+                styles.input,
+                { fontSize: 12 }, // Override the font size here directly
+              ]}
+              placeholder="Presentation"
+              value={form.presentation}
+              onChangeText={(text) => handleFieldChange(index, "presentation", text)}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
+            />
+          </View>
+          <View style={styles.halfWidth}>
+            <FieldLabel label="Form *" />
+            <TextInput
+              style={[
+                styles.input,
+                { fontSize: 12 }, // Override the font size here directly
+              ]}
+              placeholder="Form"
+              value={form.form}
+              onChangeText={(text) => handleFieldChange(index, "form", text)}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
+            />
+          </View>
         </View>
-        <View style={styles.halfWidth}>
-          <FieldLabel label="Form *" />
-          <TextInput
-            style={[
-              styles.input, 
-              { fontSize: 12 } // Override the font size here directly
-            ]}
-            placeholder="Form"
-            value={form.form}
-            onChangeText={text => handleFieldChange(index, 'form', text)}
-            onFocus={() => setIsInputFocused(true)}
-            onBlur={() => setIsInputFocused(false)}
-          />
+        <View style={styles.row}>
+          <View style={styles.halfWidth}>
+            <FieldLabel label="Laboratory *" />
+            <TextInput
+              style={[
+                styles.input,
+                { fontSize: 12 }, // Override the font size here directly
+              ]}
+              placeholder="Laboratory"
+              value={form.owner}
+              onChangeText={(text) => handleFieldChange(index, "owner", text)}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
+            />
+          </View>
+          <View style={styles.halfWidth}>
+            <FieldLabel label="Country *" />
+            <TextInput
+              style={[
+                styles.input,
+                { fontSize: 12 }, // Override the font size here directly
+              ]}
+              placeholder="Country"
+              value={form.country}
+              onChangeText={(text) => handleFieldChange(index, "country", text)}
+              onFocus={() => setIsInputFocused(true)}
+              onBlur={() => setIsInputFocused(false)}
+            />
+          </View>
         </View>
       </View>
-      <View style={styles.row}>
-        <View style={styles.halfWidth}>
-          <FieldLabel label="Laboratory *" />
-          <TextInput
-           style={[
-            styles.input, 
-            { fontSize: 12 } // Override the font size here directly
-          ]}
-            placeholder="Laboratory"
-            value={form.owner}
-            onChangeText={text => handleFieldChange(index, 'owner', text)}
-            onFocus={() => setIsInputFocused(true)}
-            onBlur={() => setIsInputFocused(false)}
-          />
-        </View>
-        <View style={styles.halfWidth}>
-          <FieldLabel label="Country *" />
-          <TextInput
-            style={[
-        styles.input, 
-        { fontSize: 12 } // Override the font size here directly
-      ]}
-            placeholder="Country"
-            value={form.country}
-            onChangeText={text => handleFieldChange(index, 'country', text)}
-            onFocus={() => setIsInputFocused(true)}
-            onBlur={() => setIsInputFocused(false)}
-          />
-        </View>
-      </View>
-    </View>
-  );
-});
+    )
+  },
+)
 
 const Donate = ({ route }) => {
-  const [username, setUsername] = useState('');
-
-    useEffect(() => {
-        const fetchUsername = async () => {
-            try {
-                const storedUsername = await AsyncStorage.getItem('username');
-                if (storedUsername) {
-                    setUsername(storedUsername);
-                }
-            } catch (error) {
-                console.error('Failed to load username:', error);
-            }
-        };
-
-        fetchUsername();
-    }, []);
-
-    useEffect(() => {
-      navigation.setOptions({
-        headerLeft: () => (
-          <TouchableOpacity onPress={() => navigation.navigate('Landing')} style={styles.backButtonContainer}>
-             
-              <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
-          </TouchableOpacity>
-      ),
-       
-        headerTitleAlign: 'center',
-        headerTitle: 'Donate',
-        headerTitleStyle: {
-         
-          fontFamily: 'RobotoCondensed-Bold',
-
-        },
-        headerStyle: {
-           // Increase the header height to accommodate the margin
-          backgroundColor: '#f9f9f9',
-          elevation: 0,            // Remove shadow on Android
-          shadowOpacity: 0,        // Remove shadow on iOS
-          borderBottomWidth: 0, 
-          
-           
-      },
-      });
-    }, [navigation, username]);  // Add packCounter to dependencies
-  
-  const { donorId, recipientId, donationPurpose, donationId } = route.params || {};
-  const navigation = useNavigation();
-  const scrollViewRef = useRef(null);
-  const batchLotRefs = useRef([]);
-  const [batchLots, setBatchLots] = useState([createEmptyBatchLot()]);
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const [type, setType] = useState(CameraType.back);
-  const [permission, setPermission] = useState(null);
-  const [cameraIndex, setCameraIndex] = useState(null);
-  const [drugItems, setDrugItems] = useState([]);
-  const [scrollEnabled, setScrollEnabled] = useState(true);
-  const [isInputFocused, setIsInputFocused] = useState(false);
-  const [isDropDownOpen, setIsDropDownOpen] = useState(false);
-  const [scrollPosition, setScrollPosition] = useState(0);
-  const [validationErrors, setValidationErrors] = useState([]);
-  const [isFormValid, setIsFormValid] = useState(false);
-  const [currentBox, setCurrentBox] = useState(1);
-  const [packCount, setPackCount] = useState(0);
-  const [boxLabelCounter, setBoxLabelCounter] = useState(1);
-  const [packCounter, setPackCounter] = useState(1);  // Initialize packCounter with 1
-  const [finishModalVisible, setFinishModalVisible] = useState(false);
-  const [newPackCount, setNewPackCount] = useState(0);
-  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
-  const [isFontLoaded, setIsFontLoaded] = useState(false);
-  const fetchFonts = async () => {
-    await Font.loadAsync({
-      'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
-      'RobotoCondensed-Medium': require('./assets/fonts/RobotoCondensed-Medium.ttf'),
-      'RobotoCondensed-Regular': require('./assets/fonts/RobotoCondensed-Regular.ttf'),
-    });
-    setIsFontLoaded(true);
-  };
+  const [username, setUsername] = useState("")
 
   useEffect(() => {
-    fetchFonts(); // Load fonts on component mount
-  }, []);
+    const fetchUsername = async () => {
+      try {
+        const storedUsername = await AsyncStorage.getItem("username")
+        if (storedUsername) {
+          setUsername(storedUsername)
+        }
+      } catch (error) {
+        console.error("Failed to load username:", error)
+      }
+    }
+
+    fetchUsername()
+  }, [])
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <TouchableOpacity onPress={() => navigation.navigate("Landing")} style={styles.backButtonContainer}>
+          <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
+        </TouchableOpacity>
+      ),
+
+      headerTitleAlign: "center",
+      headerTitle: "Donate",
+      headerTitleStyle: {
+        fontFamily: "RobotoCondensed-Bold",
+      },
+      headerStyle: {
+        // Increase the header height to accommodate the margin
+        backgroundColor: "#f9f9f9",
+        elevation: 0, // Remove shadow on Android
+        shadowOpacity: 0, // Remove shadow on iOS
+        borderBottomWidth: 0,
+      },
+    })
+  }, [navigation]) // Add packCounter to dependencies
+
+  const { donorId, recipientId, donationPurpose, donationId } = route.params || {}
+  const navigation = useNavigation()
+  const scrollViewRef = useRef(null)
+  const batchLotRefs = useRef([])
+  const [batchLots, setBatchLots] = useState([createEmptyBatchLot()])
+  const [isCameraOpen, setIsCameraOpen] = useState(false)
+  const [type, setType] = useState(CameraType.back)
+  const [permission, setPermission] = useState(null)
+  const [cameraIndex, setCameraIndex] = useState(null)
+  const [drugItems, setDrugItems] = useState([])
+  const [scrollEnabled, setScrollEnabled] = useState(true)
+  const [isInputFocused, setIsInputFocused] = useState(false)
+  const [isDropDownOpen, setIsDropDownOpen] = useState(false)
+  const [scrollPosition, setScrollPosition] = useState(0)
+  const [validationErrors, setValidationErrors] = useState([])
+  const [isFormValid, setIsFormValid] = useState(false)
+  const [currentBox, setCurrentBox] = useState(1)
+  const [packCount, setPackCount] = useState(0)
+  const [boxLabelCounter, setBoxLabelCounter] = useState(1)
+  const [packCounter, setPackCounter] = useState(1) // Initialize packCounter with 1
+  const [finishModalVisible, setFinishModalVisible] = useState(false)
+  const [newPackCount, setNewPackCount] = useState(0)
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false)
+  const [isFontLoaded, setIsFontLoaded] = useState(false)
+  const fetchFonts = async () => {
+    await Font.loadAsync({
+      "RobotoCondensed-Bold": require("./assets/fonts/RobotoCondensed-Bold.ttf"),
+      "RobotoCondensed-Medium": require("./assets/fonts/RobotoCondensed-Medium.ttf"),
+      "RobotoCondensed-Regular": require("./assets/fonts/RobotoCondensed-Regular.ttf"),
+    })
+    setIsFontLoaded(true)
+  }
+
+  useEffect(() => {
+    fetchFonts() // Load fonts on component mount
+  }, [fetchFonts])
 
   useEffect(() => {
     navigation.setOptions({
@@ -337,80 +369,83 @@ const Donate = ({ route }) => {
           <Text style={styles.packText2}>Pack(s)</Text>
         </View>
       ),
-    });
-  }, [navigation, packCounter]); 
+    })
+  }, [navigation, packCounter])
   useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setPermission(status === 'granted');
-    })();
-  }, []);
+    ;(async () => {
+      const { status } = await Camera.requestCameraPermissionsAsync()
+      setPermission(status === "granted")
+    })()
+  }, [])
 
   useEffect(() => {
-    fetchDrugNames();
-  }, []);
+    fetchDrugNames()
+  }, [])
 
   useEffect(() => {
     const createFirstBox = async () => {
       try {
-        const response = await axios.post('https://apiv2.medleb.org/boxes/add', {
+        const response = await axios.post("https://apiv2.medleb.org/boxes/add", {
           DonationId: donationId,
-          BoxLabel: `Box 1`
-        });
+          BoxLabel: `Box 1`,
+        })
 
         if (response.status === 201) {
-          setCurrentBox(response.data.BoxId);
-          setBoxLabelCounter(2);
+          setCurrentBox(response.data.BoxId)
+          setBoxLabelCounter(2)
         } else {
-          console.error('Error creating the first box');
+          console.error("Error creating the first box")
         }
       } catch (error) {
-        console.error('Error creating the first box:', error);
+        console.error("Error creating the first box:", error)
       }
-    };
+    }
 
-    createFirstBox();
-  }, [donationId]);
-
+    createFirstBox()
+  }, [donationId])
 
   useEffect(() => {
-    const keyboardDidHideListener = Keyboard.addListener(
-      'keyboardDidHide',
-      () => setIsInputFocused(false)
-    );
-    
+    const keyboardDidHideListener = Keyboard.addListener("keyboardDidHide", () => setIsInputFocused(false))
 
     const backAction = () => {
-      showExitConfirmation();
-      return true;
-    };
+      showExitConfirmation()
+      return true
+    }
 
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+    const backHandler = BackHandler.addEventListener("hardwareBackPress", backAction)
 
     return () => {
-      keyboardDidHideListener.remove();
-      backHandler.remove();
-    };
-  }, []);
+      keyboardDidHideListener.remove()
+      backHandler.remove()
+    }
+  }, [])
 
   const showExitConfirmation = () => {
     Alert.alert(
-      'Confirm Exit',
-      'Are you sure you want to cancel the Donation?',
+      "Confirm Exit",
+      "Are you sure you want to cancel the Donation?",
       [
         {
-          text: 'Cancel',
-          style: 'cancel',
+          text: "Cancel",
+          style: "cancel",
         },
         {
-          text: 'Yes',
-          onPress: () => navigation.navigate('Landing'),
+          text: "Yes",
+          onPress: () => navigation.navigate("Landing"),
         },
       ],
-      { cancelable: false }
-    );
-  };
-
+      { cancelable: false },
+    )
+  }
+  const generateUniqueSerialNumber = () => {
+    const length = Math.floor(Math.random() * (12 - 6 + 1)) + 6
+    const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    let result = ""
+    for (let i = 0; i < length; i++) {
+      result += characters.charAt(Math.floor(Math.random() * characters.length))
+    }
+    return result
+  }
   const excludedOwners = [
     "TEVA SANTE",
     "TEVA (PAYS-BAS)",
@@ -418,230 +453,250 @@ const Donate = ({ route }) => {
     "TEVA (ALLEMAGNE)",
     "TEVA PHARMA (FRANCE)",
     "TEVA PHARMA (ALLEMAGNE)",
-    "TEVA"
-  ];
+    "TEVA",
+  ]
 
-  const fetchDrugNames = async (query = '') => {
+  const fetchDrugNames = async (query = "") => {
     try {
-      const response = await axios.get(`https://data.instamed.fr/api/drugs?name=${query}`);
-      const drugsData = response.data["hydra:member"];
-      const filteredDrugsData = drugsData.filter(drug => !excludedOwners.includes(drug.owner));
+      const response = await axios.get(`https://data.instamed.fr/api/drugs?name=${query}`)
+      const drugsData = response.data["hydra:member"]
+      const filteredDrugsData = drugsData.filter((drug) => !excludedOwners.includes(drug.owner))
       const dropdownItems = filteredDrugsData.map((drug, index) => ({
         label: drug.name,
         value: `${drug.name}-${index}`,
-        drug
-      }));
-      setDrugItems(dropdownItems);
+        drug,
+      }))
+      setDrugItems(dropdownItems)
     } catch (error) {
-      console.error("Error fetching drug names:", error);
+      console.error("Error fetching drug names:", error)
     }
-  };
+  }
 
   const handleBarcodeDetected = async ({ type, data }) => {
     try {
-      const response = extractDataMatrix(data);
-      
+      const response = extractDataMatrix(data)
+
       // Close the camera immediately after scanning
-      setIsCameraOpen(false);
-  
+      setIsCameraOpen(false)
+
       // Call the checkDonationStatus API
-      const donationStatusResponse = await axios.post('https://apiv2.medleb.org/batchserial/checkDonationStatus', {
+      const donationStatusResponse = await axios.post("https://apiv2.medleb.org/batchserial/checkDonationStatus", {
         GTIN: response.gtin,
         BatchNumber: response.lot,
         SerialNumber: response.sn,
-        ExpiryDate: response.exp ? response.exp.toISOString().split('T')[0] : '',
-      });
-  
-      const { isValid, isDonated, messageEN } = donationStatusResponse.data;
-  
+        ExpiryDate: response.exp ? response.exp.toISOString().split("T")[0] : "",
+      })
+
+      const { isValid, isDonated, messageEN } = donationStatusResponse.data
+
       if (isValid) {
         setTimeout(() => {
           Alert.alert(
-            'Drug Status',
-            messageEN,  // Display the message from the API response
-            [{ text: 'OK' }]
-          );
-        }, 100);
-  
-        setIsFormValid(false);  // Disable form submission
-        return;
+            "Drug Status",
+            messageEN, // Display the message from the API response
+            [{ text: "OK" }],
+          )
+        }, 100)
+
+        setIsFormValid(false) // Disable form submission
+        return
       }
-  
+
       // If the drug is found but not donated, continue with the donation process
-      const updatedBatchLots = [...batchLots];
+      const updatedBatchLots = [...batchLots]
       updatedBatchLots[cameraIndex] = {
         ...updatedBatchLots[cameraIndex],
         gtin: response.gtin,
         lotNumber: response.lot,
-        expiryDate: response.exp ? response.exp.toISOString().split('T')[0] : '',
-        serialNumber: response.sn,
-      };
-  
-      setBatchLots(updatedBatchLots);
-  
+        expiryDate: response.exp ? response.exp.toISOString().split("T")[0] : "",
+        serialNumber: response.sn || generateUniqueSerialNumber(), // Only generate if not found in barcode
+        isSerialNumberGenerated: !response.sn, // Flag to indicate if the serial number was generated
+      }
+
+      setBatchLots(updatedBatchLots)
+
       setTimeout(() => {
-        const currentRef = batchLotRefs.current[cameraIndex];
+        const currentRef = batchLotRefs.current[cameraIndex]
         if (currentRef) {
           currentRef.measureLayout(scrollViewRef.current, (x, y) => {
-            scrollViewRef.current.scrollTo({ y, animated: true });
-          });
+            scrollViewRef.current.scrollTo({ y, animated: true })
+          })
         }
-      }, 100);
+      }, 100)
     } catch (error) {
-      console.error("Error checking donation status or parsing scanned data:", error);
-      Alert.alert("Error", "Failed to check donation status. Please try again.");
+      console.error("Error checking donation status or parsing scanned data:", error)
+      Alert.alert("Error", "Failed to check donation status. Please try again.")
     }
-  };
-  
-  
+  }
 
   const extractDataMatrix = (code) => {
-    const response = { gtin: '', lot: '', sn: '', exp: null };
-    let responseCode = code;
+    const response = { gtin: "", lot: "", sn: "", exp: null }
+    let responseCode = code
 
     const prefixes = [
-      { prefix: '01', key: 'gtin', length: 14 },
-      { prefix: '17', key: 'exp', length: 6 }
-    ];
+      { prefix: "01", key: "gtin", length: 14 },
+      { prefix: "17", key: "exp", length: 6 },
+    ]
 
     prefixes.forEach(({ prefix, key, length }) => {
-      const position = responseCode.indexOf(prefix);
+      const position = responseCode.indexOf(prefix)
 
       if (position !== -1) {
-        const start = position + prefix.length;
-        const end = start + length;
+        const start = position + prefix.length
+        const end = start + length
 
-        response[key] = key === 'exp' ? parseExpiryDate(responseCode.substring(start, end)) : responseCode.substring(start, end);
-        responseCode = responseCode.slice(0, position) + responseCode.slice(end);
+        response[key] =
+          key === "exp" ? parseExpiryDate(responseCode.substring(start, end)) : responseCode.substring(start, end)
+        responseCode = responseCode.slice(0, position) + responseCode.slice(end)
       }
-    });
+    })
 
-    const lotAndSn = extractLotAndSn(responseCode);
-    response.lot = lotAndSn.lot;
-    response.sn = lotAndSn.sn;
+    const lotAndSn = extractLotAndSn(responseCode)
+    response.lot = lotAndSn.lot
+    response.sn = lotAndSn.sn
 
-    return response;
-  };
+    return response
+  }
 
   const extractLotAndSn = (responseCode) => {
-    const lotPattern = /10([^\u001d]*)/;
-    const snPattern = /21([^\u001d]*)/;
+    const lotPattern = /10([^\u001d]*)/
+    const snPattern = /21([^\u001d]*)/
 
-    const snMatch = responseCode.match(snPattern);
-    let sn = '';
-    let lot = '';
+    const snMatch = responseCode.match(snPattern)
+    let sn = ""
+    let lot = ""
 
     if (snMatch) {
-      const snPosition = snMatch.index;
-      sn = snMatch[1].trim();
-      const remainingCode = responseCode.slice(0, snPosition) + responseCode.slice(snPosition + snMatch[0].length);
+      const snPosition = snMatch.index
+      sn = snMatch[1].trim()
+      const remainingCode = responseCode.slice(0, snPosition) + responseCode.slice(snPosition + snMatch[0].length)
 
-      const lotMatch = remainingCode.match(lotPattern);
+      const lotMatch = remainingCode.match(lotPattern)
       if (lotMatch) {
-        lot = lotMatch[1].trim();
+        lot = lotMatch[1].trim()
       }
     } else {
-      const lotMatch = responseCode.match(lotPattern);
+      const lotMatch = responseCode.match(lotPattern)
       if (lotMatch) {
-        lot = lotMatch[1].trim();
+        lot = lotMatch[1].trim()
       }
     }
 
-    return { lot, sn };
-  };
+    return { lot, sn }
+  }
 
   const parseExpiryDate = (expDateString) => {
-    const year = parseInt(expDateString.substring(0, 2)) + 2000;
-    const month = parseInt(expDateString.substring(2, 4)) - 1;
-    const day = parseInt(expDateString.substring(4, 6));
-    return new Date(year, month, day);
-  };
+    const year = Number.parseInt(expDateString.substring(0, 2)) + 2000
+    const month = Number.parseInt(expDateString.substring(2, 4)) - 1
+    const day = Number.parseInt(expDateString.substring(4, 6))
+    return new Date(year, month, day)
+  }
 
   const handleOpenCamera = async (index) => {
     if (permission === null) {
-      const { status } = await Camera.requestPermissionsAsync();
-      setPermission(status === 'granted');
-      setIsCameraOpen(status === 'granted');
-      setCameraIndex(index);
-      if (!status === 'granted') {
-        Alert.alert('Permission denied', 'Camera permission is required to use the camera.');
+      const { status } = await Camera.requestPermissionsAsync()
+      setPermission(status === "granted")
+      setIsCameraOpen(status === "granted")
+      setCameraIndex(index)
+      if (!status === "granted") {
+        Alert.alert("Permission denied", "Camera permission is required to use the camera.")
       }
     } else if (permission === false) {
-      Alert.alert('Permission denied', 'Camera permission is required to use the camera.');
+      Alert.alert("Permission denied", "Camera permission is required to use the camera.")
     } else {
-      const currentRef = batchLotRefs.current[index];
+      const currentRef = batchLotRefs.current[index]
       if (currentRef) {
         currentRef.measureLayout(scrollViewRef.current, (x, y) => {
-          setScrollPosition(y);
-        });
+          setScrollPosition(y)
+        })
       }
-      setIsCameraOpen(true);
-      setCameraIndex(index);
+      setIsCameraOpen(true)
+      setCameraIndex(index)
     }
-  };
+  }
 
   const checkDrugNameInAPI = async (index, selectedValue) => {
     try {
-      const response = await axios.get(`https://apiv2.medleb.org/drugs/checkDrugNameInAPI/${selectedValue}`);
-      const drugExists = response.data.exists;
-      const updatedBatchLots = [...batchLots];
-      updatedBatchLots[index].drugValid = drugExists;
+      const response = await axios.get(`https://apiv2.medleb.org/drugs/checkDrugNameInAPI/${selectedValue}`)
+      const drugExists = response.data.exists
+      const updatedBatchLots = [...batchLots]
+      updatedBatchLots[index].drugValid = drugExists
 
       if (drugExists) {
-        updatedBatchLots[index].drugName = selectedValue;
-        updatedBatchLots[index].drugValidationMessage = '';
+        updatedBatchLots[index].drugName = selectedValue
+        updatedBatchLots[index].drugValidationMessage = ""
       } else {
-        updatedBatchLots[index].drugValidationMessage = "This drug isn't found in your country's database";
+        updatedBatchLots[index].drugValidationMessage = "This drug isn't found in your country's database"
       }
-      setBatchLots(updatedBatchLots);
+      setBatchLots(updatedBatchLots)
     } catch (error) {
-      console.error("Error checking drug name:", error);
-      const updatedBatchLots = [...batchLots];
-      updatedBatchLots[index].drugValidationMessage = "Error checking the database";
-      updatedBatchLots[index].drugValid = false;
-      setBatchLots(updatedBatchLots);
+      console.error("Error checking drug name:", error)
+      const updatedBatchLots = [...batchLots]
+      updatedBatchLots[index].drugValidationMessage = "Error checking the database"
+      updatedBatchLots[index].drugValid = false
+      setBatchLots(updatedBatchLots)
     }
-  };
+  }
 
   const checkFormValidity = () => {
-    const allFilled = batchLots.every(batchLot => {
-      const requiredFields = ['gtin', 'lotNumber', 'expiryDate', 'serialNumber', 'drugName', 'presentation', 'form', 'owner', 'country'];
-      return requiredFields.every(field => batchLot[field] && batchLot[field].trim() !== '');
-    });
+    const allFilled = batchLots.every((batchLot) => {
+      const requiredFields = [
+        "gtin",
+        "lotNumber",
+        "expiryDate",
+        "serialNumber",
+        "drugName",
+        "presentation",
+        "form",
+        "owner",
+        "country",
+      ]
+      return requiredFields.every((field) => batchLot[field] && batchLot[field].trim() !== "")
+    })
 
-    setIsFormValid(allFilled);
-  };
+    setIsFormValid(allFilled)
+  }
 
   const handleFieldChange = (index, field, value) => {
-    setBatchLots(prevBatchLots => {
-      const updatedBatchLots = [...prevBatchLots];
-      updatedBatchLots[index][field] = value;
+    setBatchLots((prevBatchLots) => {
+      const updatedBatchLots = [...prevBatchLots]
+      updatedBatchLots[index][field] = value
 
-      const updatedValidationErrors = [...validationErrors];
+      const updatedValidationErrors = [...validationErrors]
       if (updatedValidationErrors[index]) {
-        delete updatedValidationErrors[index][field];
+        delete updatedValidationErrors[index][field]
       }
-      setValidationErrors(updatedValidationErrors);
+      setValidationErrors(updatedValidationErrors)
 
-      return updatedBatchLots;
-    }, () => checkFormValidity());
-  };
+      return updatedBatchLots
+    })
+  }
 
   useEffect(() => {
-    checkFormValidity();
-  }, [batchLots]);
+    checkFormValidity()
+  }, [batchLots])
 
   const addBatchLotForm = () => {
-    setBatchLots([...batchLots, createEmptyBatchLot()]);
-    setPackCounter(packCounter + 1);  // Increment packCounter on adding more batch lots
-    console.log(packCounter);
-
-  };
+    setBatchLots([...batchLots, createEmptyBatchLot()])
+    setPackCounter(packCounter + 1) // Increment packCounter on adding more batch lots
+    console.log(packCounter)
+  }
 
   const exportToExcel = async (donationData, donorName, recipientName, donationDate) => {
     try {
-      const tableHead = ['Drug Name', 'GTIN', 'LOT', 'Serial Number', 'Expiry Date', 'Form', 'Presentation', 'Owner', 'Country', 'Donation Date'];
-      const filteredData = donationData.map(batchLot => [
+      const tableHead = [
+        "Drug Name",
+        "GTIN",
+        "LOT",
+        "Serial Number",
+        "Expiry Date",
+        "Form",
+        "Presentation",
+        "Owner",
+        "Country",
+        "Donation Date",
+      ]
+      const filteredData = donationData.map((batchLot) => [
         batchLot.drugName,
         batchLot.gtin,
         batchLot.lotNumber,
@@ -651,12 +706,12 @@ const Donate = ({ route }) => {
         batchLot.presentation,
         batchLot.owner,
         batchLot.country,
-        batchLot.donationDate
-      ]);
+        batchLot.donationDate,
+      ])
 
-      const ws = XLSX.utils.aoa_to_sheet([tableHead, ...filteredData]);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Donations");
+      const ws = XLSX.utils.aoa_to_sheet([tableHead, ...filteredData])
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, "Donations")
 
       const wscols = [
         { wch: 20 },
@@ -669,182 +724,215 @@ const Donate = ({ route }) => {
         { wch: 15 },
         { wch: 15 },
         { wch: 20 },
-      ];
-      ws['!cols'] = wscols;
+      ]
+      ws["!cols"] = wscols
 
-      const wbout = XLSX.write(wb, { type: 'base64', bookType: "xlsx" });
+      const wbout = XLSX.write(wb, { type: "base64", bookType: "xlsx" })
 
-      const fileName = `${donorName.replace(/[^a-zA-Z0-9]/g, '_')}_${recipientName.replace(/[^a-zA-Z0-9]/g, '_')}_${donationDate.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
-      const uri = FileSystem.documentDirectory + fileName;
+      const fileName = `${donorName.replace(/[^a-zA-Z0-9]/g, "_")}_${recipientName.replace(/[^a-zA-Z0-9]/g, "_")}_${donationDate.replace(/[^a-zA-Z0-9]/g, "_")}.xlsx`
+      const uri = FileSystem.documentDirectory + fileName
 
       await FileSystem.writeAsStringAsync(uri, wbout, {
-        encoding: FileSystem.EncodingType.Base64
-      });
+        encoding: FileSystem.EncodingType.Base64,
+      })
 
       const shareOptions = {
-        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        dialogTitle: 'Share Donations Excel',
-        UTI: 'com.microsoft.excel.xlsx',
-      };
+        mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        dialogTitle: "Share Donations Excel",
+        UTI: "com.microsoft.excel.xlsx",
+      }
 
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, shareOptions);
+        await Sharing.shareAsync(uri, shareOptions)
       } else {
-        Alert.alert("Success", "Excel file has been saved to your device's storage.", [{ text: "OK" }]);
+        Alert.alert("Success", "Excel file has been saved to your device's storage.", [{ text: "OK" }])
       }
     } catch (error) {
-      console.error("Error exporting to Excel:", error);
-      Alert.alert("Error", `Failed to export to Excel. Please try again. ${error.message}`, [{ text: "OK" }]);
+      console.error("Error exporting to Excel:", error)
+      Alert.alert("Error", `Failed to export to Excel. Please try again. ${error.message}`, [{ text: "OK" }])
     }
-  };
+  }
 
   const validateFields = () => {
-    let isAllFieldsValid = true;
+    let isAllFieldsValid = true
     const updatedValidationErrors = batchLots.map((batchLot, index) => {
-      const errors = {};
-      const requiredFields = ['gtin', 'lotNumber', 'expiryDate', 'serialNumber', 'drugName', 'presentation', 'form', 'owner', 'country'];
-      requiredFields.forEach(field => {
-        if (!batchLot[field] || batchLot[field].trim() === '') {
-          errors[field] = 'This field is required';
-          isAllFieldsValid = false;
+      const errors = {}
+      const requiredFields = [
+        "gtin",
+        "lotNumber",
+        "expiryDate",
+        "serialNumber",
+        "drugName",
+        "presentation",
+        "form",
+        "owner",
+        "country",
+      ]
+      requiredFields.forEach((field) => {
+        if (!batchLot[field] || batchLot[field].trim() === "") {
+          errors[field] = "This field is required"
+          isAllFieldsValid = false
         }
-      });
-      return errors;
-    });
+      })
+      return errors
+    })
 
-    setValidationErrors(updatedValidationErrors);
-    return isAllFieldsValid;
-  };
+    setValidationErrors(updatedValidationErrors)
+    return isAllFieldsValid
+  }
 
   const scrollToField = (index, field) => {
-    const currentRef = batchLotRefs.current[index];
+    const currentRef = batchLotRefs.current[index]
     if (currentRef && currentRef[field]) {
       currentRef[field].current.measureLayout(scrollViewRef.current, (x, y) => {
-        scrollViewRef.current.scrollTo({ y, animated: true });
-      });
+        scrollViewRef.current.scrollTo({ y, animated: true })
+      })
     }
-  };
+  }
+
+  // ...existing code...
 
   const submitBatchLot = async () => {
     if (!validateFields()) {
-      return;
+      return
     }
 
     try {
-      const responses = await Promise.all(batchLots.map(batchLot =>
-        axios.post('https://apiv2.medleb.org/donation/batchlot', {
-          DonationId: donationId,
-          DrugName: batchLot.drugName,
-          GTIN: batchLot.gtin,
-          LOT: batchLot.lotNumber,
-          ProductionDate: new Date().toISOString(),
-          ExpiryDate: batchLot.expiryDate,
-          Presentation: batchLot.presentation,
-          Form: batchLot.form,
-          Laboratory: batchLot.owner,
-          LaboratoryCountry: batchLot.country,
-          SerialNumber: batchLot.serialNumber,
-          DonationDate: batchLot.donationDate,
-          BoxId: currentBox,
-        })
-      ));
+      console.log("Submitting batch lots...")
+      const responses = await Promise.all(
+        batchLots.map((batchLot) =>
+          axios.post("https://apiv2.medleb.org/donation/batchlot", {
+            DonationId: donationId,
+            DrugName: batchLot.drugName,
+            GTIN: batchLot.gtin,
+            LOT: batchLot.lotNumber,
+            ProductionDate: new Date().toISOString(),
+            ExpiryDate: batchLot.expiryDate,
+            Presentation: batchLot.presentation,
+            Form: batchLot.form,
+            Laboratory: batchLot.owner,
+            LaboratoryCountry: batchLot.country,
+            SerialNumber: batchLot.serialNumber,
+            DonationDate: batchLot.donationDate,
+            BoxId: currentBox,
+          }),
+        ),
+      )
 
-      if (responses.every(response => response.status === 200)) {
-        const newPackCount = packCount + batchLots.length;
-        setPackCount(newPackCount);
-      
-        await axios.put(`https://apiv2.medleb.org/boxes/${currentBox}`, { NumberOfPacks: newPackCount });
-      
-        setNewPackCount(newPackCount); // Store new pack count in state
-        setFinishModalVisible(true); // Show the custom modal
+      if (responses.every((response) => response.status === 200)) {
+        console.log("Batch lots submitted successfully.")
+        const newPackCount = packCount + batchLots.length
+        setPackCount(newPackCount)
+
+        await axios.put(`https://apiv2.medleb.org/boxes/${currentBox}`, { NumberOfPacks: newPackCount })
+        console.log("Box updated with new pack count.")
+
+        setNewPackCount(newPackCount) // Store new pack count in state
+        setFinishModalVisible(true) // Show the custom modal
       } else {
-        Alert.alert('Warning', 'Make sure you entered all of the required fields correctly');
+        console.warn("Some batch lots were not submitted successfully.")
+        Alert.alert("Warning", "Make sure you entered all of the required fields correctly")
       }
     } catch (error) {
-      console.error('Error creating batch lot:', error);
-      Alert.alert('Warning', 'Make sure you scanned the barcode and entered all of the fields correctly');
+      console.error("Error creating batch lot or recipient agreement:", error)
+      Alert.alert("Warning", "Make sure you scanned the barcode and entered all of the fields correctly")
     }
-  };
+  }
+
+  // ...existing code...
 
   const handleAddAnotherBox = async () => {
     try {
-      const response = await axios.post('https://apiv2.medleb.org/boxes/add', {
+      const response = await axios.post("https://apiv2.medleb.org/boxes/add", {
         DonationId: donationId,
-        BoxLabel: `Box ${boxLabelCounter}`
-      });
+        BoxLabel: `Box ${boxLabelCounter}`,
+      })
 
       if (response.status === 201) {
-        setCurrentBox(response.data.BoxId);
-        setBoxLabelCounter(prevCounter => prevCounter + 1);
-        setBatchLots([createEmptyBatchLot()]);
+        setCurrentBox(response.data.BoxId)
+        setBoxLabelCounter((prevCounter) => prevCounter + 1)
+        setBatchLots([createEmptyBatchLot()])
       } else {
-        Alert.alert('Error', 'Failed to add a new box.');
+        Alert.alert("Error", "Failed to add a new box.")
       }
     } catch (error) {
-      console.error('Error adding new box:', error);
-      Alert.alert('Error', 'An error occurred while adding a new box.');
+      console.error("Error adding new box:", error)
+      Alert.alert("Error", "An error occurred while adding a new box.")
     }
-  };
+  }
 
   const handleFinishDonation = () => {
-   setConfirmModalVisible(true);
-  };
-
+    setConfirmModalVisible(true)
+  }
+  const createAgreement = async () => {
+    try {
+      console.log("Creating recipient agreement...")
+      const agreementResponse = await axios.post("https://apiv2.medleb.org/RecipientAgreements/add", {
+        DonationId: donationId,
+        DonorId: donorId,
+        RecipientId: recipientId,
+        Agreed_Upon: "pending",
+      })
+      console.log("Recipient agreement created successfully:", agreementResponse.data)
+    } catch (error) {
+      console.error("Error creating recipient agreement:", error)
+    }
+  }
   const handleNavigation = (routeName) => {
     Alert.alert(
-      'Confirm Navigation',
-      'Are you sure you want to leave this page?',
+      "Confirm Navigation",
+      "Are you sure you want to leave this page?",
       [
         {
-          text: 'Cancel',
-          style: 'cancel',
+          text: "Cancel",
+          style: "cancel",
         },
         {
-          text: 'Yes',
+          text: "Yes",
           onPress: () => navigation.navigate(routeName),
         },
       ],
-      { cancelable: false }
-    );
-  };
+      { cancelable: false },
+    )
+  }
 
   return (
     <View style={styles.container}>
       {isCameraOpen ? (
         <BarCodeScanner
-          style={{ ...StyleSheet.absoluteFillObject, height: '100%' }}
+          style={{ ...StyleSheet.absoluteFillObject, height: "100%" }}
           type={type}
           onBarCodeScanned={handleBarcodeDetected}
-      />
+        />
       ) : (
         <ScrollView
           ref={scrollViewRef}
-          onScroll={event => setScrollPosition(event.nativeEvent.contentOffset.y)}
+          onScroll={(event) => setScrollPosition(event.nativeEvent.contentOffset.y)}
           scrollEventThrottle={16}
-          contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between' }}
+          contentContainerStyle={{ flexGrow: 1, justifyContent: "space-between" }}
           scrollEnabled={scrollEnabled}
         >
           <View style={styles.originalFormContainer}>
-            <TouchableOpacity onPress={() => handleOpenCamera(0)} activeOpacity={0.6} style={styles.cameraContainer} ref={el => batchLotRefs.current[0] = el}>
-              {batchLots[0].gtin === '' && (
-                <Image
-                  source={require("./assets/2d.png")}
-                  style={styles.cameraImage}
-                />
-              )}
+            <TouchableOpacity
+              onPress={() => handleOpenCamera(0)}
+              activeOpacity={0.6}
+              style={styles.cameraContainer}
+              ref={(el) => (batchLotRefs.current[0] = el)}
+            >
+              {batchLots[0].gtin === "" && <Image source={require("./assets/2d.png")} style={styles.cameraImage} />}
             </TouchableOpacity>
 
             <View style={styles.barcodeContainer}>
-            <FieldLabel label="GTIN*" />
+              <FieldLabel label="GTIN*" />
               <TextInput
                 style={[styles.input, validationErrors[0] && validationErrors[0].gtin ? styles.inputError : null]}
                 placeholder="GTIN"
                 value={batchLots[0].gtin}
-                onChangeText={text => handleFieldChange(0, 'gtin', text)}
+                onChangeText={(text) => handleFieldChange(0, "gtin", text)}
                 onFocus={() => setIsInputFocused(true)}
                 onBlur={() => {
-                  setIsInputFocused(false);
-                  validateFields();
+                  setIsInputFocused(false)
+                  validateFields()
                 }}
               />
               {validationErrors[0] && validationErrors[0].gtin && (
@@ -856,161 +944,167 @@ const Donate = ({ route }) => {
                 style={[styles.input, validationErrors[0]?.lotNumber ? styles.inputError : null]}
                 placeholder="Batch Lot number"
                 value={batchLots[0].lotNumber}
-                onChangeText={text => handleFieldChange(0, 'lotNumber', text)}
+                onChangeText={(text) => handleFieldChange(0, "lotNumber", text)}
                 onFocus={() => setIsInputFocused(true)}
                 onBlur={() => setIsInputFocused(false)}
               />
-              {validationErrors[0]?.lotNumber && <Text style={styles.errorMessage}>{validationErrors[0].lotNumber}</Text>}
+              {validationErrors[0]?.lotNumber && (
+                <Text style={styles.errorMessage}>{validationErrors[0].lotNumber}</Text>
+              )}
               <FieldLabel label="Expiry Date*" />
               <TextInput
                 style={[styles.input, validationErrors[0]?.expiryDate ? styles.inputError : null]}
                 placeholder="Expiry Date"
                 value={batchLots[0].expiryDate}
-                onChangeText={text => handleFieldChange(0, 'expiryDate', text)}
+                onChangeText={(text) => handleFieldChange(0, "expiryDate", text)}
                 onFocus={() => setIsInputFocused(true)}
                 onBlur={() => setIsInputFocused(false)}
               />
-              {validationErrors[0]?.expiryDate && <Text style={styles.errorMessage}>{validationErrors[0].expiryDate}</Text>}
+              {validationErrors[0]?.expiryDate && (
+                <Text style={styles.errorMessage}>{validationErrors[0].expiryDate}</Text>
+              )}
               <FieldLabel label="Serial Number*" />
               <TextInput
                 style={[styles.input, validationErrors[0]?.serialNumber ? styles.inputError : null]}
                 placeholder="Serial Number"
                 value={batchLots[0].serialNumber}
-                onChangeText={text => handleFieldChange(0, 'serialNumber', text)}
+                onChangeText={(text) => handleFieldChange(0, "serialNumber", text)}
                 onFocus={() => setIsInputFocused(true)}
                 onBlur={() => setIsInputFocused(false)}
               />
-              {validationErrors[0]?.serialNumber && <Text style={styles.errorMessage}>{validationErrors[0].serialNumber}</Text>}
+              {validationErrors[0]?.serialNumber && (
+                <Text style={styles.errorMessage}>{validationErrors[0].serialNumber}</Text>
+              )}
             </View>
 
-
             <View style={styles.detailsContainer}>
-            <View style={styles.medicationDetailsContainer}>
-    <View style={styles.line} />
-    <Text style={styles.detailsText}>Medication Details</Text>
-    <View style={styles.line} />
-</View>
+              <View style={styles.medicationDetailsContainer}>
+                <View style={styles.line} />
+                <Text style={styles.detailsText}>Medication Details</Text>
+                <View style={styles.line} />
+              </View>
 
               <DropDownPicker
                 open={batchLots[0].open}
                 value={batchLots[0].drugName}
                 items={drugItems}
                 setOpen={(open) => {
-                  handleFieldChange(0, 'open', open);
-                  setIsDropDownOpen(open);
+                  handleFieldChange(0, "open", open)
+                  setIsDropDownOpen(open)
                 }}
                 setValue={(callback) => {
-                  const originalValue = callback(batchLots[0].drugName);
-                  handleFieldChange(0, 'drugName', originalValue);
-                  handleFieldChange(0, 'drugValid', null);
+                  const originalValue = callback(batchLots[0].drugName)
+                  handleFieldChange(0, "drugName", originalValue)
+                  handleFieldChange(0, "drugValid", null)
 
-                  const selectedDrug = drugItems.find(item => item.value === originalValue);
+                  const selectedDrug = drugItems.find((item) => item.value === originalValue)
                   if (selectedDrug) {
-                    handleFieldChange(0, 'form', selectedDrug.drug.pharmaceuticalForm);
-                    handleFieldChange(0, 'presentation', selectedDrug.drug.presentationLabel);
+                    handleFieldChange(0, "form", selectedDrug.drug.pharmaceuticalForm)
+                    handleFieldChange(0, "presentation", selectedDrug.drug.presentationLabel)
 
-                    const owner = selectedDrug.drug.owner;
-                    const countryMatch = owner.match(/\(([^)]+)\)/);
+                    const owner = selectedDrug.drug.owner
+                    const countryMatch = owner.match(/$$([^)]+)$$/)
                     if (countryMatch) {
-                      handleFieldChange(0, 'owner', owner.replace(countryMatch[0], '').trim());
-                      handleFieldChange(0, 'country', countryMatch[1]);
+                      handleFieldChange(0, "owner", owner.replace(countryMatch[0], "").trim())
+                      handleFieldChange(0, "country", countryMatch[1])
                     } else {
-                      handleFieldChange(0, 'owner', owner.trim());
-                      handleFieldChange(0, 'country', 'France');
+                      handleFieldChange(0, "owner", owner.trim())
+                      handleFieldChange(0, "country", "France")
                     }
                   }
                 }}
                 onChangeSearchText={(text) => {
-                  fetchDrugNames(text);
+                  fetchDrugNames(text)
                 }}
                 setItems={() => {}}
                 searchable={true}
                 placeholder="Select a drug"
                 searchPlaceholder="Search..."
-                arrowIconStyle={{ display: 'none' }}
+                arrowIconStyle={{ display: "none" }}
                 style={{
                   borderWidth: 1,
-                  borderColor: '#00a651',
+                  borderColor: "#00a651",
                   borderRadius: 20,
                   padding: 5,
-                  paddingLeft:10,
-                  minHeight: 30,  // Set height to 30px
+                  paddingLeft: 10,
+                  minHeight: 30, // Set height to 30px
                   marginBottom: 10,
                   backgroundColor: "#FFFCFC",
-                  marginLeft:35,
-                  marginRight:35,
-                  width:325,
+                  marginLeft: 35,
+                  marginRight: 35,
+                  width: 325,
                 }}
                 dropDownContainerStyle={{
                   backgroundColor: "#FFFCFC",
                   borderWidth: 1,
-                  borderColor: '#00a651',
+                  borderColor: "#00a651",
                   borderRadius: 10,
-                  width: '90%', // Matches the GTIN input width
-                  alignSelf: 'center',
+                  width: "90%", // Matches the GTIN input width
+                  alignSelf: "center",
                   zIndex: 1000, // Ensures dropdown appears above other elements
                 }}
               />
 
               {batchLots[0].drugValid && <Icon name="check" size={30} color="green" style={{ marginLeft: 270 }} />}
-              {batchLots[0].drugValid === false && <Text style={{ color: 'red' }}>{batchLots[0].drugValidationMessage}</Text>}
+              {batchLots[0].drugValid === false && (
+                <Text style={{ color: "red" }}>{batchLots[0].drugValidationMessage}</Text>
+              )}
 
               <View style={styles.detailsContainer}>
+                {/* Presentation and Form side by side */}
+                <View style={styles.row}>
+                  <View style={styles.halfWidth}>
+                    <FieldLabel label="Presentation *" />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Presentation"
+                      value={batchLots[0].presentation}
+                      onChangeText={(text) => handleFieldChange(0, "presentation", text)}
+                      onFocus={() => setIsInputFocused(true)}
+                      onBlur={() => setIsInputFocused(false)}
+                    />
+                  </View>
+                  <View style={styles.halfWidth}>
+                    <FieldLabel label="Form *" />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Form"
+                      value={batchLots[0].form}
+                      onChangeText={(text) => handleFieldChange(0, "form", text)}
+                      onFocus={() => setIsInputFocused(true)}
+                      onBlur={() => setIsInputFocused(false)}
+                    />
+                  </View>
+                </View>
 
-    {/* Presentation and Form side by side */}
-    <View style={styles.row}>
-        <View style={styles.halfWidth}>
-            <FieldLabel label="Presentation *" />
-            <TextInput
-                style={styles.input}
-                placeholder="Presentation"
-                value={batchLots[0].presentation}
-                onChangeText={text => handleFieldChange(0, 'presentation', text)}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => setIsInputFocused(false)}
-            />
-        </View>
-        <View style={styles.halfWidth}>
-            <FieldLabel label="Form *" />
-            <TextInput
-                style={styles.input}
-                placeholder="Form"
-                value={batchLots[0].form}
-                onChangeText={text => handleFieldChange(0, 'form', text)}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => setIsInputFocused(false)}
-            />
-        </View>
-    </View>
-
-    {/* Laboratory and Country side by side */}
-    <View style={styles.row}>
-        <View style={styles.halfWidth}>
-            <FieldLabel label="Laboratory *" />
-            <TextInput
-                style={styles.input}
-                placeholder="Laboratory"
-                value={batchLots[0].owner}
-                onChangeText={text => handleFieldChange(0, 'owner', text)}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => setIsInputFocused(false)}
-            />
-        </View>
-        <View style={styles.halfWidth}>
-            <FieldLabel label="Country *" />
-            <TextInput
-                style={styles.input}
-                placeholder="Country"
-                value={batchLots[0].country}
-                onChangeText={text => handleFieldChange(0, 'country', text)}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => setIsInputFocused(false)}
-            />
-        </View>
-    </View>
-</View>
-</View>
-</View>
+                {/* Laboratory and Country side by side */}
+                <View style={styles.row}>
+                  <View style={styles.halfWidth}>
+                    <FieldLabel label="Laboratory *" />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Laboratory"
+                      value={batchLots[0].owner}
+                      onChangeText={(text) => handleFieldChange(0, "owner", text)}
+                      onFocus={() => setIsInputFocused(true)}
+                      onBlur={() => setIsInputFocused(false)}
+                    />
+                  </View>
+                  <View style={styles.halfWidth}>
+                    <FieldLabel label="Country *" />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Country"
+                      value={batchLots[0].country}
+                      onChangeText={(text) => handleFieldChange(0, "country", text)}
+                      onFocus={() => setIsInputFocused(true)}
+                      onBlur={() => setIsInputFocused(false)}
+                    />
+                  </View>
+                </View>
+              </View>
+            </View>
+          </View>
           {batchLots.slice(1).map((form, index) => (
             <BatchLotForm
               key={index + 1}
@@ -1024,118 +1118,115 @@ const Donate = ({ route }) => {
               setIsInputFocused={setIsInputFocused}
               setIsDropDownOpen={setIsDropDownOpen}
               validationErrors={validationErrors}
-              ref={el => batchLotRefs.current[index + 1] = el}
+              ref={(el) => (batchLotRefs.current[index + 1] = el)}
             />
           ))}
 
           <View style={styles.buttonContainer}>
-          <TouchableOpacity
-    style={[
-      styles.button, 
-      styles.addMoreButton, 
-      !isFormValid && styles.disabledAddMoreButton // Apply disabled style when form is not valid
-    ]}
-    onPress={() => isFormValid ? addBatchLotForm() : validateFields()}
-  >
-    <Text style={[styles.addMoreButtonText, !isFormValid && styles.disabledAddMoreButtonText]}>
-      Add more
-    </Text>
-  </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.button, !isFormValid ? { backgroundColor: 'grey' } : {}]}
-              onPress={() => isFormValid ? submitBatchLot() : validateFields()}
+              style={[
+                styles.button,
+                styles.addMoreButton,
+                !isFormValid && styles.disabledAddMoreButton, // Apply disabled style when form is not valid
+              ]}
+              onPress={() => (isFormValid ? addBatchLotForm() : validateFields())}
+            >
+              <Text style={[styles.addMoreButtonText, !isFormValid && styles.disabledAddMoreButtonText]}>Add more</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, !isFormValid ? { backgroundColor: "grey" } : {}]}
+              onPress={() => (isFormValid ? submitBatchLot() : validateFields())}
             >
               <Text style={styles.buttonText}>Submit</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
       )}
-      {!isCameraOpen && !isInputFocused && !isDropDownOpen && (
-        <BottomNavBar />
-      )}
+      {!isCameraOpen && !isInputFocused && !isDropDownOpen && <BottomNavBar />}
       <Modal
-  animationType="fade"
-  transparent={true}
-  visible={finishModalVisible}
-  onRequestClose={() => setFinishModalVisible(false)}
->
-  <View style={styles.modalBackground}>
-    <View style={styles.modalContainer}>
-      <Text style={styles.modalTitle}>{newPackCount} Packs in this box</Text>
-      <Text style={styles.modalSubtitle}>{`"Box ${boxLabelCounter - 1}"`}</Text>
+        animationType="fade"
+        transparent={true}
+        visible={finishModalVisible}
+        onRequestClose={() => setFinishModalVisible(false)}
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>{newPackCount} Packs in this box</Text>
+            <Text style={styles.modalSubtitle}>{`"Box ${boxLabelCounter - 1}"`}</Text>
 
-      <View style={styles.modalButtonContainer}>
-        <TouchableOpacity
-          style={[styles.modalButton, styles.addBoxButton]}
-          onPress={() => {
-            setFinishModalVisible(false);
-            handleAddAnotherBox();
-            setPackCount(0); // Reset pack count
-          }}
-        >
-          <Text style={styles.AddBoxButtonText}>Add Box</Text>
-        </TouchableOpacity>
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.addBoxButton]}
+                onPress={() => {
+                  setFinishModalVisible(false)
+                  handleAddAnotherBox()
+                  setPackCount(0) // Reset pack count
+                }}
+              >
+                <Text style={styles.AddBoxButtonText}>Add Box</Text>
+              </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.modalButton, styles.finishButton]}
-          onPress={() => {
-            setFinishModalVisible(false);
-            handleFinishDonation();
-          }}
-        >
-          <Text style={styles.modalButtonText}>Finish</Text>
-        </TouchableOpacity>
-      </View>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.finishButton]}
+                onPress={() => {
+                  setFinishModalVisible(false)
+                  handleFinishDonation()
+                }}
+              >
+                <Text style={styles.modalButtonText}>Finish</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={confirmModalVisible}
+        onRequestClose={() => setConfirmModalVisible(false)}
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Confirm finish</Text>
+            <Text style={styles.modalSubtitle}>Are you sure you want to finish the donation?</Text>
+
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.addBoxButton]}
+                onPress={() => {
+                  setConfirmModalVisible(false)
+                  createAgreement()
+                  navigation.navigate("DonorList")
+                }}
+              >
+                <Text style={styles.AddBoxButtonText}>Yes</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.finishButton]}
+                onPress={() => {
+                  setConfirmModalVisible(false)
+                }}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
-  </View>
-</Modal>
-<Modal
-  animationType="fade"
-  transparent={true}
-  visible={confirmModalVisible}
-  onRequestClose={() => setConfirmModalVisible(false)}
->
-  <View style={styles.modalBackground}>
-    <View style={styles.modalContainer}>
-      <Text style={styles.modalTitle}>Confirm finish</Text>
-      <Text style={styles.modalSubtitle}>Are you sure you want to finish the donation?</Text>
-
-      <View style={styles.modalButtonContainer}>
-        <TouchableOpacity
-          style={[styles.modalButton, styles.addBoxButton]}
-          onPress={() => {
-            setConfirmModalVisible(false);     
-            navigation.navigate('DonorList');
-          }}
-        >
-          <Text style={styles.AddBoxButtonText}>Yes</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.modalButton, styles.finishButton]}
-          onPress={() => {
-            setConfirmModalVisible(false);
-          }}
-        >
-          <Text style={styles.modalButtonText}>Cancel</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </View>
-</Modal>
-    </View>
-  );
-};
+  )
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: "#f9f9f9",
   },
   cameraContainer: {
     marginBottom: 10, // Reduced margin
-    alignItems: 'center',
-    width: '100%',
+    alignItems: "center",
+    width: "100%",
   },
   cameraImage: {
     width: 200, // Reduced width
@@ -1146,58 +1237,54 @@ const styles = StyleSheet.create({
     marginBottom: 10, // Reduced margin
   },
   barcodeInputContainer: {
-    position: 'relative',
-    
+    position: "relative",
   },
   barcodeIcon: {
-    position: 'absolute',
+    position: "absolute",
     right: 0,
     top: -5,
     height: 40, // Reduced height
     width: 40, // Reduced width
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   barcodeImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
     resizeMode: "contain",
   },
   fieldLabel: {
-    color: '#707070',
+    color: "#707070",
     fontSize: 12, // Reduced font size
     marginBottom: 3, // Reduced margin
     marginLeft: 40, // Reduced margin
-    fontFamily: 'RobotoCondensed-Bold',
-
+    fontFamily: "RobotoCondensed-Bold",
   },
   input: {
-      borderWidth: 1,
-      borderColor: '#00a651',
-      borderRadius: 20,
-      padding: 5,
-      paddingLeft:10,
-      height: 35,  // Set height to 30px
-      marginBottom: 5,
-      backgroundColor: '#FFFCFC',
-      marginLeft:35,
-      marginRight:35,
-      fontFamily: 'RobotoCondensed-Medium',
-
-
+    borderWidth: 1,
+    borderColor: "#00a651",
+    borderRadius: 20,
+    padding: 5,
+    paddingLeft: 10,
+    height: 35, // Set height to 30px
+    marginBottom: 5,
+    backgroundColor: "#FFFCFC",
+    marginLeft: 35,
+    marginRight: 35,
+    fontFamily: "RobotoCondensed-Medium",
   },
   inputError: {
-    borderColor: 'red',
+    borderColor: "red",
   },
   errorMessage: {
-    color: 'red',
+    color: "red",
     marginLeft: 20, // Adjusted margin
     marginBottom: 5, // Reduced margin
   },
   separator: {
     height: 1, // Reduced height
-    backgroundColor: '#ccc',
-    width: '100%',
+    backgroundColor: "#ccc",
+    width: "100%",
     marginBottom: 5, // Reduced margin
   },
   detailsContainer: {
@@ -1205,80 +1292,78 @@ const styles = StyleSheet.create({
   },
   header: {
     fontSize: 14, // Reduced font size
-    color: '#000',
-    fontFamily: 'RobotoCondensed-Bold',
+    color: "#000",
+    fontFamily: "RobotoCondensed-Bold",
     marginBottom: 8, // Reduced margin
-    alignSelf: 'center',
+    alignSelf: "center",
   },
   buttonContainer: {
-    marginLeft:75,
+    marginLeft: 75,
     marginBottom: 65, // Reduced margin
-    flexDirection: 'row', // Align items horizontally (in a row)
-    marginTop:20,
-    
+    flexDirection: "row", // Align items horizontally (in a row)
+    marginTop: 20,
   },
   button: {
-    backgroundColor: '#00a651',
+    backgroundColor: "#00a651",
     paddingVertical: 10, // Reduced padding
     paddingHorizontal: 10, // Reduced padding
     borderRadius: 20, // Reduced border radius
-    width: '35%',
-    alignSelf: 'center',
-    alignItems: 'center',
+    width: "35%",
+    alignSelf: "center",
+    alignItems: "center",
     marginTop: 10, // Reduced margin
     marginHorizontal: 5, // Add space between buttons
-    
   },
   buttonText: {
-    color: 'white',
-    fontFamily: 'RobotoCondensed-Bold',
+    color: "white",
+    fontFamily: "RobotoCondensed-Bold",
     fontSize: 16, // Reduced font size
   },
-   addMoreButton: {
-    backgroundColor: '#fff',          // White background
-    borderColor: '#00a651',           // Green border
-    borderWidth: 2,                   // Border width of 2px
-    borderRadius: 20,                 // Same border radius as the original button
-    paddingVertical: 10,              // Same padding as original button
-    paddingHorizontal: 10,            // Same padding as original button
-    width: '35%',                     // Same width as original button
-    alignSelf: 'center',              // Center the button horizontally
-    alignItems: 'center',             // Center the text inside the button
-    marginTop: 10,                    // Same margin as original button
-    marginHorizontal: 5,              // Same margin as original button
+  addMoreButton: {
+    backgroundColor: "#fff", // White background
+    borderColor: "#00a651", // Green border
+    borderWidth: 2, // Border width of 2px
+    borderRadius: 20, // Same border radius as the original button
+    paddingVertical: 10, // Same padding as original button
+    paddingHorizontal: 10, // Same padding as original button
+    width: "35%", // Same width as original button
+    alignSelf: "center", // Center the button horizontally
+    alignItems: "center", // Center the text inside the button
+    marginTop: 10, // Same margin as original button
+    marginHorizontal: 5, // Same margin as original button
   },
   addMoreButtonText: {
-    color: '#00a651',                 // Green text color
-    fontFamily: 'RobotoCondensed-Bold',
-    fontSize: 16,                     // Same font size as original button
+    color: "#00a651", // Green text color
+    fontFamily: "RobotoCondensed-Bold",
+    fontSize: 16, // Same font size as original button
   },
   newDrugSeparator: {
-    backgroundColor: '#f9f9f9',
+    backgroundColor: "#f9f9f9",
     padding: 5, // Reduced padding
   },
   newDrugTitle: {
-    color: '#00a651',
+    color: "#00a651",
     fontSize: 14, // Reduced font size
-    fontFamily: 'RobotoCondensed-Bold',
-    marginLeft:35,
-    backgroundColor:'#f9f9f9'
+    fontFamily: "RobotoCondensed-Bold",
+    marginLeft: 35,
+    backgroundColor: "#f9f9f9",
   },
   row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 8, // Reduced margin
   },
   halfWidth: {
-    width: '49%', // Adjusted width to create space between fields
+    width: "49%", // Adjusted width to create space between fields
   },
   backButton: {
     fontSize: 14, // Reduced font size
-    fontWeight: 'bold',
-    color: '#000',
+    fontWeight: "bold",
+    color: "#000",
     marginLeft: 10,
   },
   profileContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginRight: 10,
   },
   circle: {
@@ -1286,156 +1371,153 @@ const styles = StyleSheet.create({
     height: 30, // Reduced size
     borderRadius: 15, // Adjusted for reduced size
     borderWidth: 2,
-    borderColor: '#00A651',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: "#00A651",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 5,
   },
   circleText: {
     fontSize: 12, // Reduced font size
-    color: '#00A651',
-    fontWeight: 'bold',
+    color: "#00A651",
+    fontWeight: "bold",
   },
   profileText: {
     fontSize: 12, // Reduced font size
-    color: '#000',
-    fontFamily: 'RobotoCondensed-Bold',
+    color: "#000",
+    fontFamily: "RobotoCondensed-Bold",
   },
   packContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginRight: 15,
-    flexDirection: 'column', // Ensure items are stacked vertically
-
+    flexDirection: "column", // Ensure items are stacked vertically
   },
   packText: {
     fontSize: 18,
-    color: 'red',
-    fontFamily: 'RobotoCondensed-Bold',
-
+    color: "red",
+    fontFamily: "RobotoCondensed-Bold",
   },
   packText2: {
     fontSize: 12,
-    color: 'red',
-    fontFamily: 'RobotoCondensed-Bold',
-
+    color: "red",
+    fontFamily: "RobotoCondensed-Bold",
   },
   backButtonImage: {
-    width: 41,  // Adjust the size of the back button image
+    width: 41, // Adjust the size of the back button image
     height: 15,
     marginLeft: 10,
-  
   },
-   detailsImage: {
-    width: 291,  // Adjust the width as needed
+  detailsImage: {
+    width: 291, // Adjust the width as needed
     height: 19, // Adjust the height as needed
-    resizeMode: 'contain',  // Ensure the image maintains its aspect ratio
+    resizeMode: "contain", // Ensure the image maintains its aspect ratio
     marginBottom: 10, // Add space between the image and the next elements
-    marginLeft:45,
+    marginLeft: 45,
   },
   disabledAddMoreButton: {
-    backgroundColor: '#fff',          // White background
-    borderColor: 'grey',              // Grey border when form is invalid
+    backgroundColor: "#fff", // White background
+    borderColor: "grey", // Grey border when form is invalid
     borderWidth: 2,
   },
   disabledAddMoreButtonText: {
-    color: 'grey',                    // Grey text color when form is invalid
+    color: "grey", // Grey text color when form is invalid
   },
   modalBackground: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Darken background
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)", // Darken background
   },
   modalContainer: {
     width: 300,
-    backgroundColor: '#00a651', // Green background
+    backgroundColor: "#00a651", // Green background
     borderRadius: 20,
     padding: 20,
-    alignItems: 'center',
-    height:300,
+    alignItems: "center",
+    height: 300,
   },
   modalTitle: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 24,
-    fontFamily: 'RobotoCondensed-Bold',
-    textAlign: 'center',
+    fontFamily: "RobotoCondensed-Bold",
+    textAlign: "center",
     marginBottom: 10,
-    marginTop:50,
+    marginTop: 50,
   },
   modalSubtitle: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 18,
-    fontFamily: 'RobotoCondensed-Bold',
-    textAlign: 'center',
+    fontFamily: "RobotoCondensed-Bold",
+    textAlign: "center",
     marginBottom: 55,
   },
   modalButtonContainer: {
-    flexDirection: 'row',
-    width: '100%',
-
+    flexDirection: "row",
+    width: "100%",
   },
   modalButton: {
     borderRadius: 20,
     paddingVertical: 10,
     paddingHorizontal: 20,
-    width: '45%', // Two buttons should take 45% of the modal's width
-    alignItems: 'center',
-    
+    width: "45%", // Two buttons should take 45% of the modal's width
+    alignItems: "center",
   },
   addBoxButton: {
-    backgroundColor: '#00a651',
+    backgroundColor: "#00a651",
     borderWidth: 2,
-    borderColor: '#fff',
-    marginRight:5,
-    marginLeft:10,
-
+    borderColor: "#fff",
+    marginRight: 5,
+    marginLeft: 10,
   },
   finishButton: {
-    backgroundColor: '#fff',
-    marginRight:10,
-    marginLeft:5,
+    backgroundColor: "#fff",
+    marginRight: 10,
+    marginLeft: 5,
   },
   modalButtonText: {
-    color: '#00a651',
-    fontFamily: 'RobotoCondensed-Bold',
+    color: "#00a651",
+    fontFamily: "RobotoCondensed-Bold",
   },
-  AddBoxButtonText:{
-color:'#ffff'
+  AddBoxButtonText: {
+    color: "#ffff",
   },
   smallinput: {
-    
     borderWidth: 1,
-    borderColor: '#00a651',
+    borderColor: "#00a651",
     borderRadius: 20,
     padding: 5,
     paddingLeft: 10,
-    height: 30,  // Keep height as before
+    height: 30, // Keep height as before
     marginBottom: 10,
-    backgroundColor: '#FFFCFC',
+    backgroundColor: "#FFFCFC",
     marginLeft: 35,
     marginRight: 35,
-      // Smaller font size for short fields
+    // Smaller font size for short fields
   },
   medicationDetailsContainer: {
-    flexDirection: 'row', // Arrange the line and text horizontally
-    alignItems: 'center', // Aligns the text vertically in the center of the lines
-    justifyContent: 'center',
+    flexDirection: "row", // Arrange the line and text horizontally
+    alignItems: "center", // Aligns the text vertically in the center of the lines
+    justifyContent: "center",
     marginBottom: 10,
   },
   line: {
     flex: 1, // Ensures the line stretches to the available width
     height: 1, // The height of the line
-    backgroundColor: '#000', // The color of the line
+    backgroundColor: "#000", // The color of the line
     marginHorizontal: 10, // Adds space between the text and the lines
   },
   detailsText: {
     fontSize: 16, // Adjust for text size
-    fontFamily: 'RobotoCondensed-Bold',
-    textAlign: 'center',
-    color: '#000', // Ensures the text is black
-     // Adjusts the space between characters
+    fontFamily: "RobotoCondensed-Bold",
+    textAlign: "center",
+    color: "#000", // Ensures the text is black
+    // Adjusts the space between characters
   },
+  generatedMessage: {
+    color: "00a651",
+    marginLeft: 20,
+    marginBottom: 5,
+  },
+})
 
-});
+export default Donate
 
-export default Donate;

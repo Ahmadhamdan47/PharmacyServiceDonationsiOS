@@ -1,11 +1,14 @@
 import React, { useState, useLayoutEffect } from 'react';
-import { View, TextInput, Text, StyleSheet, Alert, Image, TouchableOpacity, ScrollView } from 'react-native';
+import { View, TextInput, Text, StyleSheet, Alert, Image, TouchableOpacity, ScrollView, Modal } from 'react-native';
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import DropDownPicker from 'react-native-dropdown-picker';
 
 const SignUp = () => {
+    const [userType, setUserType] = useState('Donor'); // Toggle between Donor and Recipient
     const [donorName, setDonorName] = useState('');
+    const [name, setName] = useState('');
+
     const [address, setAddress] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
     const [email, setEmail] = useState('');
@@ -16,6 +19,10 @@ const SignUp = () => {
         { label: 'Organisation', value: 'Organisation' },
         { label: 'Individual', value: 'Individual' },
     ]);
+    const [userAnswer, setUserAnswer] = useState('');
+    const [captchaQuestion, setCaptchaQuestion] = useState('');
+    const [correctAnswer, setCorrectAnswer] = useState(null);
+    const [isCaptchaVisible, setIsCaptchaVisible] = useState(false);
     const [countryOpen, setCountryOpen] = useState(false);
     const [country, setCountry] = useState(null);
     const [countries, setCountries] = useState([
@@ -99,7 +106,6 @@ const SignUp = () => {
         { label: 'Iran', value: 'Iran' },
         { label: 'Iraq', value: 'Iraq' },
         { label: 'Ireland', value: 'Ireland' },
-        { label: 'Israel', value: 'Israel' },
         { label: 'Italy', value: 'Italy' },
         { label: 'Jamaica', value: 'Jamaica' },
         { label: 'Japan', value: 'Japan' },
@@ -217,40 +223,97 @@ const SignUp = () => {
     ]);
     useLayoutEffect(() => {
         navigation.setOptions({
-            headerTitle: () => (
-                <Image
-                    source={require('./assets/medleblogo.png')}
-                    style={{ width: 166, height: 54 }}
-                />
-            ),
+            headerTitle: 'Sign Up',
             headerTitleAlign: 'center',  // Center the logo horizontally
             headerLeft: () => null,      // Remove the back button
             headerStyle: {
-                height: 150,             // Adjust the height of the header
+                           // Adjust the height of the header
                 backgroundColor: '#f9f9f9',
             },
             headerTitleStyle: {
-                marginTop: 50,           // Distance from the top (50px)
+                         // Distance from the top (50px)
             },
         });
     }, [navigation]);
 
     const navigation = useNavigation();
+    const generateCaptcha = () => {
+        const num1 = Math.floor(Math.random() * 10);
+        const num2 = Math.floor(Math.random() * 10);
+        setCorrectAnswer(num1 + num2);
+        setCaptchaQuestion(`What is ${num1} + ${num2}?`);
+    };
 
-    const handleSignUp = async () => {
+    // Run CAPTCHA generation on component mount
+    React.useEffect(() => {
+        generateCaptcha();
+    }, []);
+   
+    const handleVerifyCaptcha = () => {
+        if (parseInt(userAnswer) === correctAnswer) {
+            return true;
+        } else {
+            Alert.alert('Error', 'Incorrect CAPTCHA. Please try again.');
+            return false;
+        }
+    };
+    
+
+    const handleSignUp = () => {
+        generateCaptcha(); // Generate a CAPTCHA question
+        setIsCaptchaVisible(true); // Show the CAPTCHA modal
+    };
+
+    const handleCaptchaSubmit = async () => {
+        if (!handleVerifyCaptcha()) return;
+
+        setIsCaptchaVisible(false); // Hide the CAPTCHA modal
+
         try {
-            const donorData = {
-                DonorName: donorName,
-                DonorType: organizationType,
-                Address: address,
-                PhoneNumber: phoneNumber,
-                Email: email,
-                DonorCountry: country,
-                IsActive: null,
-            };
-            await axios.post('https://apiv2.medleb.org/users/Donor/register', { donorData, username: donorName, password });
-            Alert.alert('Success', 'Your Account has been sent to validation', [{ text: 'OK', onPress: () => navigation.navigate('SignIn') }]);
+            if (userType === 'Donor') {
+                const donorData = {
+                    DonorName: name,
+                    DonorType: organizationType,
+                    Address: address,
+                    PhoneNumber: phoneNumber,
+                    Email: email,
+                    DonorCountry: country,
+                    IsActive: null,
+                };
+
+                const endpoint = 'users/Donor/register';
+
+                await axios.post(`https://apiv2.medleb.org/${endpoint}`, {
+                    donorData,
+                    username: name,
+                    password,
+                });
+            } else if (userType === 'Recipient') {
+                const recipientData = {
+                    RecipientName: name,
+                    RecipientType: organizationType,
+                    Address: address,
+                    City: '',
+                    Country: country,
+                    ContactPerson: '',
+                    ContactNumber: phoneNumber,
+                    IsActive: null,
+                };
+
+                const endpoint = 'users/Recipient/register';
+
+                await axios.post(`https://apiv2.medleb.org/${endpoint}`, {
+                    recipientData,
+                    username: name,
+                    password,
+                });
+            }
+
+            Alert.alert('Success', 'Your Account has been sent for validation', [
+                { text: 'OK', onPress: () => navigation.navigate('SignIn') },
+            ]);
         } catch (error) {
+            console.error(error);
             Alert.alert('Error', 'Failed to sign up');
         }
     };
@@ -258,31 +321,69 @@ const SignUp = () => {
     return (
         <ScrollView contentContainerStyle={styles.scrollContainer}>
             <View style={styles.container}>
-                <Text style={styles.label}>Donor Name*</Text>
+                <Text style={styles.label}>Sign Up as</Text>
+                <View style={styles.toggleContainer}>
+                    <TouchableOpacity
+                        style={[styles.toggleButton, userType === 'Donor' && styles.activeToggleButton]}
+                        onPress={() => setUserType('Donor')}
+                    >
+                        <Text
+                            style={[
+                                styles.toggleButtonText,
+                                userType === 'Donor' && styles.activeToggleButtonText,
+                            ]}
+                        >
+                            Donor
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.toggleButton, userType === 'Recipient' && styles.activeToggleButton]}
+                        onPress={() => setUserType('Recipient')}
+                    >
+                        <Text
+                            style={[
+                                styles.toggleButtonText,
+                                userType === 'Recipient' && styles.activeToggleButtonText,
+                            ]}
+                        >
+                            Recipient
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
+                <Text style={styles.label}>{userType} Name*</Text>
                 <TextInput
                     style={styles.input}
-                    value={donorName}
-                    onChangeText={setDonorName}
-                    placeholder="Donor Name"
+                    value={name}
+                    onChangeText={setName}
+                    placeholder={`${userType} Name`}
+                    placeholderTextColor="#A9A9A9"
                 />
-                <Text style={styles.label}>Donor Type*</Text>
-                <DropDownPicker
-                    open={open}
-                    value={organizationType}
-                    items={items}
-                    setOpen={setOpen}
-                    setValue={setOrganizationType}
-                    setItems={setItems}
-                    placeholder="Select Donor Type"
-                    style={styles.dropdown}
-                    containerStyle={styles.dropdownContainer}  // Ensure container is styled
-                />
+                {userType === 'Donor' && (
+                    <>
+                        <Text style={styles.label}>Donor Type*</Text>
+                        <DropDownPicker
+                            open={open}
+                            value={organizationType}
+                            items={items}
+                            setOpen={setOpen}
+                            setValue={setOrganizationType}
+                            setItems={setItems}
+                            placeholder="Select Donor Type"
+                            placeholderStyle={styles.placeholder}
+                            style={styles.dropdownInput }
+                            containerStyle={styles.dropdownContainer}
+                            dropDownContainerStyle={styles.dropdownMenuContainer}
+                        />
+                    </>
+                )}
                 <Text style={styles.label}>Password*</Text>
                 <TextInput
                     style={styles.input}
                     value={password}
                     onChangeText={setPassword}
                     placeholder="Password"
+                    placeholderTextColor="#A9A9A9"
                     secureTextEntry
                 />
                 <Text style={styles.label}>Address*</Text>
@@ -291,6 +392,7 @@ const SignUp = () => {
                     value={address}
                     onChangeText={setAddress}
                     placeholder="Address"
+                    placeholderTextColor="#A9A9A9"
                 />
                 <Text style={styles.label}>Phone Number*</Text>
                 <TextInput
@@ -298,6 +400,7 @@ const SignUp = () => {
                     value={phoneNumber}
                     onChangeText={setPhoneNumber}
                     placeholder="Phone Number"
+                    placeholderTextColor="#A9A9A9"
                 />
                 <Text style={styles.label}>Email*</Text>
                 <TextInput
@@ -305,6 +408,7 @@ const SignUp = () => {
                     value={email}
                     onChangeText={setEmail}
                     placeholder="Email"
+                    placeholderTextColor="#A9A9A9"
                 />
                 <Text style={styles.label}>Country*</Text>
                 <DropDownPicker
@@ -315,15 +419,42 @@ const SignUp = () => {
                     setValue={setCountry}
                     setItems={setCountries}
                     placeholder="Select Country"
+                    placeholderStyle={styles.placeholder}
                     searchable={true}
                     searchPlaceholder="Search country..."
-                    style={styles.dropdown}
+                    style={styles.dropdownInput}
                     containerStyle={styles.dropdownContainer}
                     dropDownContainerStyle={styles.dropdownMenuContainer}
                 />
+
                 <TouchableOpacity style={styles.button} onPress={handleSignUp}>
                     <Text style={styles.buttonText}>Sign Up</Text>
                 </TouchableOpacity>
+
+                {/* CAPTCHA Modal */}
+                <Modal
+                    visible={isCaptchaVisible}
+                    transparent={true}
+                    animationType="slide"
+                    onRequestClose={() => setIsCaptchaVisible(false)}
+                >
+                    <View style={styles.modalContainer}>
+                        <View style={styles.modalContent}>
+                            <Text style={styles.captchaLabel}>{captchaQuestion}</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={userAnswer}
+                                onChangeText={setUserAnswer}
+                                keyboardType="numeric"
+                                placeholder="Enter your answer"
+                                placeholderTextColor="#A9A9A9"
+                            />
+                            <TouchableOpacity style={styles.button} onPress={handleCaptchaSubmit}>
+                                <Text style={styles.buttonText}>Submit</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
             </View>
         </ScrollView>
     );
@@ -331,68 +462,109 @@ const SignUp = () => {
 
 const styles = StyleSheet.create({
     scrollContainer: {
-        flexGrow: 0,
+        flexGrow: 1,
         justifyContent: 'center',
-        
-        
     },
     container: {
         flex: 1,
         justifyContent: 'center',
-        padding: 20,
-        backgroundColor:'#f9f9f9',
-        paddingBottom:'100%'
-        },
-    logo: {
-        width: 200,
-        height: 80,
-        resizeMode: 'contain',
-        alignSelf: 'center',
-        marginBottom: 30,
+        padding: 30,
+        backgroundColor: '#f9f9f9',
     },
     label: {
         fontSize: 14,
         marginBottom: 5,
-        color: "#A9A9A9",
-        marginLeft:10,
+        color: '#A9A9A9',
+        marginLeft: 10,
     },
     input: {
         borderWidth: 1,
         borderColor: '#00a651',
         padding: 5,
-        paddingLeft:10,
+        paddingLeft: 10,
+        marginBottom: 10,
+        borderRadius: 20,
+        height: 40,
+        backgroundColor: '#f9f9f9',
+    },
+    dropdownInput: {
+        borderWidth: 1,
+        borderColor: '#00a651',
+        paddingLeft: 10,
         marginBottom: 20,
         borderRadius: 20,
-        height: 30,  // Match input height
+        height: 40,
+        backgroundColor: '#f9f9f9',
+        minHeight: 40,
+        maxHeight: 40,
     },
-    dropdown: {
-        borderColor: '#00a651',
-        borderRadius: 20,
-        minHeight: 30,  // Set height same as input
-        paddingHorizontal: 10,  // Ensure text fits within the dropdown
-        backgroundColor:'#f9f9f9'
+    placeholder: {
+        color: '#A9A9A9',
     },
     dropdownContainer: {
-        marginBottom: 20,  // Ensure space between elements
-        height: 30,  // Same height as inputs
+        marginBottom: 10,
+        height: 40,
     },
     dropdownMenuContainer: {
-        borderColor: '#00a651',  // Make sure the dropdown menu's border is styled consistently
+        borderColor: '#00a651',
+        borderRadius: 20,
     },
     button: {
         backgroundColor: '#00a651',
-        paddingVertical: 5,
-        paddingHorizontal: 10,
+        paddingVertical: 10,
+        paddingHorizontal: 15,
         borderRadius: 25,
         marginTop: 20,
-        height:30,
-        justifyContent: 'center',// Center button text vertically
+        justifyContent: 'center',
         alignItems: 'center',
     },
     buttonText: {
         color: 'white',
         fontWeight: 'bold',
         fontSize: 14,
+    },
+    toggleContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginBottom: 20,
+    },
+    toggleButton: {
+        flex: 1,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: '#00a651',
+        borderRadius: 20,
+        alignItems: 'center',
+        marginHorizontal: 5,
+    },
+    activeToggleButton: {
+        backgroundColor: '#00a651',
+    },
+    toggleButtonText: {
+        color: '#00a651',
+        fontWeight: 'bold',
+    },
+    activeToggleButtonText: {
+        color: '#fff',
+    },
+    modalContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    modalContent: {
+        width: '80%',
+        backgroundColor: '#f9f9f9',
+        borderRadius: 20,
+        padding: 20,
+        alignItems: 'center',
+    },
+    captchaLabel: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#00a651',
+        marginBottom: 10,
     },
 });
 
