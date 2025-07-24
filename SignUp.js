@@ -8,11 +8,17 @@ const SignUp = () => {
     const [userType, setUserType] = useState('Donor'); // Toggle between Donor and Recipient
     const [donorName, setDonorName] = useState('');
     const [name, setName] = useState('');
-
+    const [lastName, setLastName] = useState('');
+    const [organizationName, setOrganizationName] = useState('');
+    const [decreeNumber, setDecreeNumber] = useState('');
+    const [registrationDate, setRegistrationDate] = useState('');
+    const [website, setWebsite] = useState('');
+    const [contactPersonName, setContactPersonName] = useState('');
     const [address, setAddress] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [open, setOpen] = useState(false);
     const [organizationType, setOrganizationType] = useState(null);
     const [items, setItems] = useState([
@@ -221,6 +227,7 @@ const SignUp = () => {
         { label: 'Zambia', value: 'Zambia' },
         { label: 'Zimbabwe', value: 'Zimbabwe' },
     ]);
+
     useLayoutEffect(() => {
         navigation.setOptions({
             headerTitle: 'Sign Up',
@@ -257,9 +264,22 @@ const SignUp = () => {
             return false;
         }
     };
+
+    const validatePassword = () => {
+        if (password.length < 8) {
+            Alert.alert('Error', 'Password must be at least 8 characters long');
+            return false;
+        }
+        if (password !== confirmPassword) {
+            Alert.alert('Error', 'Passwords do not match');
+            return false;
+        }
+        return true;
+    };
     
 
     const handleSignUp = () => {
+        if (!validatePassword()) return;
         generateCaptcha(); // Generate a CAPTCHA question
         setIsCaptchaVisible(true); // Show the CAPTCHA modal
     };
@@ -272,7 +292,7 @@ const SignUp = () => {
         try {
             if (userType === 'Donor') {
                 const donorData = {
-                    DonorName: name,
+                    DonorName: organizationType === 'Individual' ? `${name} ${lastName}` : organizationName,
                     DonorType: organizationType,
                     Address: address,
                     PhoneNumber: phoneNumber,
@@ -285,17 +305,17 @@ const SignUp = () => {
 
                 await axios.post(`https://apiv2.medleb.org/${endpoint}`, {
                     donorData,
-                    username: name,
+                    username: organizationType === 'Individual' ? `${name} ${lastName}` : organizationName,
                     password,
                 });
             } else if (userType === 'Recipient') {
                 const recipientData = {
-                    RecipientName: name,
+                    RecipientName: organizationType === 'Individual' ? `${name} ${lastName}` : organizationName,
                     RecipientType: organizationType,
                     Address: address,
                     City: '',
                     Country: country,
-                    ContactPerson: '',
+                    ContactPerson: organizationType === 'Organisation' ? contactPersonName : '',
                     ContactNumber: phoneNumber,
                     IsActive: null,
                 };
@@ -304,7 +324,7 @@ const SignUp = () => {
 
                 await axios.post(`https://apiv2.medleb.org/${endpoint}`, {
                     recipientData,
-                    username: name,
+                    username: organizationType === 'Individual' ? `${name} ${lastName}` : organizationName,
                     password,
                 });
             }
@@ -317,6 +337,173 @@ const SignUp = () => {
             Alert.alert('Error', 'Failed to sign up');
         }
     };
+
+    const renderIndividualFields = () => (
+        <>
+            <Text style={styles.label}>Country*</Text>
+            <DropDownPicker
+                open={countryOpen}
+                value={country}
+                items={countries}
+                setOpen={setCountryOpen}
+                setValue={setCountry}
+                setItems={setCountries}
+                placeholder="Select Country"
+                placeholderStyle={styles.placeholder}
+                searchable={true}
+                searchPlaceholder="Search country..."
+                style={styles.input}
+                containerStyle={styles.dropdownContainer}
+                dropDownContainerStyle={styles.dropdownMenuContainer}
+            />
+
+            <Text style={styles.label}>Donor Type*</Text>
+            <DropDownPicker
+                open={open}
+                value={organizationType}
+                items={items}
+                setOpen={setOpen}
+                setValue={setOrganizationType}
+                setItems={setItems}
+                placeholder="Select Donor Type"
+                placeholderStyle={styles.placeholder}
+                style={styles.input}
+                containerStyle={styles.dropdownContainer}
+                dropDownContainerStyle={styles.dropdownMenuContainer}
+            />
+
+            <Text style={styles.label}>Name*</Text>
+            <TextInput
+                style={styles.input}
+                value={name}
+                onChangeText={setName}
+                placeholder="First Name"
+                placeholderTextColor="#A9A9A9"
+            />
+
+            <Text style={styles.label}>Last Name*</Text>
+            <TextInput
+                style={styles.input}
+                value={lastName}
+                onChangeText={setLastName}
+                placeholder="Last Name"
+                placeholderTextColor="#A9A9A9"
+            />
+
+            <Text style={styles.label}>Email*</Text>
+            <TextInput
+                style={styles.input}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Email"
+                placeholderTextColor="#A9A9A9"
+                keyboardType="email-address"
+            />
+
+            <Text style={styles.label}>Phone Number*</Text>
+            <TextInput
+                style={styles.input}
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                placeholder="Phone Number"
+                placeholderTextColor="#A9A9A9"
+                keyboardType="phone-pad"
+            />
+
+            <Text style={styles.label}>Address*</Text>
+            <TextInput
+                style={styles.input}
+                value={address}
+                onChangeText={setAddress}
+                placeholder="Address"
+                placeholderTextColor="#A9A9A9"
+            />
+        </>
+    );
+
+    const renderOrganizationFields = () => (
+        <>
+            <Text style={styles.label}>Organization Name*</Text>
+            <TextInput
+                style={styles.input}
+                value={organizationName}
+                onChangeText={setOrganizationName}
+                placeholder="Organization Name"
+                placeholderTextColor="#A9A9A9"
+            />
+
+            <Text style={styles.label}>Decree Number*</Text>
+            <TextInput
+                style={styles.input}
+                value={decreeNumber}
+                onChangeText={setDecreeNumber}
+                placeholder="Decree Number"
+                placeholderTextColor="#A9A9A9"
+            />
+
+            <Text style={styles.label}>Registration Date*</Text>
+            <TextInput
+                style={styles.input}
+                value={registrationDate}
+                onChangeText={setRegistrationDate}
+                placeholder="Registration Date (DD/MM/YYYY)"
+                placeholderTextColor="#A9A9A9"
+            />
+
+            <Text style={styles.label}>Attach Document*</Text>
+            <TouchableOpacity style={styles.fileUploadButton}>
+                <Text style={styles.fileUploadText}>Choose File</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.label}>Website (Optional)</Text>
+            <TextInput
+                style={styles.input}
+                value={website}
+                onChangeText={setWebsite}
+                placeholder="Website URL"
+                placeholderTextColor="#A9A9A9"
+                keyboardType="url"
+            />
+
+            <Text style={styles.label}>Contact Person Name*</Text>
+            <TextInput
+                style={styles.input}
+                value={contactPersonName}
+                onChangeText={setContactPersonName}
+                placeholder="Contact Person Name"
+                placeholderTextColor="#A9A9A9"
+            />
+
+            <Text style={styles.label}>Email*</Text>
+            <TextInput
+                style={styles.input}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Email"
+                placeholderTextColor="#A9A9A9"
+                keyboardType="email-address"
+            />
+
+            <Text style={styles.label}>Phone Number*</Text>
+            <TextInput
+                style={styles.input}
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                placeholder="Phone Number"
+                placeholderTextColor="#A9A9A9"
+                keyboardType="phone-pad"
+            />
+
+            <Text style={styles.label}>Address*</Text>
+            <TextInput
+                style={styles.input}
+                value={address}
+                onChangeText={setAddress}
+                placeholder="Address"
+                placeholderTextColor="#A9A9A9"
+            />
+        </>
+    );
 
     return (
         <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -351,14 +538,6 @@ const SignUp = () => {
                     </TouchableOpacity>
                 </View>
 
-                <Text style={styles.label}>{userType} Name*</Text>
-                <TextInput
-                    style={styles.input}
-                    value={name}
-                    onChangeText={setName}
-                    placeholder={`${userType} Name`}
-                    placeholderTextColor="#A9A9A9"
-                />
                 {userType === 'Donor' && (
                     <>
                         <Text style={styles.label}>Donor Type*</Text>
@@ -371,68 +550,33 @@ const SignUp = () => {
                             setItems={setItems}
                             placeholder="Select Donor Type"
                             placeholderStyle={styles.placeholder}
-<<<<<<< HEAD
-                            style={styles.dropdownInput }
-=======
                             style={styles.input}
->>>>>>> 2c17bcbc2f9294663fa9f922974886a98acccf2e
                             containerStyle={styles.dropdownContainer}
                             dropDownContainerStyle={styles.dropdownMenuContainer}
                         />
                     </>
                 )}
+
+                {organizationType === 'Individual' ? renderIndividualFields() : organizationType === 'Organisation' ? renderOrganizationFields() : null}
+
                 <Text style={styles.label}>Password*</Text>
                 <TextInput
                     style={styles.input}
                     value={password}
                     onChangeText={setPassword}
-                    placeholder="Password"
+                    placeholder="Password (min 8 characters)"
                     placeholderTextColor="#A9A9A9"
                     secureTextEntry
                 />
-                <Text style={styles.label}>Address*</Text>
+
+                <Text style={styles.label}>Confirm Password*</Text>
                 <TextInput
                     style={styles.input}
-                    value={address}
-                    onChangeText={setAddress}
-                    placeholder="Address"
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    placeholder="Confirm Password"
                     placeholderTextColor="#A9A9A9"
-                />
-                <Text style={styles.label}>Phone Number*</Text>
-                <TextInput
-                    style={styles.input}
-                    value={phoneNumber}
-                    onChangeText={setPhoneNumber}
-                    placeholder="Phone Number"
-                    placeholderTextColor="#A9A9A9"
-                />
-                <Text style={styles.label}>Email*</Text>
-                <TextInput
-                    style={styles.input}
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder="Email"
-                    placeholderTextColor="#A9A9A9"
-                />
-                <Text style={styles.label}>Country*</Text>
-                <DropDownPicker
-                    open={countryOpen}
-                    value={country}
-                    items={countries}
-                    setOpen={setCountryOpen}
-                    setValue={setCountry}
-                    setItems={setCountries}
-                    placeholder="Select Country"
-                    placeholderStyle={styles.placeholder}
-                    searchable={true}
-                    searchPlaceholder="Search country..."
-<<<<<<< HEAD
-                    style={styles.dropdownInput}
-=======
-                    style={styles.input}
->>>>>>> 2c17bcbc2f9294663fa9f922974886a98acccf2e
-                    containerStyle={styles.dropdownContainer}
-                    dropDownContainerStyle={styles.dropdownMenuContainer}
+                    secureTextEntry
                 />
 
                 <TouchableOpacity style={styles.button} onPress={handleSignUp}>
@@ -476,11 +620,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         justifyContent: 'center',
-<<<<<<< HEAD
-        padding: 30,
-=======
         padding: 20,
->>>>>>> 2c17bcbc2f9294663fa9f922974886a98acccf2e
         backgroundColor: '#f9f9f9',
     },
     label: {
@@ -494,45 +634,20 @@ const styles = StyleSheet.create({
         borderColor: '#00a651',
         padding: 5,
         paddingLeft: 10,
-<<<<<<< HEAD
-        marginBottom: 10,
-        borderRadius: 20,
-        height: 40,
-        backgroundColor: '#f9f9f9',
-    },
-    dropdownInput: {
-        borderWidth: 1,
-        borderColor: '#00a651',
-        paddingLeft: 10,
-=======
->>>>>>> 2c17bcbc2f9294663fa9f922974886a98acccf2e
         marginBottom: 20,
         borderRadius: 20,
         height: 40,
         backgroundColor: '#f9f9f9',
-<<<<<<< HEAD
-        minHeight: 40,
-        maxHeight: 40,
-=======
->>>>>>> 2c17bcbc2f9294663fa9f922974886a98acccf2e
     },
     placeholder: {
         color: '#A9A9A9',
     },
     dropdownContainer: {
-<<<<<<< HEAD
-        marginBottom: 10,
-=======
         marginBottom: 20,
->>>>>>> 2c17bcbc2f9294663fa9f922974886a98acccf2e
         height: 40,
     },
     dropdownMenuContainer: {
         borderColor: '#00a651',
-<<<<<<< HEAD
-        borderRadius: 20,
-=======
->>>>>>> 2c17bcbc2f9294663fa9f922974886a98acccf2e
     },
     button: {
         backgroundColor: '#00a651',
@@ -590,6 +705,22 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#00a651',
         marginBottom: 10,
+    },
+    fileUploadButton: {
+        borderWidth: 1,
+        borderColor: '#00a651',
+        borderStyle: 'dashed',
+        padding: 10,
+        marginBottom: 20,
+        borderRadius: 20,
+        height: 40,
+        backgroundColor: '#f9f9f9',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    fileUploadText: {
+        color: '#00a651',
+        fontSize: 14,
     },
 });
 
