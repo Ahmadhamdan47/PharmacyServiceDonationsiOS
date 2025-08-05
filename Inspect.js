@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, Image, ScrollView, TouchableOpacity, Alert, StyleSheet, Keyboard, BackHandler, StatusBar } from 'react-native';
-import { Camera } from 'expo-camera';
-import { BarCodeScanner } from 'expo-barcode-scanner';
-import { CameraType } from 'expo-camera/build/legacy/Camera.types';
+import { CameraView } from 'expo-camera';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomNavBarInspection
+import HeaderProfile from './HeaderProfile'; // Import HeaderProfile component
 import axios from 'axios';
 import * as Font from 'expo-font';
 
@@ -15,12 +14,12 @@ const Inspect = ({ route }) => {
     const scrollViewRef = useRef(null);
     const [batchLot, setBatchLot] = useState(createEmptyBatchLot());
     const [isCameraOpen, setIsCameraOpen] = useState(false);
-    const [type, setType] = useState(CameraType.back);
     const [permission, setPermission] = useState(null);
     const [isInputFocused, setIsInputFocused] = useState(false);
     const [inspectionMessage, setInspectionMessage] = useState('');
     const [username, setUsername] = useState('');
     const [selectedOption, setSelectedOption] = useState('Packs'); // Default to 'Packs'
+    const [selectedType, setSelectedType] = useState('Donations'); // New: Donations or Importations
     const [isFieldsVisible, setIsFieldsVisible] = useState(false); // Show fields after a successful scan
     const [isCheckButtonVisible, setIsCheckButtonVisible] = useState(false); // Show Check button after scanning
     const [isFontLoaded, setIsFontLoaded] = useState(false);
@@ -39,7 +38,7 @@ const Inspect = ({ route }) => {
   
     useEffect(() => {
         (async () => {
-            const { status } = await Camera.requestCameraPermissionsAsync();
+            const { status } = await CameraView.requestCameraPermissionsAsync();
             setPermission(status === 'granted');
         })();
 
@@ -76,12 +75,7 @@ const Inspect = ({ route }) => {
                 </TouchableOpacity>
             ),
             headerRight: () => (
-                <View style={styles.profileContainer}>
-                    <View style={styles.circle}>
-                        <Text style={styles.circleText}>{username.charAt(0).toUpperCase()}</Text>
-                    </View>
-                    <Text style={styles.profileText}>{username}</Text>
-                </View>
+                <HeaderProfile username={username} />
             ),
             headerTitleAlign: 'center',
             headerTitleStyle: 
@@ -149,7 +143,12 @@ const Inspect = ({ route }) => {
             } else if (selectedOption === 'Boxes') {
                 const boxId = data;
                 setIsCameraOpen(false);
-                navigation.navigate('BoxInspection', { boxId });
+                // Navigate to appropriate box inspection based on type
+                if (selectedType === 'Donations') {
+                    navigation.navigate('BoxInspection', { boxId, type: 'donation' });
+                } else {
+                    navigation.navigate('BoxInspection', { boxId, type: 'importation' });
+                }
             }
         } catch (error) {
             console.error("Error processing scanned data:", error);
@@ -218,10 +217,10 @@ const Inspect = ({ route }) => {
 
     const handleOpenCamera = async () => {
         if (permission === null) {
-            const { status } = await Camera.requestPermissionsAsync();
+            const { status } = await CameraView.requestCameraPermissionsAsync();
             setPermission(status === 'granted');
             setIsCameraOpen(status === 'granted');
-            if (!status === 'granted') {
+            if (status !== 'granted') {
                 Alert.alert('Permission denied', 'Camera permission is required to use the camera.');
             }
         } else if (permission === false) {
@@ -233,7 +232,12 @@ const Inspect = ({ route }) => {
 
     const handleInspect = async (batchLotData) => {
         try {
-            const response = await fetch('https://apiv2.medleb.org/batchserial/checkDonationStatus', {
+            // Choose the appropriate API endpoint based on selected type
+            const apiEndpoint = selectedType === 'Donations' 
+                ? 'https://apiv2.medleb.org/batchserial/checkDonationStatus'
+                : 'https://apiv2.medleb.org/batchserial/checkImportationStatus';
+
+            const response = await fetch(apiEndpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -250,42 +254,84 @@ const Inspect = ({ route }) => {
             }
     
             const data = await response.json();
-            const { isValid, isDonated, batchLot } = data;
-    
-            if (isValid && isDonated) {
-                setInspectionMessage('');
-                let boxLabel = '';
-                let donationId = '';
-                let serialNumberId = '';
-    
-                if (batchLot.BoxId) {
-                    boxLabel = await fetchBoxLabel(batchLot.BoxId);
-                    donationId = await fetchDonationId(batchLot.BoxId);
-                }
-    
-                serialNumberId = await fetchSerialNumberId(batchLotData.serialNumber);
-    
-                navigation.navigate('PackInspection', {
-                    batchLot: { 
-                        ...batchLotData, 
-                        drugName: batchLot.DrugName,
-                        donationId: donationId,
-                        form: batchLot.Form,
-                        presentation: batchLot.Presentation,
-                        quantity: batchLot.Quantity,
-                        owner: batchLot.Laboratory,
-                        country: batchLot.LaboratoryCountry,
-                        boxId: batchLot.BoxId,
-                        boxLabel: boxLabel,
-                        batchLotId: batchLot.BatchLotId,
-                        serialNumberId: serialNumberId
+            
+            if (selectedType === 'Donations') {
+                const { isValid, isDonated, batchLot } = data;
+                
+                if (isValid && isDonated) {
+                    setInspectionMessage('');
+                    let boxLabel = '';
+                    let donationId = '';
+                    let serialNumberId = '';
+        
+                    if (batchLot.BoxId) {
+                        boxLabel = await fetchBoxLabel(batchLot.BoxId);
+                        donationId = await fetchDonationId(batchLot.BoxId);
                     }
-                });
-    
-            } else if (isValid && !isDonated) {
-                Alert.alert('Drug Status', 'This drug is already found in our database but not donated.', [{ text: 'OK' }]);
-            } else if (!isValid) {
-                Alert.alert('Drug Status', 'This drug is not found in our database.', [{ text: 'OK' }]);
+        
+                    serialNumberId = await fetchSerialNumberId(batchLotData.serialNumber);
+        
+                    navigation.navigate('PackInspection', {
+                        batchLot: { 
+                            ...batchLotData, 
+                            drugName: batchLot.DrugName,
+                            donationId: donationId,
+                            form: batchLot.Form,
+                            presentation: batchLot.Presentation,
+                            quantity: batchLot.Quantity,
+                            owner: batchLot.Laboratory,
+                            country: batchLot.LaboratoryCountry,
+                            boxId: batchLot.BoxId,
+                            boxLabel: boxLabel,
+                            batchLotId: batchLot.BatchLotId,
+                            serialNumberId: serialNumberId,
+                            type: 'donation'
+                        }
+                    });
+        
+                } else if (isValid && !isDonated) {
+                    Alert.alert('Drug Status', 'This drug is already found in our database but not donated.', [{ text: 'OK' }]);
+                } else if (!isValid) {
+                    Alert.alert('Drug Status', 'This drug is not found in our database.', [{ text: 'OK' }]);
+                }
+            } else {
+                // Handle importations
+                const { isValid, isImported, batchLot } = data;
+                
+                if (isValid && isImported) {
+                    setInspectionMessage('');
+                    let boxLabel = '';
+                    let serialNumberId = '';
+        
+                    if (batchLot.BoxId) {
+                        boxLabel = await fetchImportationBoxLabel(batchLot.BoxId);
+                    }
+        
+                    serialNumberId = await fetchSerialNumberId(batchLotData.serialNumber);
+        
+                    navigation.navigate('PackInspection', {
+                        batchLot: { 
+                            ...batchLotData, 
+                            drugName: batchLot.DrugName,
+                            donationId: null, // No donation ID for importations
+                            form: batchLot.Form,
+                            presentation: batchLot.Presentation,
+                            quantity: batchLot.Quantity,
+                            owner: batchLot.Laboratory,
+                            country: batchLot.LaboratoryCountry,
+                            boxId: batchLot.BoxId,
+                            boxLabel: boxLabel,
+                            batchLotId: batchLot.BatchLotId,
+                            serialNumberId: serialNumberId,
+                            type: 'importation'
+                        }
+                    });
+        
+                } else if (isValid && !isImported) {
+                    Alert.alert('Drug Status', 'This drug is already found in our database but not imported.', [{ text: 'OK' }]);
+                } else if (!isValid) {
+                    Alert.alert('Drug Status', 'This drug is not found in our database.', [{ text: 'OK' }]);
+                }
             }
         } catch (error) {
             setInspectionMessage(error.message);
@@ -353,6 +399,26 @@ const fetchDonationId = async (boxId) => {
     }
 };
 
+const fetchImportationBoxLabel = async (boxId) => {
+    try {
+        const response = await axios.get(`https://apiv2.medleb.org/importation-boxes/${boxId}`);
+        console.log('Importation Box Data:', response.data); // Log the data for debugging
+        return response.data.BoxLabel;  // axios automatically parses the JSON
+    } catch (error) {
+        if (error.response) {
+            // The request was made and the server responded with a status code outside 2xx
+            console.error('Error fetching importation box label:', error.response.data);
+        } else if (error.request) {
+            // The request was made but no response was received
+            console.error('Error: No response from server', error.request);
+        } else {
+            // Something happened in setting up the request
+            console.error('Error setting up request:', error.message);
+        }
+        return '';
+    }
+};
+
 
     
     return (
@@ -360,10 +426,10 @@ const fetchDonationId = async (boxId) => {
             <StatusBar backgroundColor="#f9f9f9"/>
 
             {isCameraOpen ? (
-                <BarCodeScanner
+                <CameraView
                     style={StyleSheet.absoluteFillObject}
-                    type={type}
-                    onBarCodeScanned={handleBarcodeDetected}
+                    facing="back"
+                    onBarcodeScanned={handleBarcodeDetected}
                 />
             ) : (
                 <ScrollView
@@ -373,7 +439,12 @@ const fetchDonationId = async (boxId) => {
                     {/* Show picker and scan button only before the scan */}
                     {!isFieldsVisible && (
                         <>
-                            {/* Dropdown Button */}
+                            {/* Type Selection Dropdown (Donations/Importations) */}
+                            <TouchableOpacity style={styles.typeButton} onPress={() => setSelectedType(selectedType === 'Donations' ? 'Importations' : 'Donations')}>
+                                <Text style={styles.typeButtonText}>{selectedType}</Text>
+                            </TouchableOpacity>
+
+                            {/* Pack/Box Dropdown Button */}
                             <TouchableOpacity style={styles.dropdownButton} onPress={() => setSelectedOption(selectedOption === 'Packs' ? 'Boxes' : 'Packs')}>
                                 <Text style={styles.dropdownButtonText}>{selectedOption}</Text>
                             </TouchableOpacity>
@@ -458,46 +529,33 @@ const styles = StyleSheet.create({
         paddingVertical: 20,
     },
     profileContainer: {
-        width: 47,
-        height: 16,
-        backgroundColor: '#f9f9f9',
-        fontSize: 14,
-        fontFamily: 'RobotoCondensed-Bold',
-        marginRight:24,
-        marginLeft: 103,
-        marginBottom:30,
-        
-        position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
-    
+        alignItems: 'center',
+        marginRight: 20,
+        position: 'relative',
       },
       circle: {
-        backgroundColor: '#f9f9f9',
         width: 40,
         height: 40,
-        borderRadius: 25,
+        borderRadius: 20,
         borderWidth: 2,
         borderColor: '#00A651',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 2,
-        marginLeft:5,
+        backgroundColor: 'transparent',
+        marginBottom: 4,
       },
       circleText: {
-        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
-    
-        fontSize: 20,
+        fontSize: 18,
         color: '#00A651',
         fontFamily: 'RobotoCondensed-Bold',
-        marginBottom:2,
+        fontWeight: 'bold',
       },
       profileText: {
-        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
-    
-        fontSize: 14,
-        color: '#000',
         fontFamily: 'RobotoCondensed-Bold',
-        textAlign: 'left',
-        
+        fontSize: 12,
+        color: '#000',
+        textAlign: 'center',
+        maxWidth: 60,
       },
     dropdownButton: {
         flexDirection: 'row',
@@ -511,6 +569,24 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         marginTop: 10,
         marginBottom: 100,
+    },
+    typeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#00A651',
+        borderWidth: 1,
+        borderColor: '#00A651',
+        borderRadius: 20,
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        marginTop: 10,
+        marginBottom: 10,
+    },
+    typeButtonText: {
+        fontSize: 16,
+        color: '#fff',
+        fontFamily: 'RobotoCondensed-Bold',
     },
     dropdownButtonText: {
         fontSize: 16,

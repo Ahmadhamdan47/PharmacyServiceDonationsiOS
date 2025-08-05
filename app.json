@@ -2,9 +2,10 @@
   "expo": {
     "name": "MedLeb PS",
     "slug": "PharmacyServiceDonations",
-    "splash":{
+    "splash": {
+      "image": "./assets/Icons.png",
+      "resizeMode": "contain",
       "backgroundColor": "#ffffff"
-
     },
     "ios": {
       "bundleIdentifier": "com.anonymous.PharmacyServiceDonations",
@@ -14,7 +15,7 @@
     "version": "3.0.12",
     "android": {
       "package": "com.anonymous.PharmacyServiceDonations",
-      "icon": "./assets/icon/android-icon.png" 
+      "icon": "./assets/icon/android-icon.png"
     },
     "extra": {
       "eas": {
@@ -26,8 +27,14 @@
       "url": "https://u.expo.dev/58244e3c-69dd-4e9d-ac67-cffb4a705d19"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan barcodes.",
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone for video recording."
+        }
+      ]
     ]
-  },
-  "name": "MedLeb PS"
+  }
 }

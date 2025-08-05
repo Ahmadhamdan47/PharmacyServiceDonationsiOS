@@ -1,8 +1,10 @@
 import React, { useState, useLayoutEffect } from 'react';
-import { View, TextInput, Text, StyleSheet, Alert, Image, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import { View, TextInput, Text, StyleSheet, Alert, Image, TouchableOpacity, ScrollView, Modal, FlatList, Platform } from 'react-native';
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import DropDownPicker from 'react-native-dropdown-picker';
+import CountryPicker from '@realtril/react-native-country-picker-modal';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const SignUp = () => {
     const [userType, setUserType] = useState('Donor'); // Toggle between Donor and Recipient
@@ -15,6 +17,7 @@ const SignUp = () => {
     const [website, setWebsite] = useState('');
     const [contactPersonName, setContactPersonName] = useState('');
     const [address, setAddress] = useState('');
+    const [city, setCity] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -25,208 +28,29 @@ const SignUp = () => {
         { label: 'Organisation', value: 'Organisation' },
         { label: 'Individual', value: 'Individual' },
     ]);
+    const [organizationCategoryOpen, setOrganizationCategoryOpen] = useState(false);
+    const [organizationCategory, setOrganizationCategory] = useState(null);
+    const [organizationCategories, setOrganizationCategories] = useState([
+        { label: 'International Development and Financing Institutions', value: 'international_development' },
+        { label: 'Government Bodies / Institutions', value: 'government_bodies' },
+        { label: 'Public Service Providers', value: 'public_service' },
+        { label: 'Private Sector', value: 'private_sector' },
+        { label: 'Nonprofit Organizations, Networks & Associations', value: 'nonprofit' },
+    ]);
+    const [organizationSubTypeOpen, setOrganizationSubTypeOpen] = useState(false);
+    const [organizationSubType, setOrganizationSubType] = useState(null);
+    const [organizationSubTypes, setOrganizationSubTypes] = useState([]);
+    const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
+    const [subTypePickerVisible, setSubTypePickerVisible] = useState(false);
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [selectedDate, setSelectedDate] = useState(new Date());
     const [userAnswer, setUserAnswer] = useState('');
     const [captchaQuestion, setCaptchaQuestion] = useState('');
     const [correctAnswer, setCorrectAnswer] = useState(null);
     const [isCaptchaVisible, setIsCaptchaVisible] = useState(false);
-    const [countryOpen, setCountryOpen] = useState(false);
-    const [country, setCountry] = useState(null);
-    const [countries, setCountries] = useState([
-        { label: 'Afghanistan', value: 'Afghanistan' },
-        { label: 'Albania', value: 'Albania' },
-        { label: 'Algeria', value: 'Algeria' },
-        { label: 'Andorra', value: 'Andorra' },
-        { label: 'Angola', value: 'Angola' },
-        { label: 'Antigua and Barbuda', value: 'Antigua and Barbuda' },
-        { label: 'Argentina', value: 'Argentina' },
-        { label: 'Armenia', value: 'Armenia' },
-        { label: 'Australia', value: 'Australia' },
-        { label: 'Austria', value: 'Austria' },
-        { label: 'Azerbaijan', value: 'Azerbaijan' },
-        { label: 'Bahamas', value: 'Bahamas' },
-        { label: 'Bahrain', value: 'Bahrain' },
-        { label: 'Bangladesh', value: 'Bangladesh' },
-        { label: 'Barbados', value: 'Barbados' },
-        { label: 'Belarus', value: 'Belarus' },
-        { label: 'Belgium', value: 'Belgium' },
-        { label: 'Belize', value: 'Belize' },
-        { label: 'Benin', value: 'Benin' },
-        { label: 'Bhutan', value: 'Bhutan' },
-        { label: 'Bolivia', value: 'Bolivia' },
-        { label: 'Bosnia and Herzegovina', value: 'Bosnia and Herzegovina' },
-        { label: 'Botswana', value: 'Botswana' },
-        { label: 'Brazil', value: 'Brazil' },
-        { label: 'Brunei', value: 'Brunei' },
-        { label: 'Bulgaria', value: 'Bulgaria' },
-        { label: 'Burkina Faso', value: 'Burkina Faso' },
-        { label: 'Burundi', value: 'Burundi' },
-        { label: 'Cabo Verde', value: 'Cabo Verde' },
-        { label: 'Cambodia', value: 'Cambodia' },
-        { label: 'Cameroon', value: 'Cameroon' },
-        { label: 'Canada', value: 'Canada' },
-        { label: 'Central African Republic', value: 'Central African Republic' },
-        { label: 'Chad', value: 'Chad' },
-        { label: 'Chile', value: 'Chile' },
-        { label: 'China', value: 'China' },
-        { label: 'Colombia', value: 'Colombia' },
-        { label: 'Comoros', value: 'Comoros' },
-        { label: 'Congo, Democratic Republic of the', value: 'Congo, Democratic Republic of the' },
-        { label: 'Congo, Republic of the', value: 'Congo, Republic of the' },
-        { label: 'Costa Rica', value: 'Costa Rica' },
-        { label: 'Croatia', value: 'Croatia' },
-        { label: 'Cuba', value: 'Cuba' },
-        { label: 'Cyprus', value: 'Cyprus' },
-        { label: 'Czech Republic', value: 'Czech Republic' },
-        { label: 'Denmark', value: 'Denmark' },
-        { label: 'Djibouti', value: 'Djibouti' },
-        { label: 'Dominica', value: 'Dominica' },
-        { label: 'Dominican Republic', value: 'Dominican Republic' },
-        { label: 'Ecuador', value: 'Ecuador' },
-        { label: 'Egypt', value: 'Egypt' },
-        { label: 'El Salvador', value: 'El Salvador' },
-        { label: 'Equatorial Guinea', value: 'Equatorial Guinea' },
-        { label: 'Eritrea', value: 'Eritrea' },
-        { label: 'Estonia', value: 'Estonia' },
-        { label: 'Eswatini', value: 'Eswatini' },
-        { label: 'Ethiopia', value: 'Ethiopia' },
-        { label: 'Fiji', value: 'Fiji' },
-        { label: 'Finland', value: 'Finland' },
-        { label: 'France', value: 'France' },
-        { label: 'Gabon', value: 'Gabon' },
-        { label: 'Gambia', value: 'Gambia' },
-        { label: 'Georgia', value: 'Georgia' },
-        { label: 'Germany', value: 'Germany' },
-        { label: 'Ghana', value: 'Ghana' },
-        { label: 'Greece', value: 'Greece' },
-        { label: 'Grenada', value: 'Grenada' },
-        { label: 'Guatemala', value: 'Guatemala' },
-        { label: 'Guinea', value: 'Guinea' },
-        { label: 'Guinea-Bissau', value: 'Guinea-Bissau' },
-        { label: 'Guyana', value: 'Guyana' },
-        { label: 'Haiti', value: 'Haiti' },
-        { label: 'Honduras', value: 'Honduras' },
-        { label: 'Hungary', value: 'Hungary' },
-        { label: 'Iceland', value: 'Iceland' },
-        { label: 'India', value: 'India' },
-        { label: 'Indonesia', value: 'Indonesia' },
-        { label: 'Iran', value: 'Iran' },
-        { label: 'Iraq', value: 'Iraq' },
-        { label: 'Ireland', value: 'Ireland' },
-        { label: 'Italy', value: 'Italy' },
-        { label: 'Jamaica', value: 'Jamaica' },
-        { label: 'Japan', value: 'Japan' },
-        { label: 'Jordan', value: 'Jordan' },
-        { label: 'Kazakhstan', value: 'Kazakhstan' },
-        { label: 'Kenya', value: 'Kenya' },
-        { label: 'Kiribati', value: 'Kiribati' },
-        { label: 'Kuwait', value: 'Kuwait' },
-        { label: 'Kyrgyzstan', value: 'Kyrgyzstan' },
-        { label: 'Laos', value: 'Laos' },
-        { label: 'Latvia', value: 'Latvia' },
-        { label: 'Lebanon', value: 'Lebanon' },
-        { label: 'Lesotho', value: 'Lesotho' },
-        { label: 'Liberia', value: 'Liberia' },
-        { label: 'Libya', value: 'Libya' },
-        { label: 'Liechtenstein', value: 'Liechtenstein' },
-        { label: 'Lithuania', value: 'Lithuania' },
-        { label: 'Luxembourg', value: 'Luxembourg' },
-        { label: 'Madagascar', value: 'Madagascar' },
-        { label: 'Malawi', value: 'Malawi' },
-        { label: 'Malaysia', value: 'Malaysia' },
-        { label: 'Maldives', value: 'Maldives' },
-        { label: 'Mali', value: 'Mali' },
-        { label: 'Malta', value: 'Malta' },
-        { label: 'Marshall Islands', value: 'Marshall Islands' },
-        { label: 'Mauritania', value: 'Mauritania' },
-        { label: 'Mauritius', value: 'Mauritius' },
-        { label: 'Mexico', value: 'Mexico' },
-        { label: 'Micronesia', value: 'Micronesia' },
-        { label: 'Moldova', value: 'Moldova' },
-        { label: 'Monaco', value: 'Monaco' },
-        { label: 'Mongolia', value: 'Mongolia' },
-        { label: 'Montenegro', value: 'Montenegro' },
-        { label: 'Morocco', value: 'Morocco' },
-        { label: 'Mozambique', value: 'Mozambique' },
-        { label: 'Myanmar', value: 'Myanmar' },
-        { label: 'Namibia', value: 'Namibia' },
-        { label: 'Nauru', value: 'Nauru' },
-        { label: 'Nepal', value: 'Nepal' },
-        { label: 'Netherlands', value: 'Netherlands' },
-        { label: 'New Zealand', value: 'New Zealand' },
-        { label: 'Nicaragua', value: 'Nicaragua' },
-        { label: 'Niger', value: 'Niger' },
-        { label: 'Nigeria', value: 'Nigeria' },
-        { label: 'North Korea', value: 'North Korea' },
-        { label: 'North Macedonia', value: 'North Macedonia' },
-        { label: 'Norway', value: 'Norway' },
-        { label: 'Oman', value: 'Oman' },
-        { label: 'Pakistan', value: 'Pakistan' },
-        { label: 'Palau', value: 'Palau' },
-        { label: 'Palestine', value: 'Palestine' },
-        { label: 'Panama', value: 'Panama' },
-        { label: 'Papua New Guinea', value: 'Papua New Guinea' },
-        { label: 'Paraguay', value: 'Paraguay' },
-        { label: 'Peru', value: 'Peru' },
-        { label: 'Philippines', value: 'Philippines' },
-        { label: 'Poland', value: 'Poland' },
-        { label: 'Portugal', value: 'Portugal' },
-        { label: 'Qatar', value: 'Qatar' },
-        { label: 'Romania', value: 'Romania' },
-        { label: 'Russia', value: 'Russia' },
-        { label: 'Rwanda', value: 'Rwanda' },
-        { label: 'Saint Kitts and Nevis', value: 'Saint Kitts and Nevis' },
-        { label: 'Saint Lucia', value: 'Saint Lucia' },
-        { label: 'Saint Vincent and the Grenadines', value: 'Saint Vincent and the Grenadines' },
-        { label: 'Samoa', value: 'Samoa' },
-        { label: 'San Marino', value: 'San Marino' },
-        { label: 'Sao Tome and Principe', value: 'Sao Tome and Principe' },
-        { label: 'Saudi Arabia', value: 'Saudi Arabia' },
-        { label: 'Senegal', value: 'Senegal' },
-        { label: 'Serbia', value: 'Serbia' },
-        { label: 'Seychelles', value: 'Seychelles' },
-        { label: 'Sierra Leone', value: 'Sierra Leone' },
-        { label: 'Singapore', value: 'Singapore' },
-        { label: 'Slovakia', value: 'Slovakia' },
-        { label: 'Slovenia', value: 'Slovenia' },
-        { label: 'Solomon Islands', value: 'Solomon Islands' },
-        { label: 'Somalia', value: 'Somalia' },
-        { label: 'South Africa', value: 'South Africa' },
-        { label: 'South Korea', value: 'South Korea' },
-        { label: 'South Sudan', value: 'South Sudan' },
-        { label: 'Spain', value: 'Spain' },
-        { label: 'Sri Lanka', value: 'Sri Lanka' },
-        { label: 'Sudan', value: 'Sudan' },
-        { label: 'Suriname', value: 'Suriname' },
-        { label: 'Sweden', value: 'Sweden' },
-        { label: 'Switzerland', value: 'Switzerland' },
-        { label: 'Syria', value: 'Syria' },
-        { label: 'Taiwan', value: 'Taiwan' },
-        { label: 'Tajikistan', value: 'Tajikistan' },
-        { label: 'Tanzania', value: 'Tanzania' },
-        { label: 'Thailand', value: 'Thailand' },
-        { label: 'Timor-Leste', value: 'Timor-Leste' },
-        { label: 'Togo', value: 'Togo' },
-        { label: 'Tonga', value: 'Tonga' },
-        { label: 'Trinidad and Tobago', value: 'Trinidad and Tobago' },
-        { label: 'Tunisia', value: 'Tunisia' },
-        { label: 'Turkey', value: 'Turkey' },
-        { label: 'Turkmenistan', value: 'Turkmenistan' },
-        { label: 'Tuvalu', value: 'Tuvalu' },
-        { label: 'Uganda', value: 'Uganda' },
-        { label: 'Ukraine', value: 'Ukraine' },
-        { label: 'United Arab Emirates', value: 'United Arab Emirates' },
-        { label: 'United Kingdom', value: 'United Kingdom' },
-        { label: 'United States', value: 'United States' },
-        { label: 'Uruguay', value: 'Uruguay' },
-        { label: 'Uzbekistan', value: 'Uzbekistan' },
-        { label: 'Vanuatu', value: 'Vanuatu' },
-        { label: 'Vatican City', value: 'Vatican City' },
-        { label: 'Venezuela', value: 'Venezuela' },
-        { label: 'Vietnam', value: 'Vietnam' },
-        { label: 'Yemen', value: 'Yemen' },
-        { label: 'Zambia', value: 'Zambia' },
-        { label: 'Zimbabwe', value: 'Zimbabwe' },
-    ]);
+    const [countryCode, setCountryCode] = useState('');
+    const [country, setCountry] = useState('');
+    const [countryVisible, setCountryVisible] = useState(false);
 
     useLayoutEffect(() => {
         navigation.setOptions({
@@ -244,6 +68,133 @@ const SignUp = () => {
     }, [navigation]);
 
     const navigation = useNavigation();
+    
+    const onSelectCountry = (country) => {
+        setCountryCode(country.cca2);
+        setCountry(country.name);
+        setCountryVisible(false);
+    };
+
+    const getOrganizationCategoryLabel = (value) => {
+        const category = organizationCategories.find(cat => cat.value === value);
+        return category ? category.label : 'Select Organization Category';
+    };
+
+    const getOrganizationSubTypeLabel = (value) => {
+        const subType = organizationSubTypes.find(sub => sub.value === value);
+        return subType ? subType.label : 'Select Organization Type';
+    };
+
+    const formatDate = (date) => {
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+    };
+
+    const onDateChange = (event, selectedDate) => {
+        const currentDate = selectedDate || new Date();
+        setShowDatePicker(Platform.OS === 'ios');
+        setSelectedDate(currentDate);
+        setRegistrationDate(formatDate(currentDate));
+    };
+
+    const renderCategoryPicker = () => (
+        <Modal
+            visible={categoryPickerVisible}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setCategoryPickerVisible(false)}
+        >
+            <View style={styles.pickerModalContainer}>
+                <View style={styles.pickerModalContent}>
+                    <View style={styles.pickerHeader}>
+                        <Text style={styles.pickerTitle}>Select Organization Category</Text>
+                        <TouchableOpacity 
+                            onPress={() => setCategoryPickerVisible(false)}
+                            style={styles.closeButton}
+                        >
+                            <Text style={styles.closeButtonText}>✕</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <FlatList
+                        data={organizationCategories}
+                        keyExtractor={(item) => item.value}
+                        renderItem={({ item }) => (
+                            <TouchableOpacity
+                                style={[
+                                    styles.pickerItem,
+                                    organizationCategory === item.value && styles.selectedPickerItem
+                                ]}
+                                onPress={() => {
+                                    setOrganizationCategory(item.value);
+                                    setCategoryPickerVisible(false);
+                                }}
+                            >
+                                <Text style={[
+                                    styles.pickerItemText,
+                                    organizationCategory === item.value && styles.selectedPickerItemText
+                                ]}>
+                                    {item.label}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                        showsVerticalScrollIndicator={true}
+                        style={styles.pickerList}
+                    />
+                </View>
+            </View>
+        </Modal>
+    );
+
+    const renderSubTypePicker = () => (
+        <Modal
+            visible={subTypePickerVisible}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setSubTypePickerVisible(false)}
+        >
+            <View style={styles.pickerModalContainer}>
+                <View style={styles.pickerModalContent}>
+                    <View style={styles.pickerHeader}>
+                        <Text style={styles.pickerTitle}>Select Organization Type</Text>
+                        <TouchableOpacity 
+                            onPress={() => setSubTypePickerVisible(false)}
+                            style={styles.closeButton}
+                        >
+                            <Text style={styles.closeButtonText}>✕</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <FlatList
+                        data={organizationSubTypes}
+                        keyExtractor={(item) => item.value}
+                        renderItem={({ item }) => (
+                            <TouchableOpacity
+                                style={[
+                                    styles.pickerItem,
+                                    organizationSubType === item.value && styles.selectedPickerItem
+                                ]}
+                                onPress={() => {
+                                    setOrganizationSubType(item.value);
+                                    setSubTypePickerVisible(false);
+                                }}
+                            >
+                                <Text style={[
+                                    styles.pickerItemText,
+                                    organizationSubType === item.value && styles.selectedPickerItemText
+                                ]}>
+                                    {item.label}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+                        showsVerticalScrollIndicator={true}
+                        style={styles.pickerList}
+                    />
+                </View>
+            </View>
+        </Modal>
+    );
+    
     const generateCaptcha = () => {
         const num1 = Math.floor(Math.random() * 10);
         const num2 = Math.floor(Math.random() * 10);
@@ -255,6 +206,64 @@ const SignUp = () => {
     React.useEffect(() => {
         generateCaptcha();
     }, []);
+
+    // Update organization sub-types based on selected category
+    React.useEffect(() => {
+        if (organizationCategory) {
+            let subTypes = [];
+            switch (organizationCategory) {
+                case 'international_development':
+                    subTypes = [
+                        { label: 'Multilateral Organizations', value: 'multilateral_organizations' },
+                        { label: 'Bilateral Development', value: 'bilateral_development' },
+                        { label: 'Development Fund', value: 'development_fund' },
+                        { label: 'Other Financing Mechanism', value: 'other_financing_mechanism' },
+                    ];
+                    break;
+                case 'government_bodies':
+                    subTypes = [
+                        { label: 'Central / Federal Government Body', value: 'central_federal_government' },
+                        { label: 'Regional/local authority', value: 'regional_local_authority' },
+                        { label: 'Government agency', value: 'government_agency' },
+                        { label: 'National Bank', value: 'national_bank' },
+                        { label: 'Trade / Export promotion agency', value: 'trade_export_agency' },
+                        { label: 'Other government entity', value: 'other_government_entity' },
+                    ];
+                    break;
+                case 'public_service':
+                    subTypes = [
+                        { label: 'Academic institution', value: 'academic_institution' },
+                        { label: 'Healthcare institution', value: 'healthcare_institution' },
+                        { label: 'Utility', value: 'utility' },
+                        { label: 'Other public service entity', value: 'other_public_service' },
+                    ];
+                    break;
+                case 'private_sector':
+                    subTypes = [
+                        { label: 'Consulting organization', value: 'consulting_organization' },
+                        { label: 'Engineering firm', value: 'engineering_firm' },
+                        { label: 'Supplier/manufacturer', value: 'supplier_manufacturer' },
+                        { label: 'Financial service provider/bank', value: 'financial_service_provider' },
+                        { label: 'Other business entity', value: 'other_business_entity' },
+                    ];
+                    break;
+                case 'nonprofit':
+                    subTypes = [
+                        { label: 'NGO (Non-Governmental Organization)', value: 'ngo' },
+                        { label: 'Foundation/charity', value: 'foundation_charity' },
+                        { label: 'Nonprofit institute/think tank', value: 'nonprofit_institute' },
+                        { label: 'Chamber of Commerce', value: 'chamber_of_commerce' },
+                        { label: 'Professional / trade association', value: 'professional_trade_association' },
+                        { label: 'Other nonprofit entity', value: 'other_nonprofit_entity' },
+                    ];
+                    break;
+                default:
+                    subTypes = [];
+            }
+            setOrganizationSubTypes(subTypes);
+            setOrganizationSubType(null); // Reset sub-type when category changes
+        }
+    }, [organizationCategory]);
    
     const handleVerifyCaptcha = () => {
         if (parseInt(userAnswer) === correctAnswer) {
@@ -280,6 +289,19 @@ const SignUp = () => {
 
     const handleSignUp = () => {
         if (!validatePassword()) return;
+        
+        // Validate organization fields if organization type is selected
+        if (organizationType === 'Organisation') {
+            if (!organizationCategory) {
+                Alert.alert('Error', 'Please select an organization category');
+                return;
+            }
+            if (!organizationSubType) {
+                Alert.alert('Error', 'Please select an organization type');
+                return;
+            }
+        }
+        
         generateCaptcha(); // Generate a CAPTCHA question
         setIsCaptchaVisible(true); // Show the CAPTCHA modal
     };
@@ -299,6 +321,10 @@ const SignUp = () => {
                     Email: email,
                     DonorCountry: country,
                     IsActive: null,
+                    ...(organizationType === 'Organisation' && {
+                        OrganizationCategory: organizationCategory,
+                        OrganizationSubType: organizationSubType,
+                    }),
                 };
 
                 const endpoint = 'users/Donor/register';
@@ -313,11 +339,15 @@ const SignUp = () => {
                     RecipientName: organizationType === 'Individual' ? `${name} ${lastName}` : organizationName,
                     RecipientType: organizationType,
                     Address: address,
-                    City: '',
+                    City: city,
                     Country: country,
                     ContactPerson: organizationType === 'Organisation' ? contactPersonName : '',
                     ContactNumber: phoneNumber,
                     IsActive: null,
+                    ...(organizationType === 'Organisation' && {
+                        OrganizationCategory: organizationCategory,
+                        OrganizationSubType: organizationSubType,
+                    }),
                 };
 
                 const endpoint = 'users/Recipient/register';
@@ -341,36 +371,29 @@ const SignUp = () => {
     const renderIndividualFields = () => (
         <>
             <Text style={styles.label}>Country*</Text>
-            <DropDownPicker
-                open={countryOpen}
-                value={country}
-                items={countries}
-                setOpen={setCountryOpen}
-                setValue={setCountry}
-                setItems={setCountries}
-                placeholder="Select Country"
-                placeholderStyle={styles.placeholder}
-                searchable={true}
-                searchPlaceholder="Search country..."
-                style={styles.input}
-                containerStyle={styles.dropdownContainer}
-                dropDownContainerStyle={styles.dropdownMenuContainer}
-            />
-
-            <Text style={styles.label}>Donor Type*</Text>
-            <DropDownPicker
-                open={open}
-                value={organizationType}
-                items={items}
-                setOpen={setOpen}
-                setValue={setOrganizationType}
-                setItems={setItems}
-                placeholder="Select Donor Type"
-                placeholderStyle={styles.placeholder}
-                style={styles.input}
-                containerStyle={styles.dropdownContainer}
-                dropDownContainerStyle={styles.dropdownMenuContainer}
-            />
+            <TouchableOpacity 
+                style={styles.countryPickerButton} 
+                onPress={() => setCountryVisible(true)}
+            >
+                <Text style={[styles.countryPickerText, !country && styles.placeholder]}>
+                    {country || 'Select Country'}
+                </Text>
+            </TouchableOpacity>
+            
+            {countryVisible && (
+                <CountryPicker
+                    visible={countryVisible}
+                    onSelect={onSelectCountry}
+                    onClose={() => setCountryVisible(false)}
+                    withFilter
+                    withFlag
+                    withCountryNameButton
+                    withAlphaFilter
+                    withCallingCode
+                    countryCode={countryCode || 'LB'}
+                    excludeCountries={['IL']}
+                />
+            )}
 
             <Text style={styles.label}>Name*</Text>
             <TextInput
@@ -423,6 +446,55 @@ const SignUp = () => {
 
     const renderOrganizationFields = () => (
         <>
+            <Text style={styles.label}>Country*</Text>
+            <TouchableOpacity 
+                style={styles.countryPickerButton} 
+                onPress={() => setCountryVisible(true)}
+            >
+                <Text style={[styles.countryPickerText, !country && styles.placeholder]}>
+                    {country || 'Select Country'}
+                </Text>
+            </TouchableOpacity>
+            
+            {countryVisible && (
+                <CountryPicker
+                    visible={countryVisible}
+                    onSelect={onSelectCountry}
+                    onClose={() => setCountryVisible(false)}
+                    withFilter
+                    withFlag
+                    withCountryNameButton
+                    withAlphaFilter
+                    withCallingCode
+                    countryCode={countryCode || 'LB'}
+                    excludeCountries={['IL']}
+                />
+            )}
+
+            <Text style={styles.label}>Organization Category*</Text>
+            <TouchableOpacity 
+                style={styles.pickerButton} 
+                onPress={() => setCategoryPickerVisible(true)}
+            >
+                <Text style={[styles.pickerButtonText, !organizationCategory && styles.placeholder]}>
+                    {getOrganizationCategoryLabel(organizationCategory)}
+                </Text>
+            </TouchableOpacity>
+
+            {organizationCategory && (
+                <>
+                    <Text style={styles.label}>Organization Type*</Text>
+                    <TouchableOpacity 
+                        style={styles.pickerButton} 
+                        onPress={() => setSubTypePickerVisible(true)}
+                    >
+                        <Text style={[styles.pickerButtonText, !organizationSubType && styles.placeholder]}>
+                            {getOrganizationSubTypeLabel(organizationSubType)}
+                        </Text>
+                    </TouchableOpacity>
+                </>
+            )}
+
             <Text style={styles.label}>Organization Name*</Text>
             <TextInput
                 style={styles.input}
@@ -442,13 +514,24 @@ const SignUp = () => {
             />
 
             <Text style={styles.label}>Registration Date*</Text>
-            <TextInput
-                style={styles.input}
-                value={registrationDate}
-                onChangeText={setRegistrationDate}
-                placeholder="Registration Date (DD/MM/YYYY)"
-                placeholderTextColor="#A9A9A9"
-            />
+            <TouchableOpacity 
+                style={styles.datePickerButton} 
+                onPress={() => setShowDatePicker(true)}
+            >
+                <Text style={[styles.datePickerText, !registrationDate && styles.placeholder]}>
+                    {registrationDate || 'Select Registration Date'}
+                </Text>
+            </TouchableOpacity>
+
+            {showDatePicker && (
+                <DateTimePicker
+                    value={selectedDate}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={onDateChange}
+                    maximumDate={new Date()}
+                />
+            )}
 
             <Text style={styles.label}>Attach Document*</Text>
             <TouchableOpacity style={styles.fileUploadButton}>
@@ -500,6 +583,180 @@ const SignUp = () => {
                 value={address}
                 onChangeText={setAddress}
                 placeholder="Address"
+                placeholderTextColor="#A9A9A9"
+            />
+        </>
+    );
+
+    const renderRecipientIndividualFields = () => (
+        <>
+            <Text style={styles.label}>Country*</Text>
+            <TouchableOpacity 
+                style={styles.countryPickerButton} 
+                onPress={() => setCountryVisible(true)}
+            >
+                <Text style={[styles.countryPickerText, !country && styles.placeholder]}>
+                    {country || 'Select Country'}
+                </Text>
+            </TouchableOpacity>
+            
+            {countryVisible && (
+                <CountryPicker
+                    visible={countryVisible}
+                    onSelect={onSelectCountry}
+                    onClose={() => setCountryVisible(false)}
+                    withFilter
+                    withFlag
+                    withCountryNameButton
+                    withAlphaFilter
+                    withCallingCode
+                    countryCode={countryCode || 'LB'}
+                    excludeCountries={['IL']}
+                />
+            )}
+
+            <Text style={styles.label}>Name*</Text>
+            <TextInput
+                style={styles.input}
+                value={name}
+                onChangeText={setName}
+                placeholder="First Name"
+                placeholderTextColor="#A9A9A9"
+            />
+
+            <Text style={styles.label}>Last Name*</Text>
+            <TextInput
+                style={styles.input}
+                value={lastName}
+                onChangeText={setLastName}
+                placeholder="Last Name"
+                placeholderTextColor="#A9A9A9"
+            />
+
+            <Text style={styles.label}>Phone Number*</Text>
+            <TextInput
+                style={styles.input}
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                placeholder="Phone Number"
+                placeholderTextColor="#A9A9A9"
+                keyboardType="phone-pad"
+            />
+
+            <Text style={styles.label}>Address*</Text>
+            <TextInput
+                style={styles.input}
+                value={address}
+                onChangeText={setAddress}
+                placeholder="Address"
+                placeholderTextColor="#A9A9A9"
+            />
+
+            <Text style={styles.label}>City*</Text>
+            <TextInput
+                style={styles.input}
+                value={city}
+                onChangeText={setCity}
+                placeholder="City"
+                placeholderTextColor="#A9A9A9"
+            />
+        </>
+    );
+
+    const renderRecipientOrganizationFields = () => (
+        <>
+            <Text style={styles.label}>Country*</Text>
+            <TouchableOpacity 
+                style={styles.countryPickerButton} 
+                onPress={() => setCountryVisible(true)}
+            >
+                <Text style={[styles.countryPickerText, !country && styles.placeholder]}>
+                    {country || 'Select Country'}
+                </Text>
+            </TouchableOpacity>
+            
+            {countryVisible && (
+                <CountryPicker
+                    visible={countryVisible}
+                    onSelect={onSelectCountry}
+                    onClose={() => setCountryVisible(false)}
+                    withFilter
+                    withFlag
+                    withCountryNameButton
+                    withAlphaFilter
+                    withCallingCode
+                    countryCode={countryCode || 'LB'}
+                    excludeCountries={['IL']}
+                />
+            )}
+
+            <Text style={styles.label}>Organization Category*</Text>
+            <TouchableOpacity 
+                style={styles.pickerButton} 
+                onPress={() => setCategoryPickerVisible(true)}
+            >
+                <Text style={[styles.pickerButtonText, !organizationCategory && styles.placeholder]}>
+                    {getOrganizationCategoryLabel(organizationCategory)}
+                </Text>
+            </TouchableOpacity>
+
+            {organizationCategory && (
+                <>
+                    <Text style={styles.label}>Organization Type*</Text>
+                    <TouchableOpacity 
+                        style={styles.pickerButton} 
+                        onPress={() => setSubTypePickerVisible(true)}
+                    >
+                        <Text style={[styles.pickerButtonText, !organizationSubType && styles.placeholder]}>
+                            {getOrganizationSubTypeLabel(organizationSubType)}
+                        </Text>
+                    </TouchableOpacity>
+                </>
+            )}
+
+            <Text style={styles.label}>Organization Name*</Text>
+            <TextInput
+                style={styles.input}
+                value={organizationName}
+                onChangeText={setOrganizationName}
+                placeholder="Organization Name"
+                placeholderTextColor="#A9A9A9"
+            />
+
+            <Text style={styles.label}>Contact Person Name*</Text>
+            <TextInput
+                style={styles.input}
+                value={contactPersonName}
+                onChangeText={setContactPersonName}
+                placeholder="Contact Person Name"
+                placeholderTextColor="#A9A9A9"
+            />
+
+            <Text style={styles.label}>Phone Number*</Text>
+            <TextInput
+                style={styles.input}
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                placeholder="Phone Number"
+                placeholderTextColor="#A9A9A9"
+                keyboardType="phone-pad"
+            />
+
+            <Text style={styles.label}>Address*</Text>
+            <TextInput
+                style={styles.input}
+                value={address}
+                onChangeText={setAddress}
+                placeholder="Address"
+                placeholderTextColor="#A9A9A9"
+            />
+
+            <Text style={styles.label}>City*</Text>
+            <TextInput
+                style={styles.input}
+                value={city}
+                onChangeText={setCity}
+                placeholder="City"
                 placeholderTextColor="#A9A9A9"
             />
         </>
@@ -557,7 +814,29 @@ const SignUp = () => {
                     </>
                 )}
 
-                {organizationType === 'Individual' ? renderIndividualFields() : organizationType === 'Organisation' ? renderOrganizationFields() : null}
+                {userType === 'Recipient' && (
+                    <>
+                        <Text style={styles.label}>Recipient Type*</Text>
+                        <DropDownPicker
+                            open={open}
+                            value={organizationType}
+                            items={items}
+                            setOpen={setOpen}
+                            setValue={setOrganizationType}
+                            setItems={setItems}
+                            placeholder="Select Recipient Type"
+                            placeholderStyle={styles.placeholder}
+                            style={styles.input}
+                            containerStyle={styles.dropdownContainer}
+                            dropDownContainerStyle={styles.dropdownMenuContainer}
+                        />
+                    </>
+                )}
+
+                {userType === 'Donor' && organizationType === 'Individual' && renderIndividualFields()}
+                {userType === 'Donor' && organizationType === 'Organisation' && renderOrganizationFields()}
+                {userType === 'Recipient' && organizationType === 'Individual' && renderRecipientIndividualFields()}
+                {userType === 'Recipient' && organizationType === 'Organisation' && renderRecipientOrganizationFields()}
 
                 <Text style={styles.label}>Password*</Text>
                 <TextInput
@@ -607,6 +886,12 @@ const SignUp = () => {
                         </View>
                     </View>
                 </Modal>
+
+                {/* Organization Category Picker Modal */}
+                {renderCategoryPicker()}
+
+                {/* Organization Sub-Type Picker Modal */}
+                {renderSubTypePicker()}
             </View>
         </ScrollView>
     );
@@ -721,6 +1006,112 @@ const styles = StyleSheet.create({
     fileUploadText: {
         color: '#00a651',
         fontSize: 14,
+    },
+    countryPickerButton: {
+        borderWidth: 1,
+        borderColor: '#00a651',
+        padding: 10,
+        paddingLeft: 10,
+        marginBottom: 20,
+        borderRadius: 20,
+        height: 40,
+        backgroundColor: '#f9f9f9',
+        justifyContent: 'center',
+    },
+    countryPickerText: {
+        fontSize: 14,
+        color: '#000',
+    },
+    pickerButton: {
+        borderWidth: 1,
+        borderColor: '#00a651',
+        padding: 10,
+        paddingLeft: 10,
+        marginBottom: 20,
+        borderRadius: 20,
+        height: 40,
+        backgroundColor: '#f9f9f9',
+        justifyContent: 'center',
+    },
+    pickerButtonText: {
+        fontSize: 14,
+        color: '#000',
+    },
+    datePickerButton: {
+        borderWidth: 1,
+        borderColor: '#00a651',
+        padding: 10,
+        paddingLeft: 10,
+        marginBottom: 20,
+        borderRadius: 20,
+        height: 40,
+        backgroundColor: '#f9f9f9',
+        justifyContent: 'center',
+    },
+    datePickerText: {
+        fontSize: 14,
+        color: '#000',
+    },
+    pickerModalContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    pickerModalContent: {
+        width: '85%',
+        maxHeight: '70%',
+        backgroundColor: '#f9f9f9',
+        borderRadius: 20,
+        overflow: 'hidden',
+    },
+    pickerHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+        backgroundColor: '#00a651',
+    },
+    pickerTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#fff',
+        flex: 1,
+    },
+    closeButton: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    closeButtonText: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: 'bold',
+    },
+    pickerList: {
+        maxHeight: 400,
+    },
+    pickerItem: {
+        padding: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+        backgroundColor: '#f9f9f9',
+    },
+    selectedPickerItem: {
+        backgroundColor: '#e8f5e8',
+    },
+    pickerItemText: {
+        fontSize: 16,
+        color: '#333',
+    },
+    selectedPickerItemText: {
+        color: '#00a651',
+        fontWeight: 'bold',
     },
 });
 

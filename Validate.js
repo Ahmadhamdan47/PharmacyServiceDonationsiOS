@@ -4,6 +4,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
+import HeaderProfile from './HeaderProfile'; // Import HeaderProfile component
 import * as Font from 'expo-font';
 
 const Validate = () => {
@@ -63,12 +64,7 @@ const Validate = () => {
                 </TouchableOpacity>
             ),
             headerRight: () => (
-                <View style={styles.profileContainer}>
-                    <View style={styles.circle}>
-                        <Text style={styles.circleText}>{username.charAt(0).toUpperCase()}</Text>
-                    </View>
-                    <Text style={styles.profileText}>{username}</Text>
-                </View>
+                <HeaderProfile username={username} />
             ),
             headerTitleAlign: 'center',
             headerStyle: {
@@ -316,42 +312,33 @@ const styles = StyleSheet.create({
         marginRight:30,
     },
     profileContainer: {
-        width: 47,
-        height: 16,
-        backgroundColor: '#f9f9f9',
-        fontSize: 14,
-        marginRight:10,
-        marginLeft: 103,
-        marginBottom:30,
-        position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
-    
+        alignItems: 'center',
+        marginRight: 20,
+        position: 'relative',
       },
       circle: {
-        backgroundColor: '#f9f9f9',
         width: 40,
         height: 40,
-        borderRadius: 25,
+        borderRadius: 20,
         borderWidth: 2,
         borderColor: '#00A651',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 2,
+        backgroundColor: 'transparent',
+        marginBottom: 4,
       },
       circleText: {
-        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
-    
-        fontSize: 20,
+        fontSize: 18,
         color: '#00A651',
+        fontFamily: 'RobotoCondensed-Bold',
         fontWeight: 'bold',
       },
       profileText: {
-        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
-                
-        fontFamily: 'RobotoCondensed-Bold',    
-        fontSize: 14,
+        fontFamily: 'RobotoCondensed-Bold',
+        fontSize: 12,
         color: '#000',
         textAlign: 'center',
-        
+        maxWidth: 60,
       },
           filterRow: {
         flexDirection: 'row',

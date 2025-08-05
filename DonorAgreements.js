@@ -4,6 +4,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import BottomNavBar from './BottomNavBar'; // Import the BottomNavBar for Donor
+import HeaderProfile from './HeaderProfile'; // Import HeaderProfile component
 import * as Font from 'expo-font';
 
 const DonorAgreement = () => {
@@ -42,12 +43,7 @@ const DonorAgreement = () => {
                 </TouchableOpacity>
             ),
             headerRight: () => (
-                <View style={styles.profileContainer}>
-                    <View style={styles.circle}>
-                        <Text style={styles.circleText}>{username.charAt(0).toUpperCase()}</Text>
-                    </View>
-                    <Text style={styles.profileText}>{username}</Text>
-                </View>
+                <HeaderProfile username={username} />
             ),
             headerTitleAlign: 'center',
             headerStyle: {
@@ -88,14 +84,14 @@ const DonorAgreement = () => {
 
     const fetchDonorDetails = async () => {
         try {
-            console.log(`Fetching donor details for username: ${username}`);
-            const response = await axios.get(`https://apiv2.medleb.org/users/Donor/username/${username}`);
-            console.log('Donor details response:', response);
-            if (response.data && response.data.DonorId) {
-                console.log('Donor ID found:', response.data.DonorId);
-                setDonorId(response.data.DonorId);
+            const storedDonorId = await AsyncStorage.getItem('donorId');
+            console.log('Getting donor ID from storage:', storedDonorId);
+            
+            if (storedDonorId) {
+                setDonorId(parseInt(storedDonorId));
+                console.log('Donor ID found in storage:', storedDonorId);
             } else {
-                console.log('No donor ID found in response.');
+                console.log('No donor ID found in storage.');
             }
         } catch (error) {
             console.error('Failed to fetch donor details:', error);
@@ -132,6 +128,21 @@ const DonorAgreement = () => {
         return 'orange';
     };
 
+    const handleStartDonation = (agreement) => {
+        // Navigate to Donate screen with the agreement details
+        navigation.navigate('Donate', {
+            donationId: agreement.DonationId,
+            donorId: agreement.DonorId,
+            recipientId: agreement.RecipientId,
+            donorName: agreement.donor.DonorName,
+            recipientName: agreement.Recipient.RecipientName,
+            donationTitle: agreement.Donation?.DonationTitle || 'Donation',
+            donationPurpose: agreement.Donation?.DonationPurpose || '',
+            donationDate: new Date().toISOString().replace(/:/g, '-'),
+            fromAgreement: true
+        });
+    };
+
     return (
         <View style={styles.container}>
             <StatusBar backgroundColor="#f9f9f9" />
@@ -151,37 +162,47 @@ const DonorAgreement = () => {
                 {/* Agreements List */}
                 <ScrollView>
                     {agreements.map((agreement, index) => (
-                        <TouchableOpacity
-                            key={index}
-                            style={styles.card}
-                            onPress={() => navigation.navigate('AgreementDetails', { agreement })}
-                        >
-                            <View style={styles.cardHeader}>
-                                <Text style={[styles.statusText, { color: getAgreedUponColor(agreement.Agreed_Upon) }]}>
-                                    {getAgreedUponText(agreement.Agreed_Upon)}
-                                </Text>
-                            </View>
+                        <View key={index} style={styles.card}>
+                            <TouchableOpacity
+                                onPress={() => navigation.navigate('AgreementDetails', { agreement })}
+                            >
+                                <View style={styles.cardHeader}>
+                                    <Text style={[styles.statusText, { color: getAgreedUponColor(agreement.Agreed_Upon) }]}>
+                                        {getAgreedUponText(agreement.Agreed_Upon)}
+                                    </Text>
+                                </View>
 
-                            <View style={styles.cardContent}>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                    {/* Left Column */}
-                                    <View style={{ flex: 1, marginRight: 10, marginLeft: 10 }}>
-                                        <Text style={[styles.cardTitle]}>Donor</Text>
-                                        <Text style={[styles.cardText]}>{agreement.donor.DonorName}</Text>
-                                    </View>
+                                <View style={styles.cardContent}>
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                        {/* Left Column */}
+                                        <View style={{ flex: 1, marginRight: 10, marginLeft: 10 }}>
+                                            <Text style={[styles.cardTitle]}>Donor</Text>
+                                            <Text style={[styles.cardText]}>{agreement.donor.DonorName}</Text>
+                                        </View>
 
-                                    {/* Right Column */}
-                                    <View style={{ flex: 1, marginLeft: 10, paddingBottom: 20 }}>
-                                        <Text style={[styles.cardTitle]}>Recipient</Text>
-                                        <Text style={[styles.cardText]}>{agreement.Recipient.RecipientName}</Text>
-                                        <Text style={[styles.cardTitle]}>Agreed Upon</Text>
-                                        <Text style={[styles.cardText, { color: getAgreedUponColor(agreement.Agreed_Upon) }]}>
-                                            {getAgreedUponText(agreement.Agreed_Upon)}
-                                        </Text>
+                                        {/* Right Column */}
+                                        <View style={{ flex: 1, marginLeft: 10, paddingBottom: 20 }}>
+                                            <Text style={[styles.cardTitle]}>Recipient</Text>
+                                            <Text style={[styles.cardText]}>{agreement.Recipient.RecipientName}</Text>
+                                            <Text style={[styles.cardTitle]}>Agreed Upon</Text>
+                                            <Text style={[styles.cardText, { color: getAgreedUponColor(agreement.Agreed_Upon) }]}>
+                                                {getAgreedUponText(agreement.Agreed_Upon)}
+                                            </Text>
+                                        </View>
                                     </View>
                                 </View>
-                            </View>
-                        </TouchableOpacity>
+                            </TouchableOpacity>
+                            
+                            {/* Start Donation Process Button - Only show for agreed agreements */}
+                            {agreement.Agreed_Upon === 'agreed' && (
+                                <TouchableOpacity 
+                                    style={styles.startDonationButton}
+                                    onPress={() => handleStartDonation(agreement)}
+                                >
+                                    <Text style={styles.startDonationButtonText}>Start Donation Process</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
                     ))}
                 </ScrollView>
             </ScrollView>
@@ -270,7 +291,7 @@ const styles = StyleSheet.create({
         borderRadius: 50,
         padding: 15,
         marginVertical: 10,
-        height: 140,
+        minHeight: 140,
     },
     statusText: {
         fontSize: 14,
@@ -295,51 +316,28 @@ const styles = StyleSheet.create({
         height: 15,
         marginLeft: 10,
     },
-    profileContainer: {
-        width: 47,
-        height: 16,
-        backgroundColor: '#f9f9f9',
-        fontSize: 14,
-        fontFamily: 'Roboto Condensed',
-        fontWeight: '400',
-        marginRight:24,
-        marginLeft: 103,
-        marginBottom:30,
-        position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
-    },
-    circle: {
-        backgroundColor: '#f9f9f9',
-        width: 40,
-        height: 40,
-        borderRadius: 25,
-        borderWidth: 2,
-        borderColor: '#00A651',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 2,
-        marginLeft:5,
-    },
-    circleText: {
-        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
-        fontSize: 20,
-        color: '#00A651',
-        fontWeight: 'bold',
-        marginBottom:2,
-    },
-    profileText: {
-        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
-        fontFamily: 'RobotoCondensed-Bold',
-        fontSize: 14,
-        color: '#000',
-        fontWeight: '400',
-        textAlign: 'left',
-    },
     backButton: {
         fontSize: 16,
         color: '#000',
         fontWeight: 'bold',
         marginLeft: 10,
         paddingRight: 100,
+    },
+    startDonationButton: {
+        backgroundColor: '#00a651',
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 25,
+        marginHorizontal: 15,
+        marginBottom: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    startDonationButtonText: {
+        color: 'white',
+        fontSize: 14,
+        fontFamily: 'RobotoCondensed-Bold',
+        fontWeight: 'bold',
     },
 });
 

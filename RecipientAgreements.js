@@ -4,6 +4,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import BottomNavBarRecipient from './BottomNavBarRecipient'; // Import the BottomNavBar for Recipient
+import HeaderProfile from './HeaderProfile'; // Import HeaderProfile component
 import * as Font from 'expo-font';
 
 const RecipientAgreements = () => {
@@ -42,12 +43,7 @@ const RecipientAgreements = () => {
                 </TouchableOpacity>
             ),
             headerRight: () => (
-                <View style={styles.profileContainer}>
-                    <View style={styles.circle}>
-                        <Text style={styles.circleText}>{username.charAt(0).toUpperCase()}</Text>
-                    </View>
-                    <Text style={styles.profileText}>{username}</Text>
-                </View>
+                <HeaderProfile username={username} />
             ),
             headerTitleAlign: 'center',
             headerStyle: {
@@ -276,40 +272,33 @@ const styles = StyleSheet.create({
         height: 15,
     },
     profileContainer: {
-        width: 47,
-        height: 16,
-        backgroundColor: '#f9f9f9',
-        fontSize: 14,
-        fontFamily: 'RobotoCondensed-Bold',
-        fontWeight: '400',
-        marginRight: 24,
-        marginLeft: 103,
+        alignItems: 'center',
+        marginRight: 20,
         position: 'relative',
     },
     circle: {
-        backgroundColor: '#f9f9f9',
         width: 40,
         height: 40,
-        borderRadius: 25,
+        borderRadius: 20,
         borderWidth: 2,
         borderColor: '#00A651',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 2,
+        backgroundColor: 'transparent',
+        marginBottom: 4,
     },
     circleText: {
-        backgroundColor: 'transparent',
-        fontSize: 20,
+        fontSize: 18,
         color: '#00A651',
+        fontFamily: 'RobotoCondensed-Bold',
         fontWeight: 'bold',
     },
     profileText: {
-        backgroundColor: 'transparent',
         fontFamily: 'RobotoCondensed-Bold',
-        fontSize: 14,
+        fontSize: 12,
         color: '#000',
-        fontWeight: '400',
         textAlign: 'center',
+        maxWidth: 60,
     },
 });
 

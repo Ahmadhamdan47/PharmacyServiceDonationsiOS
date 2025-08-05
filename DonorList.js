@@ -7,6 +7,7 @@ import * as Sharing from 'expo-sharing';
 import XLSX from 'xlsx';
 import { useNavigation, useFocusEffect } from '@react-navigation/native'; // Import useNavigation and useFocusEffect
 import BottomNavBar from './BottomNavBar'; // Import BottomNavBar
+import HeaderProfile from './HeaderProfile'; // Import HeaderProfile component
 import * as Font from 'expo-font';
 
 const DonorList = ({ navigation }) => {
@@ -39,12 +40,7 @@ const DonorList = ({ navigation }) => {
                 </TouchableOpacity>
             ),
             headerRight: () => (
-                <View style={styles.profileContainer}>
-                    <View style={styles.circle}>
-                        <Text style={styles.circleText}>{username.charAt(0).toUpperCase()}</Text>  
-                    </View>
-                    <Text style={styles.profileText}>{username}</Text> 
-                </View>
+                <HeaderProfile username={username} />
             ),
             headerTitleAlign: 'center',
            headerTitleStyle:{
@@ -81,13 +77,17 @@ const DonorList = ({ navigation }) => {
 
     const fetchDonorId = async () => {
         try {
-        const storedUsername = await AsyncStorage.getItem('username');
+            const storedUsername = await AsyncStorage.getItem('username');
+            const storedDonorId = await AsyncStorage.getItem('donorId');
+            
             if (storedUsername) {
                 setUsername(storedUsername); // Set the username state
-                const response = await axios.get(`https://apiv2.medleb.org/donor/byUsername/${storedUsername}`);
-                if (response.data && response.data.DonorId) {
-                    setDonorId(response.data.DonorId);
-                }
+            }
+            
+            if (storedDonorId) {
+                setDonorId(parseInt(storedDonorId));
+            } else {
+                Alert.alert('Error', 'Donor information not found. Please login again.');
             }
         } catch (error) {
             console.error('Failed to load donor info:', error);
@@ -99,7 +99,38 @@ const DonorList = ({ navigation }) => {
         setLoading(true);
         try {
             const response = await axios.get(`https://apiv2.medleb.org/donation/byDonor/${donorId}`);
-            setDonations(response.data);
+            const allDonations = response.data;
+            
+            // Filter donations to only show those with agreed agreements
+            const donationsWithAgreements = [];
+            
+            try {
+                // Check agreements for this donor
+                const agreementResponse = await axios.get(`https://apiv2.medleb.org/RecipientAgreements/Donor/${donorId}`);
+                if (agreementResponse.data && Array.isArray(agreementResponse.data.data)) {
+                    const agreements = agreementResponse.data.data;
+                    
+                    for (const donation of allDonations) {
+                        const hasAgreedAgreement = agreements.some(agreement => 
+                            agreement.RecipientId === donation.RecipientId && agreement.Agreed_Upon === 'agreed'
+                        );
+                        
+                        if (hasAgreedAgreement) {
+                            donationsWithAgreements.push(donation);
+                        }
+                    }
+                }
+            } catch (agreementError) {
+                // Handle 404 error (no agreements found) as normal case
+                if (agreementError.response && agreementError.response.status === 404) {
+                    console.log('No agreements found for this donor - showing no donations');
+                } else {
+                    console.error('Error checking agreements:', agreementError);
+                }
+                // If we can't check agreements or no agreements exist, show no donations
+            }
+            
+            setDonations(donationsWithAgreements);
         } catch (error) {
             console.error("Error fetching donations:", error);
             Alert.alert("Error", "Failed to load donations.");
@@ -211,48 +242,6 @@ const styles = StyleSheet.create({
         paddingTop:10,
         
     },
-    profileContainer: {
-        width: 47,
-        height: 16,
-        backgroundColor: '#f9f9f9',
-        fontSize: 14,
-        fontFamily: 'RobotoCondensed-Bold',
-        marginRight:24,
-        marginLeft: 103,
-        marginBottom:30,
-        
-        position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
-    
-      },
-      circle: {
-        backgroundColor: '#f9f9f9',
-        width: 40,
-        height: 40,
-        borderRadius: 25,
-        borderWidth: 2,
-        borderColor: '#00A651',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 2,
-        marginLeft:5,
-      },
-      circleText: {
-        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
-    
-        fontSize: 20,
-        color: '#00A651',
-        fontFamily: 'RobotoCondensed-Bold',
-        marginBottom:2,
-      },
-      profileText: {
-        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
-    
-        fontSize: 14,
-        color: '#000',
-        fontFamily: 'RobotoCondensed-Bold',
-        textAlign: 'left',
-        
-      },   
     scrollViewContainer: {
         paddingBottom: 20,
     },

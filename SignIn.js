@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useEffect } from "react"
 import { View, TextInput, Text, StyleSheet, Alert, Image, TouchableOpacity, StatusBar } from "react-native"
 import axios from "axios"
@@ -120,12 +118,20 @@ const SignIn = () => {
       const response = await axios.post("https://apiv2.medleb.org/users/login", { username, password })
       console.log(response.data)
       if (response.data.token) {
-        const { token, role, email } = response.data
+        const { token, role, email, donorData, recipientData } = response.data
   
         // Store the token, username, and user role temporarily
         await AsyncStorage.setItem("tempToken", token)
         await AsyncStorage.setItem("tempUsername", username)
         await AsyncStorage.setItem("tempUserRole", role)
+
+        // Store donor or recipient data if available
+        if (donorData) {
+          await AsyncStorage.setItem("tempDonorData", JSON.stringify(donorData))
+        }
+        if (recipientData) {
+          await AsyncStorage.setItem("tempRecipientData", JSON.stringify(recipientData))
+        }
   
         if (email) {
           // Store email for OTP verification
@@ -172,17 +178,37 @@ const SignIn = () => {
         const tempToken = await AsyncStorage.getItem("tempToken")
         const tempUsername = await AsyncStorage.getItem("tempUsername")
         const tempUserRole = await AsyncStorage.getItem("tempUserRole")
+        const tempDonorData = await AsyncStorage.getItem("tempDonorData")
+        const tempRecipientData = await AsyncStorage.getItem("tempRecipientData")
   
         // Move from temp storage to actual storage
         await AsyncStorage.setItem("token", tempToken)
         await AsyncStorage.setItem("username", tempUsername)
         await AsyncStorage.setItem("userRole", tempUserRole)
         await AsyncStorage.setItem("pinSet", "true")
+
+        // Store donor or recipient data permanently
+        if (tempDonorData) {
+          await AsyncStorage.setItem("donorData", tempDonorData)
+          const parsedDonorData = JSON.parse(tempDonorData)
+          if (parsedDonorData.DonorId) {
+            await AsyncStorage.setItem("donorId", parsedDonorData.DonorId.toString())
+          }
+        }
+        if (tempRecipientData) {
+          await AsyncStorage.setItem("recipientData", tempRecipientData)
+          const parsedRecipientData = JSON.parse(tempRecipientData)
+          if (parsedRecipientData.RecipientId) {
+            await AsyncStorage.setItem("recipientId", parsedRecipientData.RecipientId.toString())
+          }
+        }
   
         // Clear temp and OTP-related data
         await AsyncStorage.removeItem("tempToken")
         await AsyncStorage.removeItem("tempUsername")
         await AsyncStorage.removeItem("tempUserRole")
+        await AsyncStorage.removeItem("tempDonorData")
+        await AsyncStorage.removeItem("tempRecipientData")
         await AsyncStorage.removeItem("tempEmail")
         await AsyncStorage.removeItem("otpAttempts")
         await AsyncStorage.removeItem("lockoutEndTime")
@@ -370,7 +396,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     marginBottom: 60,
     width: 315,
-    height: 67,
+    height: 73,
     alignSelf: "center",
     color: "#555",
     fontStyle: "italic",

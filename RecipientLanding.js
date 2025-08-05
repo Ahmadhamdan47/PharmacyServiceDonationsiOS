@@ -77,7 +77,7 @@ const RecipientLanding = () => {
                         <View style={styles.circle}>
                             <Text style={styles.circleText}>{username.charAt(0).toUpperCase()}</Text>
                         </View>
-                        <Text style={styles.profileText}>{username}</Text>
+                        <Text style={styles.profileText}>{username.substring(0, 4)}</Text>
                     </TouchableOpacity>
                 </View>
             ),
@@ -89,11 +89,24 @@ const RecipientLanding = () => {
         <View style={styles.container}>
             {/* Dropdown for profile */}
             {dropdownVisible && (
-                <View style={styles.dropdown}>
-                    <TouchableOpacity onPress={() => navigation.navigate('SignIn')} style={styles.dropdownItem}>
-                        <Text style={styles.dropdownItemText}>Sign Out</Text>
-                    </TouchableOpacity>
-                </View>
+                <>
+                    <TouchableOpacity 
+                        style={styles.dropdownOverlay} 
+                        onPress={() => setDropdownVisible(false)}
+                        activeOpacity={1}
+                    />
+                    <View style={styles.dropdown}>
+                        <TouchableOpacity onPress={() => {
+                            setDropdownVisible(false);
+                            navigation.navigate('Settings');
+                        }} style={styles.dropdownItem}>
+                            <Text style={styles.dropdownItemText}>⚙️ Settings</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => navigation.navigate('SignIn')} style={styles.dropdownItem}>
+                            <Text style={[styles.dropdownItemText, { color: '#e74c3c' }]}>🚪 Sign Out</Text>
+                        </TouchableOpacity>
+                    </View>
+                </>
             )}
 
             <View style={styles.content}>
@@ -165,23 +178,45 @@ const styles = StyleSheet.create({
     },
     dropdown: {
         position: 'absolute',
-        top: 100,
+        top: 10,
         right: 10,
-        backgroundColor: '#fff',
-        padding: 10,
-        borderRadius: 5,
-        elevation: 5, // For Android shadow
-        shadowColor: '#000', // For iOS shadow
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 3,
+        backgroundColor: '#ffffff',
+        borderRadius: 15,
+        minWidth: 160,
+        paddingVertical: 8,
+        elevation: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        borderWidth: 1,
+        borderColor: '#e8e8e8',
+        zIndex: 1000,
+    },
+    dropdownOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'transparent',
+        zIndex: 999,
     },
     dropdownItem: {
-        paddingVertical: 10,
+        paddingVertical: 15,
+        paddingHorizontal: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f5f5f5',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     dropdownItemText: {
         fontSize: 16,
-        color: '#FF0000', // Red color for sign out
+        color: '#333333',
+        fontFamily: 'RobotoCondensed-Medium',
+        textAlign: 'center',
+        letterSpacing: 0.5,
     },
     content: {
         flex: 1,  // Allows the content to take up available space

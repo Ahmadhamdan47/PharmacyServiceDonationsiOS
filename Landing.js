@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBar from './BottomNavBar';
 import BottomNavBarInspection from './BottomNavBarInspection';
 import BottomNavBarRecipient from './BottomNavBarRecipient'; // Import the new BottomNavBar for Recipient
+import HeaderProfile from './HeaderProfile'; // Import the new HeaderProfile component
 import * as Font from 'expo-font';
 import axios from 'axios'; // Import axios
 
@@ -183,17 +184,12 @@ const Landing = () => {
       </View>
       ),
       headerRight: () => (
-      <TouchableOpacity onPress={toggleDropdown} style={styles.profileContainer}>
-        <View style={styles.circle}>
-        <Text style={styles.circleText}>{username.charAt(0).toUpperCase()}</Text>
+      <TouchableOpacity onPress={toggleDropdown}>
+        <HeaderProfile username={username} />
         {userRole === 'Donor' && pendingAgreement && (
           <View style={styles.pendingBadge}>
           <Text style={styles.pendingBadgeText}>{pendingAgreementCount}</Text>
           </View>
-        )}
-        </View>
-        {!dropdownVisible && ( // Conditionally render the username when dropdown is not visible
-        <Text style={styles.profileText}>{username}</Text>
         )}
       </TouchableOpacity>
       ),
@@ -212,21 +208,34 @@ const Landing = () => {
     <View style={styles.container}>
       <StatusBar backgroundColor="#f9f9f9" />
       {dropdownVisible && (
-        <View style={styles.dropdown}>
-          {userRole === 'Admin' && (
-            <TouchableOpacity onPress={handleValidate} style={styles.dropdownItem}>
-              <Text style={styles.dropdownItemText}>Validate</Text>
+        <>
+          <TouchableOpacity 
+            style={styles.dropdownOverlay} 
+            onPress={() => setDropdownVisible(false)}
+            activeOpacity={1}
+          />
+          <View style={styles.dropdown}>
+            <TouchableOpacity onPress={() => {
+              setDropdownVisible(false);
+              navigation.navigate('Settings');
+            }} style={styles.dropdownItem}>
+              <Text style={[styles.dropdownItemText, { color: '#00A651' }]}>⚙️ Settings</Text>
             </TouchableOpacity>
-          )}
-          {userRole === 'Donor' && (
-            <TouchableOpacity onPress={handleAgreements} style={styles.dropdownItem}>
-              <Text style={styles.dropdownItemText}>Agreements</Text>
+            {userRole === 'Admin' && (
+              <TouchableOpacity onPress={handleValidate} style={styles.dropdownItem}>
+                <Text style={[styles.dropdownItemText, { color: '#00A651' }]}>✓ Validate</Text>
+              </TouchableOpacity>
+            )}
+            {userRole === 'Donor' && (
+              <TouchableOpacity onPress={handleAgreements} style={styles.dropdownItem}>
+                <Text style={[styles.dropdownItemText, { color: '#00A651' }]}>📋 Agreements</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={handleSignOut} style={styles.dropdownItem}>
+              <Text style={[styles.dropdownItemText, { color: '#e74c3c' }]}>🚪 Sign Out</Text>
             </TouchableOpacity>
-          )}
-          <TouchableOpacity onPress={handleSignOut} style={styles.dropdownItem}>
-            <Text style={styles.dropdownItemText}>Sign Out</Text>
-          </TouchableOpacity>
-        </View>
+          </View>
+        </>
       )}
 
       <View style={styles.content}>
@@ -290,64 +299,47 @@ const styles = StyleSheet.create({
     height: 108,
     resizeMode: 'contain',
   },
-  profileContainer: {
-    width: 47,
-    height: 16,
-    backgroundColor: '#f9f9f9',
-    fontSize: 14,
-    fontFamily: 'Roboto Condensed',
-    fontWeight: '400',
-    marginRight: 24,
-    marginLeft: 103,
-    marginBottom: 15,
-    position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
-  },
-  circle: {
-    backgroundColor: '#f9f9f9',
-    width: 40,
-    height: 40,
-    borderRadius: 25,
-    borderWidth: 2,
-    borderColor: '#00A651',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 2,
-    marginLeft: 5,
-  },
-  circleText: {
-    backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
-    fontSize: 25,
-    color: '#00A651',
-    fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  profileText: {
-    backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
-    fontFamily: 'RobotoCondensed-Bold',
-    fontSize: 14,
-    color: '#000',
-    textAlign: 'left',
-  },
   dropdown: {
     position: 'absolute',
-    top: 5, // Adjust this value to position directly below the icon
-    right: 20, // Align to the right edge of the screen or the parent container
-    backgroundColor: '#f9f9f9',
-    padding: 10,
-    borderRadius: 5,
-    elevation: 5,
+    top: 10,
+    right: 5,
+    backgroundColor: '#ffffff',
+    borderRadius: 15,
+    minWidth: 180,
+    paddingVertical: 8,
+    elevation: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e8e8e8',
+    zIndex: 1000,
+  },
+  dropdownOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+    zIndex: 999,
   },
   dropdownItem: {
-    paddingVertical: 10,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f5f5f5',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dropdownItemText: {
     fontSize: 16,
-    color: '#000',
-    fontWeight: 'bold',
+    color: '#333333',
+    fontFamily: 'RobotoCondensed-Medium',
+    textAlign: 'center',
+    letterSpacing: 0.5,
   },
   content: {
     flex: 1,

@@ -22,6 +22,7 @@ import RecipientList from './RecipientList'; // Import RecipientList
 import DonorAgreements from './DonorAgreements';
 import AgreementDetails from './AgreementDetails';
 import RecipientAgreement from './RecipientAgreements';
+import Settings from './Settings';
 const Stack = createStackNavigator();
 
 const App = () => {
@@ -60,10 +61,18 @@ const App = () => {
   }, []);
 
   // Fetch donor data
-  const fetchDonorData = async (token) => {
+  const fetchDonorData = async () => {
     try {
-      const response = await axios.get('https://apiv2.medleb.org/donor/byUsername', {
-        headers: { Authorization: `Bearer ${token}` },
+      const storedDonorId = await AsyncStorage.getItem('donorId');
+      const token = await AsyncStorage.getItem('token');
+      
+      if (!storedDonorId) {
+        setIsLoggedIn(false);
+        return;
+      }
+
+      const response = await axios.get(`https://apiv2.medleb.org/Donor/${storedDonorId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         timeout: 2000,  // 2-second timeout
       });
 
@@ -92,7 +101,7 @@ const App = () => {
           setUserRole(role);
 
           if (role === 'Donor') {
-            await fetchDonorData(token);  // For donors, fetch their data
+            await fetchDonorData();  // For donors, fetch their data
           } else {
             setIsLoggedIn(true);  // Admin or other roles, assume logged in
           }
@@ -131,6 +140,7 @@ const App = () => {
         <Stack.Screen name="DonorAgreements" component={DonorAgreements} options={{ title: 'Donor Agreements' }} />
         <Stack.Screen name="AgreementDetails" component={AgreementDetails} options={{ title: 'Agreement Details' }} />
         <Stack.Screen name="RecipientAgreements" component={RecipientAgreement} options={{ title: 'Recipient Agreement' }} />
+        <Stack.Screen name="Settings" component={Settings} options={{ title: 'Settings' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

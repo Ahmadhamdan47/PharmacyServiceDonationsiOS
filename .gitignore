@@ -73,4 +73,8 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Native project folders (for CNG/Prebuild workflow)
+/android
+/ios
+
 # @end expo-cli

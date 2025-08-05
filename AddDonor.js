@@ -5,6 +5,7 @@ import DropDownPicker from 'react-native-dropdown-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import BottomNavBar from './BottomNavBar';  // Import BottomNavBar
+import HeaderProfile from './HeaderProfile'; // Import HeaderProfile component
 import * as Font from 'expo-font';
 
 const AddDonor = () => {
@@ -16,6 +17,7 @@ const AddDonor = () => {
   const [recipientOpen, setRecipientOpen] = useState(false);
   const [donorName, setDonorName] = useState('');
   const [donorId, setDonorId] = useState(null);
+  const [pendingAgreementsCount, setPendingAgreementsCount] = useState(0);
   const navigation = useNavigation();
   const [keyboardVisible, setKeyboardVisible] = useState(false);  // Track keyboard visibility
   const [isFontLoaded, setIsFontLoaded] = useState(false);
@@ -39,6 +41,33 @@ const AddDonor = () => {
   );
 
   useEffect(() => {
+    if (donorId) {
+      checkPendingAgreements();
+    }
+  }, [donorId]);
+
+  const checkPendingAgreements = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      const response = await axios.get(`https://apiv2.medleb.org/RecipientAgreements/Donor/${donorId}`, { headers });
+      if (response.data && Array.isArray(response.data.data)) {
+        const agreements = response.data.data;
+        const pendingCount = agreements.filter(agreement => agreement.Agreed_Upon === 'pending').length;
+        setPendingAgreementsCount(pendingCount);
+      }
+    } catch (error) {
+      // Handle 404 error (no agreements found) as normal case
+      if (error.response && error.response.status === 404) {
+        setPendingAgreementsCount(0);
+      } else {
+        console.error('Error checking pending agreements:', error);
+      }
+    }
+  };
+
+  useEffect(() => {
     // Listen for keyboard show and hide events
     const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
     const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
@@ -58,12 +87,7 @@ const AddDonor = () => {
             </TouchableOpacity>
         ),
         headerRight: () => (
-            <View style={styles.profileContainer}>
-                <View style={styles.circle}>
-                    <Text style={styles.circleText}>{donorName.charAt(0).toUpperCase()}</Text>  
-                </View>
-                <Text style={styles.profileText}>{donorName}</Text> 
-            </View>
+            <HeaderProfile username={donorName} notificationCount={pendingAgreementsCount} />
         ),
         headerTitleAlign: 'center',
         headerTitleStyle: {
@@ -74,33 +98,43 @@ const AddDonor = () => {
 
         },
         headerStyle: {
-          height: 100, 
+ 
           backgroundColor: '#f9f9f9',
           elevation: 0, 
           shadowOpacity: 0, 
           borderBottomWidth: 0,  
       },
     });
-}, [navigation, donorName]);
+}, [navigation, donorName, pendingAgreementsCount]);
 
   const fetchDonorNameAndId = async () => {
     try {
       const storedUsername = await AsyncStorage.getItem('username');
+      const storedDonorId = await AsyncStorage.getItem('donorId');
+      
       if (storedUsername) {
         setDonorName(storedUsername);
-        const response = await axios.get(`https://apiv2.medleb.org/donor/byUsername/${storedUsername}`);
-        if (response.data && response.data.DonorId) {
-          setDonorId(response.data.DonorId);
-        }
+      }
+      
+      if (storedDonorId) {
+        setDonorId(parseInt(storedDonorId));
+        console.log('Donor ID loaded from storage:', storedDonorId);
+      } else {
+        console.warn('No donor ID found in storage');
+        Alert.alert('Error', 'Donor information not found. Please login again.');
       }
     } catch (error) {
-      console.error('Failed to load username or donor info:', error);
+      console.error('Failed to load donor information from storage:', error);
+      Alert.alert('Error', 'Failed to load donor information. Please login again.');
     }
   };
 
   const fetchRecipients = async () => {
     try {
-      const response = await axios.get("https://apiv2.medleb.org/recipient/all");
+      const token = await AsyncStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      const response = await axios.get("https://apiv2.medleb.org/recipient/all", { headers });
       const recipientsData = response.data.map(recipient => ({
         label: recipient.RecipientName,
         value: recipient.RecipientId
@@ -111,9 +145,53 @@ const AddDonor = () => {
     }
   };
 
+  const checkExistingAgreement = async (donorId, recipientId, headers = {}) => {
+    try {
+      const response = await axios.get(`https://apiv2.medleb.org/RecipientAgreements/Donor/${donorId}`, { headers });
+      if (response.data && Array.isArray(response.data.data)) {
+        const agreements = response.data.data;
+        // Find agreement between this donor and recipient
+        const existingAgreement = agreements.find(agreement => 
+          agreement.RecipientId === recipientId
+        );
+        return existingAgreement;
+      }
+      return null;
+    } catch (error) {
+      // Handle 404 error (no agreements found) as normal case
+      if (error.response && error.response.status === 404) {
+        console.log('No existing agreements found for this donor');
+        return null;
+      }
+      console.error('Error checking existing agreement:', error);
+      return null;
+    }
+  };
+
+  const createNewAgreement = async (donorId, recipientId, donationId, headers = {}) => {
+    try {
+      const agreementResponse = await axios.post("https://apiv2.medleb.org/RecipientAgreements/add", {
+        DonationId: donationId,
+        DonorId: donorId,
+        RecipientId: recipientId,
+        Agreed_Upon: "pending",
+        expenses_on: "donor", // Add the required expenses_on field
+      }, { headers });
+      return agreementResponse.data;
+    } catch (error) {
+      console.error("Error creating agreement:", error);
+      throw error;
+    }
+  };
+
   const handleContinue = async () => {
     if (!donationTitle.trim()) {
       Alert.alert('Error', 'Donation title is required.');
+      return;
+    }
+
+    if (!selectedRecipient) {
+      Alert.alert('Error', 'Please select a recipient.');
       return;
     }
 
@@ -123,28 +201,38 @@ const AddDonor = () => {
     }
 
     try {
+      // Get the authentication token
+      const token = await AsyncStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      // First check if there's an existing agreement between donor and recipient
+      const existingAgreement = await checkExistingAgreement(donorId, selectedRecipient, headers);
+      
+      // Create the donation first
       const response = await axios.post("https://apiv2.medleb.org/donation/add", {
         DonorId: donorId,
         RecipientId: selectedRecipient,
         DonationTitle: donationTitle,
         DonationPurpose: donationPurpose,
         DonationDate: new Date().toISOString(),
-      });
-
+      }, { headers });
+      
       const donationId = response.data.DonationId;
-      const selectedRecipientName = recipients.find(recipient => recipient.value === selectedRecipient).label;
-      const donationDate = new Date().toISOString().replace(/:/g, '-');
-      navigation.navigate('Donate', {
-        donorId,
-        recipientId: selectedRecipient,
-        donorName,
-        recipientName: selectedRecipientName,
-        donationPurpose,
-        donationDate,
-        donationId,
-      });
+
+      if (existingAgreement && existingAgreement.Agreed_Upon === 'agreed') {
+        // Agreement exists and is agreed - go to agreements to proceed
+        navigation.navigate('DonorAgreements', { username: donorName });
+      } else if (existingAgreement && existingAgreement.Agreed_Upon === 'pending') {
+        // Agreement exists but is still pending - go to agreements
+        navigation.navigate('DonorAgreements', { username: donorName });
+      } else {
+        // No existing agreement or agreement was refused - create new agreement then go to agreements
+        await createNewAgreement(donorId, selectedRecipient, donationId, headers);
+        navigation.navigate('DonorAgreements', { username: donorName });
+      }
     } catch (error) {
-      console.error("Error creating donation:", error);
+      console.error("Error creating donation or agreement:", error);
+      Alert.alert('Error', 'Failed to create donation. Please try again.');
     }
   };
 
@@ -178,6 +266,8 @@ const AddDonor = () => {
               onClose={() => setIsInputFocused(false)}
               style={styles.picker}
               dropDownContainerStyle={styles.dropDownContainer}
+              searchable={true}
+              searchPlaceholder="Search recipients..."
             />
           </View>
 

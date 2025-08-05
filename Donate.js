@@ -1,5 +1,3 @@
-"use client"
-
 import React, { useState, useEffect, useRef } from "react"
 import {
   View,
@@ -16,9 +14,7 @@ import {
   StatusBar,
 } from "react-native"
 import AsyncStorage from "@react-native-async-storage/async-storage"
-import { Camera } from "expo-camera"
-import { BarCodeScanner } from "expo-barcode-scanner"
-import { CameraType } from "expo-camera/build/legacy/Camera.types"
+import { CameraView, useCameraPermissions } from "expo-camera"
 import axios from "axios"
 import DropDownPicker from "react-native-dropdown-picker"
 import Icon from "react-native-vector-icons/FontAwesome"
@@ -27,6 +23,7 @@ import * as FileSystem from "expo-file-system"
 import * as Sharing from "expo-sharing"
 import XLSX from "xlsx"
 import BottomNavBar from "./BottomNavBar" // Import BottomNavBar
+import HeaderProfile from "./HeaderProfile" // Import HeaderProfile component
 import * as Font from "expo-font"
 
 const createEmptyBatchLot = () => ({
@@ -285,6 +282,7 @@ const BatchLotForm = React.forwardRef(
 
 const Donate = ({ route }) => {
   const [username, setUsername] = useState("")
+  const [permission, requestPermission] = useCameraPermissions()
 
   useEffect(() => {
     const fetchUsername = async () => {
@@ -330,8 +328,6 @@ const Donate = ({ route }) => {
   const batchLotRefs = useRef([])
   const [batchLots, setBatchLots] = useState([createEmptyBatchLot()])
   const [isCameraOpen, setIsCameraOpen] = useState(false)
-  const [type, setType] = useState(CameraType.back)
-  const [permission, setPermission] = useState(null)
   const [cameraIndex, setCameraIndex] = useState(null)
   const [drugItems, setDrugItems] = useState([])
   const [scrollEnabled, setScrollEnabled] = useState(true)
@@ -371,12 +367,6 @@ const Donate = ({ route }) => {
       ),
     })
   }, [navigation, packCounter])
-  useEffect(() => {
-    ;(async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync()
-      setPermission(status === "granted")
-    })()
-  }, [])
 
   useEffect(() => {
     fetchDrugNames()
@@ -593,25 +583,42 @@ const Donate = ({ route }) => {
   }
 
   const handleOpenCamera = async (index) => {
-    if (permission === null) {
-      const { status } = await Camera.requestPermissionsAsync()
-      setPermission(status === "granted")
-      setIsCameraOpen(status === "granted")
-      setCameraIndex(index)
-      if (!status === "granted") {
-        Alert.alert("Permission denied", "Camera permission is required to use the camera.")
+    try {
+      if (!permission) {
+        // Request permission if not granted
+        console.log("Requesting camera permission...")
+        const result = await requestPermission()
+        
+        if (result.granted) {
+          setIsCameraOpen(true)
+          setCameraIndex(index)
+        } else {
+          Alert.alert(
+            "Camera Permission Required", 
+            "Please allow camera access in your device settings to scan barcodes.",
+            [{ text: "OK" }]
+          )
+        }
+      } else if (!permission.granted) {
+        Alert.alert(
+          "Camera Permission Denied", 
+          "Camera permission is required to scan barcodes. Please enable it in your device settings.",
+          [{ text: "OK" }]
+        )
+      } else {
+        // Permission already granted
+        const currentRef = batchLotRefs.current[index]
+        if (currentRef) {
+          currentRef.measureLayout(scrollViewRef.current, (x, y) => {
+            setScrollPosition(y)
+          })
+        }
+        setIsCameraOpen(true)
+        setCameraIndex(index)
       }
-    } else if (permission === false) {
-      Alert.alert("Permission denied", "Camera permission is required to use the camera.")
-    } else {
-      const currentRef = batchLotRefs.current[index]
-      if (currentRef) {
-        currentRef.measureLayout(scrollViewRef.current, (x, y) => {
-          setScrollPosition(y)
-        })
-      }
-      setIsCameraOpen(true)
-      setCameraIndex(index)
+    } catch (error) {
+      console.error("Error opening camera:", error)
+      Alert.alert("Error", "Failed to open camera. Please try again.")
     }
   }
 
@@ -864,20 +871,7 @@ const Donate = ({ route }) => {
   const handleFinishDonation = () => {
     setConfirmModalVisible(true)
   }
-  const createAgreement = async () => {
-    try {
-      console.log("Creating recipient agreement...")
-      const agreementResponse = await axios.post("https://apiv2.medleb.org/RecipientAgreements/add", {
-        DonationId: donationId,
-        DonorId: donorId,
-        RecipientId: recipientId,
-        Agreed_Upon: "pending",
-      })
-      console.log("Recipient agreement created successfully:", agreementResponse.data)
-    } catch (error) {
-      console.error("Error creating recipient agreement:", error)
-    }
-  }
+  
   const handleNavigation = (routeName) => {
     Alert.alert(
       "Confirm Navigation",
@@ -899,10 +893,13 @@ const Donate = ({ route }) => {
   return (
     <View style={styles.container}>
       {isCameraOpen ? (
-        <BarCodeScanner
+        <CameraView
           style={{ ...StyleSheet.absoluteFillObject, height: "100%" }}
-          type={type}
-          onBarCodeScanned={handleBarcodeDetected}
+          facing="back"
+          onBarcodeScanned={handleBarcodeDetected}
+          barcodeScannerSettings={{
+            barcodeTypes: ["datamatrix", "qr", "code128", "code39", "ean13", "ean8", "upc_a", "upc_e"],
+          }}
         />
       ) : (
         <ScrollView
@@ -1195,7 +1192,6 @@ const Donate = ({ route }) => {
                 style={[styles.modalButton, styles.addBoxButton]}
                 onPress={() => {
                   setConfirmModalVisible(false)
-                  createAgreement()
                   navigation.navigate("DonorList")
                 }}
               >

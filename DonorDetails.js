@@ -4,6 +4,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomNavBarInspection
+import HeaderProfile from './HeaderProfile'; // Import HeaderProfile component
 
 const DonorDetails = ({ route, navigation }) => {
     const { donor } = route.params;
@@ -23,12 +24,7 @@ const DonorDetails = ({ route, navigation }) => {
                 </TouchableOpacity>
             ),
             headerRight: () => (
-                <View style={styles.profileContainer}>
-                    <View style={styles.circle}>
-                        <Text style={styles.circleText}>{username.charAt(0).toUpperCase()}</Text>
-                    </View>
-                    <Text style={styles.profileText}>{username}</Text>
-                </View>
+                <HeaderProfile username={username} />
             ),
             headerTitleAlign: 'center',
             headerStyle: {
@@ -55,7 +51,7 @@ const DonorDetails = ({ route, navigation }) => {
     const handleApproval = async (isActive) => {
         setIsLoading(true);
         try {
-            await axios.put(`https://apiv2.medleb.org/donor/${donor.DonorId}`, {
+            await axios.put(`https://apiv2.medleb.org/Donor/${donor.DonorId}`, {
                 IsActive: isActive,
             });
             Alert.alert('Success', isActive ? 'Donor Approved' : 'Donor Rejected');

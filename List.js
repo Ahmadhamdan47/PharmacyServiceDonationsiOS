@@ -5,12 +5,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
 import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomNavBarInspection
+import HeaderProfile from './HeaderProfile'; // Import HeaderProfile component
 import * as Font from 'expo-font';
 
 const List = () => {
     const [donations, setDonations] = useState([]);
+    const [importations, setImportations] = useState([]);
     const [donors, setDonors] = useState([]);
     const [recipients, setRecipients] = useState([]);
+    const [selectedType, setSelectedType] = useState('Donations'); // New: Donations or Importations
     const [donorId, setDonorId] = useState('');
     const [recipientId, setRecipientId] = useState('');
     const [status, setStatus] = useState('All');
@@ -56,12 +59,7 @@ const List = () => {
                 </TouchableOpacity>
             ),
             headerRight: () => (
-                <View style={styles.profileContainer}>
-                    <View style={styles.circle}>
-                        <Text style={styles.circleText}>{username.charAt(0).toUpperCase()}</Text>
-                    </View>
-                    <Text style={styles.profileText}>{username}</Text>
-                </View>
+                <HeaderProfile username={username} />
             ),
             headerTitleAlign: 'center',
            
@@ -86,28 +84,51 @@ const List = () => {
         }
     };
 
-    const fetchDonations = async () => {
-        setDonations([]);
-        try {
-            const response = await axios.get('https://apiv2.medleb.org/donation/filtered', {
-                params: {
-                    donorId,
-                    recipientId,
-                    status: status === 'All' ? '' : status,
-                    fromDate: fromDate ? fromDate.toISOString().split('T')[0] : '',
-                    toDate: toDate ? toDate.toISOString().split('T')[0] : '',
-                },
-            });
+    const fetchData = async () => {
+        if (selectedType === 'Donations') {
+            setDonations([]);
+            try {
+                const response = await axios.get('https://apiv2.medleb.org/donation/filtered', {
+                    params: {
+                        donorId,
+                        recipientId,
+                        status: status === 'All' ? '' : status,
+                        fromDate: fromDate ? fromDate.toISOString().split('T')[0] : '',
+                        toDate: toDate ? toDate.toISOString().split('T')[0] : '',
+                    },
+                });
 
-            if (Array.isArray(response.data)) {
-                setDonations(response.data);
-            } else {
-                console.error('Unexpected response structure:', response.data);
+                if (Array.isArray(response.data)) {
+                    setDonations(response.data);
+                } else {
+                    console.error('Unexpected response format:', response.data);
+                    setDonations([]);
+                }
+            } catch (error) {
+                console.error('Error fetching donations:', error);
                 setDonations([]);
             }
-        } catch (error) {
-            console.error('Error fetching donations:', error);
-            setDonations([]);
+        } else {
+            setImportations([]);
+            try {
+                const response = await axios.get('https://apiv2.medleb.org/importation/filtered', {
+                    params: {
+                        status: status === 'All' ? '' : status,
+                        fromDate: fromDate ? fromDate.toISOString().split('T')[0] : '',
+                        toDate: toDate ? toDate.toISOString().split('T')[0] : '',
+                    },
+                });
+
+                if (Array.isArray(response.data)) {
+                    setImportations(response.data);
+                } else {
+                    console.error('Unexpected response format:', response.data);
+                    setImportations([]);
+                }
+            } catch (error) {
+                console.error('Error fetching importations:', error);
+                setImportations([]);
+            }
         }
     };
 
@@ -168,6 +189,11 @@ const List = () => {
             <StatusBar backgroundColor="#f9f9f9"/>
 
             <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+                {/* Type Selection */}
+                <TouchableOpacity style={styles.typeButton} onPress={() => setSelectedType(selectedType === 'Donations' ? 'Importations' : 'Donations')}>
+                    <Text style={styles.typeButtonText}>{selectedType}</Text>
+                </TouchableOpacity>
+
                 {/* First Row: Date Filters */}
                 <View style={styles.dateRangeContainer}>
                     <TouchableOpacity style={styles.dateContainer} onPress={() => setShowFromDatePicker(true)}>
@@ -191,53 +217,57 @@ const List = () => {
                 {/* Second Row: Donor, Recipient, Status */}
                 {/* Donor, Recipient, and Status Fields in a Row */}
                 <View style={styles.filterRow}>
-                    {/* Donor */}
-                    <View style={styles.filterColumn}>
-                        <Text style={styles.filterLabel}>Donor</Text>
-                        <TouchableOpacity onPress={() => setShowDonorPicker(!showDonorPicker)} style={styles.filterButton}>
-                            <Text style={styles.filterText}>
-                                {donors.find(d => d.DonorId === donorId)?.DonorName || 'All'}
-                            </Text>
-                        </TouchableOpacity>
-                        {showDonorPicker && (
-                            <View style={styles.dropdown}>
-                                <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
-                                    <TouchableOpacity onPress={() => { setDonorId(''); setShowDonorPicker(false); }}>
-                                        <Text style={styles.dropdownText}>All</Text>
-                                    </TouchableOpacity>
-                                    {donors.map((d) => (
-                                        <TouchableOpacity key={d.DonorId} onPress={() => { setDonorId(d.DonorId); setShowDonorPicker(false); }}>
-                                            <Text style={styles.dropdownText}>{d.DonorName}</Text>
+                    {/* Donor - Only show for Donations */}
+                    {selectedType === 'Donations' && (
+                        <View style={styles.filterColumn}>
+                            <Text style={styles.filterLabel}>Donor</Text>
+                            <TouchableOpacity onPress={() => setShowDonorPicker(!showDonorPicker)} style={styles.filterButton}>
+                                <Text style={styles.filterText}>
+                                    {donors.find(d => d.DonorId === donorId)?.DonorName || 'All'}
+                                </Text>
+                            </TouchableOpacity>
+                            {showDonorPicker && (
+                                <View style={styles.dropdown}>
+                                    <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
+                                        <TouchableOpacity onPress={() => { setDonorId(''); setShowDonorPicker(false); }}>
+                                            <Text style={styles.dropdownText}>All</Text>
                                         </TouchableOpacity>
-                                    ))}
-                                </ScrollView>
-                            </View>
-                        )}
-                    </View>
+                                        {donors.map((d) => (
+                                            <TouchableOpacity key={d.DonorId} onPress={() => { setDonorId(d.DonorId); setShowDonorPicker(false); }}>
+                                                <Text style={styles.dropdownText}>{d.DonorName}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                </View>
+                            )}
+                        </View>
+                    )}
 
-                    {/* Recipient */}
-                    <View style={styles.filterColumn}>
-                        <Text style={styles.filterLabel}>Recipient</Text>
-                        <TouchableOpacity onPress={() => setShowRecipientPicker(!showRecipientPicker)} style={styles.filterButton}>
-                            <Text style={styles.filterText}>
-                                {recipients.find(r => r.RecipientId === recipientId)?.RecipientName || 'All'}
-                            </Text>
-                        </TouchableOpacity>
-                        {showRecipientPicker && (
-                            <View style={styles.dropdown}>
-                                <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
-                                    <TouchableOpacity onPress={() => { setRecipientId(''); setShowRecipientPicker(false); }}>
-                                        <Text style={styles.dropdownText}>All</Text>
-                                    </TouchableOpacity>
-                                    {recipients.map((r) => (
-                                        <TouchableOpacity key={r.RecipientId} onPress={() => { setRecipientId(r.RecipientId); setShowRecipientPicker(false); }}>
-                                            <Text style={styles.dropdownText}>{r.RecipientName}</Text>
+                    {/* Recipient - Only show for Donations */}
+                    {selectedType === 'Donations' && (
+                        <View style={styles.filterColumn}>
+                            <Text style={styles.filterLabel}>Recipient</Text>
+                            <TouchableOpacity onPress={() => setShowRecipientPicker(!showRecipientPicker)} style={styles.filterButton}>
+                                <Text style={styles.filterText}>
+                                    {recipients.find(r => r.RecipientId === recipientId)?.RecipientName || 'All'}
+                                </Text>
+                            </TouchableOpacity>
+                            {showRecipientPicker && (
+                                <View style={styles.dropdown}>
+                                    <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
+                                        <TouchableOpacity onPress={() => { setRecipientId(''); setShowRecipientPicker(false); }}>
+                                            <Text style={styles.dropdownText}>All</Text>
                                         </TouchableOpacity>
-                                    ))}
-                                </ScrollView>
-                            </View>
-                        )}
-                    </View>
+                                        {recipients.map((r) => (
+                                            <TouchableOpacity key={r.RecipientId} onPress={() => { setRecipientId(r.RecipientId); setShowRecipientPicker(false); }}>
+                                                <Text style={styles.dropdownText}>{r.RecipientName}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                </View>
+                            )}
+                        </View>
+                    )}
 
                     {/* Status */}
                     <View style={styles.filterColumn}>
@@ -261,53 +291,90 @@ const List = () => {
 
 
                 {/* Third Row: Filter Button */}
-                <TouchableOpacity style={styles.searchButton} onPress={fetchDonations}>
-    <Image source={require('./assets/search.png')} style={styles.searchIcon} />
-</TouchableOpacity>
+                <TouchableOpacity style={styles.searchButton} onPress={fetchData}>
+                    <Image source={require('./assets/search.png')} style={styles.searchIcon} />
+                </TouchableOpacity>
 
 
                 {/* Results Count */}
                 <Image source={require('./assets/separator-green.png')} style={styles.separator} />
-                <Text style={styles.resultCount}>number of result(s): {donations.length}</Text>
+                <Text style={styles.resultCount}>number of result(s): {selectedType === 'Donations' ? donations.length : importations.length}</Text>
 
-                {/* Donations List */}
+                {/* Data List */}
                 <ScrollView>
-                    {donations.map((donation, index) => (
-                     <TouchableOpacity 
-                     key={index} 
-                     style={styles.card} 
-                     onPress={() => navigation.navigate('DonationDetails', { donation })}
-                 >
-                     <View style={styles.cardHeader}>
-                         <Text style={[styles.statusText, { color: getStatusColor(donation.status) }]}>{donation.status}</Text>
-                     </View>
-                     
-                     <View style={styles.cardContent}>
-                         {/* Two columns: left for Donation Title and Date, right for From, To, and Number of boxes */}
-                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                             
-                             {/* Left column */}
-                             <View style={{ flex: 1, marginRight: 10, marginLeft: 10,}}>
-                                 <Text style={[styles.cardTitle, ]}>Donation Title</Text>
-                                 <Text style={[styles.cardText, ]}>{donation.DonationTitle}</Text>
-                                 <Text style={[styles.cardTitle, ]}>Date</Text>
-                                 <Text style={styles.cardText}>{donation.DonationDate}</Text>
-                             </View>
-                 
-                             {/* Right column */}
-                             <View style={{ flex: 1, marginLeft: 10, paddingBottom:20, }}>
-                                 <Text style={[styles.cardTitle, ]}>From</Text>
-                                 <Text style={[styles.cardText, ]}>{donation.DonorName}</Text>
-                                 <Text style={[styles.cardTitle, ]}>To</Text>
-                                 <Text style={[styles.cardText, ]}>{donation.RecipientName}</Text>
-                                 <Text style={[styles.cardTitle,]}>nb of box(es)</Text>
-                                 <Text style={styles.cardText}>{donation.NumberOfBoxes || 0}</Text>
-                             </View>
-                         </View>
-                     </View>
-                 </TouchableOpacity>
-                 
-                    ))}
+                    {selectedType === 'Donations' ? (
+                        donations.map((donation, index) => (
+                            <TouchableOpacity 
+                                key={index} 
+                                style={styles.card} 
+                                onPress={() => navigation.navigate('DonationDetails', { donation })}
+                            >
+                                <View style={styles.cardHeader}>
+                                    <Text style={[styles.statusText, { color: getStatusColor(donation.status) }]}>{donation.status}</Text>
+                                </View>
+                                
+                                <View style={styles.cardContent}>
+                                    {/* Two columns: left for Donation Title and Date, right for From, To, and Number of boxes */}
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                        
+                                        {/* Left column */}
+                                        <View style={{ flex: 1, marginRight: 10, marginLeft: 10,}}>
+                                            <Text style={[styles.cardTitle, ]}>Donation Title</Text>
+                                            <Text style={[styles.cardText, ]}>{donation.DonationTitle}</Text>
+                                            <Text style={[styles.cardTitle, ]}>Date</Text>
+                                            <Text style={styles.cardText}>{donation.DonationDate}</Text>
+                                        </View>
+                            
+                                        {/* Right column */}
+                                        <View style={{ flex: 1, marginLeft: 10, paddingBottom:20, }}>
+                                            <Text style={[styles.cardTitle, ]}>From</Text>
+                                            <Text style={[styles.cardText, ]}>{donation.DonorName}</Text>
+                                            <Text style={[styles.cardTitle, ]}>To</Text>
+                                            <Text style={[styles.cardText, ]}>{donation.RecipientName}</Text>
+                                            <Text style={[styles.cardTitle,]}>nb of box(es)</Text>
+                                            <Text style={styles.cardText}>{donation.NumberOfBoxes || 0}</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
+                        ))
+                    ) : (
+                        importations.map((importation, index) => (
+                            <TouchableOpacity 
+                                key={index} 
+                                style={styles.card} 
+                                onPress={() => navigation.navigate('ImportationDetails', { importation })}
+                            >
+                                <View style={styles.cardHeader}>
+                                    <Text style={[styles.statusText, { color: getStatusColor(importation.status) }]}>{importation.status}</Text>
+                                </View>
+                                
+                                <View style={styles.cardContent}>
+                                    {/* Two columns: left for Importation Title and Date, right for Company and Number of boxes */}
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                        
+                                        {/* Left column */}
+                                        <View style={{ flex: 1, marginRight: 10, marginLeft: 10,}}>
+                                            <Text style={[styles.cardTitle, ]}>Importation Title</Text>
+                                            <Text style={[styles.cardText, ]}>{importation.ImportationTitle || 'N/A'}</Text>
+                                            <Text style={[styles.cardTitle, ]}>Date</Text>
+                                            <Text style={styles.cardText}>{importation.ImportationDate || importation.CreatedDate}</Text>
+                                        </View>
+                            
+                                        {/* Right column */}
+                                        <View style={{ flex: 1, marginLeft: 10, paddingBottom:20, }}>
+                                            <Text style={[styles.cardTitle, ]}>Company</Text>
+                                            <Text style={[styles.cardText, ]}>{importation.CompanyName || 'N/A'}</Text>
+                                            <Text style={[styles.cardTitle, ]}>Country</Text>
+                                            <Text style={[styles.cardText, ]}>{importation.CountryName || 'N/A'}</Text>
+                                            <Text style={[styles.cardTitle,]}>nb of box(es)</Text>
+                                            <Text style={styles.cardText}>{importation.NumberOfBoxes || 0}</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
+                        ))
+                    )}
                 </ScrollView>
             </ScrollView>
 
@@ -331,50 +398,6 @@ const styles = StyleSheet.create({
         marginLeft:30,
         marginRight:30,
     },
-    profileContainer: {
-        width: 47,
-        height: 16,
-        backgroundColor: '#f9f9f9',
-        fontSize: 14,
-        fontFamily: 'Roboto Condensed',
-        fontWeight: '400',
-        marginRight:24,
-        marginLeft: 103,
-        marginBottom:30,
-        
-        position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
-    
-      },
-      circle: {
-        backgroundColor: '#f9f9f9',
-        width: 40,
-        height: 40,
-        borderRadius: 25,
-        borderWidth: 2,
-        borderColor: '#00A651',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 2,
-        marginLeft:5,
-      },
-      circleText: {
-        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
-    
-        fontSize: 20,
-        color: '#00A651',
-        fontWeight: 'bold',
-        marginBottom:2,
-      },
-      profileText: {
-        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
-        fontFamily: 'RobotoCondensed-Bold',
-
-        fontSize: 14,
-        color: '#000',
-        fontWeight: '400',
-        textAlign: 'left',
-        
-      },
           backButton: {
         fontSize: 16,
         color: '#000',
@@ -540,7 +563,23 @@ const styles = StyleSheet.create({
     separator:{
         marginTop:10,
         
-    }
+    },
+    typeButton: {
+        backgroundColor: '#00A651',
+        borderWidth: 1,
+        borderColor: '#00A651',
+        borderRadius: 20,
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        marginBottom: 15,
+        alignSelf: 'center',
+    },
+    typeButtonText: {
+        fontSize: 16,
+        color: '#fff',
+        fontFamily: 'RobotoCondensed-Bold',
+        textAlign: 'center',
+    },
 });
 
 export default List;

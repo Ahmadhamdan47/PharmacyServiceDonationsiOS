@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx';
 import * as Font from 'expo-font';
 
 const BoxInspection = ({ route, navigation }) => {
-    const { boxId } = route.params;
+    const { boxId, type = 'donation' } = route.params; // Add type parameter with default
     const [boxLabel, setBoxLabel] = useState('');
     const [donationTitle, setDonationTitle] = useState('');
     const [donorName, setDonorName] = useState('');
@@ -38,30 +38,59 @@ const [isFontLoaded, setIsFontLoaded] = useState(false);
 useEffect(() => {
     const fetchBoxDetails = async () => {
         try {
-            // Fetch box details
-            const boxResponse = await axios.get(`https://apiv2.medleb.org/boxes/${boxId}`);
-            const boxData = boxResponse.data;
-            console.log('Box Data:', boxData); // Log box data
-            setBoxLabel(boxData.BoxLabel);
+            let boxData;
+            // Fetch box details based on type
+            if (type === 'importation') {
+                const boxResponse = await axios.get(`https://apiv2.medleb.org/importation-boxes/${boxId}`);
+                boxData = boxResponse.data;
+                console.log('Importation Box Data:', boxData);
+                setBoxLabel(boxData.BoxLabel);
+                
+                // For importations, we don't have donation data
+                setDonationTitle('Importation Batch');
+                setDonorName('N/A');
+                setRecipientName('N/A');
+            } else {
+                // Original donation logic
+                const boxResponse = await axios.get(`https://apiv2.medleb.org/boxes/${boxId}`);
+                boxData = boxResponse.data;
+                console.log('Box Data:', boxData);
+                setBoxLabel(boxData.BoxLabel);
 
-            // Fetch donation details
-            const donationResponse = await axios.get(`https://apiv2.medleb.org/donation/${boxData.DonationId}`);
-            const donationData = donationResponse.data;
-            console.log('Donation Data:', donationData); // Log donation data
-            setDonationTitle(donationData.DonationTitle);
-            setDonorName(donationData.DonorName);
-            setRecipientName(donationData.RecipientName);
+                // Fetch donation details
+                const donationResponse = await axios.get(`https://apiv2.medleb.org/donation/${boxData.DonationId}`);
+                const donationData = donationResponse.data;
+                console.log('Donation Data:', donationData);
+                setDonationTitle(donationData.DonationTitle);
+
+                // Fetch donor details
+                const donorResponse = await axios.get(`https://apiv2.medleb.org/Donor/${donationData.DonorId}`);
+                const donorData = donorResponse.data;
+                console.log('Donor Data:', donorData);
+                setDonorName(donorData.DonorName);
+
+                // Fetch recipient details
+                const recipientResponse = await axios.get(`https://apiv2.medleb.org/recipient/${donationData.RecipientId}`);
+                const recipientData = recipientResponse.data;
+                console.log('Recipient Data:', recipientData);
+                setRecipientName(recipientData.RecipientName);
+            }
 
             // Fetch batch serial numbers
-            const batchesResponse = await axios.get(`https://apiv2.medleb.org/batchserial/byBox/${boxId}`);
+            let batchesResponse;
+            if (type === 'importation') {
+                batchesResponse = await axios.get(`https://apiv2.medleb.org/importation-batchserial/byBox/${boxId}`);
+            } else {
+                batchesResponse = await axios.get(`https://apiv2.medleb.org/batchserial/byBox/${boxId}`);
+            }
             const batchesData = batchesResponse.data.data;
-            console.log('Batch Lots Data:', batchesData); // Log batch lots data
+            console.log('Batch Lots Data:', batchesData);
             setBatchLots(batchesData);
 
             // Check if all batches are inspected
             const allInspected = batchesData.every(batch => batch.Inspection === 'inspected');
             if (allInspected) {
-                await markBoxAsInspected(boxId);
+                await markBoxAsInspected(boxId, type);
             }
         } catch (error) {
             console.error('Error fetching box details:', error);
@@ -105,9 +134,12 @@ useEffect(() => {
     fetchBoxDetails();
 }, [boxId, donationTitle, donorName, recipientName, boxLabel]); // Add state dependencies for the header title
 
-    const markBoxAsInspected = async (boxId) => {
+    const markBoxAsInspected = async (boxId, boxType = 'donation') => {
         try {
-            await axios.put(`https://apiv2.medleb.org/boxes/inspected/${boxId}`);
+            const endpoint = boxType === 'importation' 
+                ? `https://apiv2.medleb.org/importation-boxes/inspected/${boxId}`
+                : `https://apiv2.medleb.org/boxes/inspected/${boxId}`;
+            await axios.put(endpoint);
             Alert.alert('Success', 'Box marked as inspected.');
         } catch (error) {
             console.error('Error marking box as inspected:', error);
@@ -138,7 +170,10 @@ useEffect(() => {
                 }
     
                 // Call the API to inspect each selected pack using batchSerialNumberId and include the inspectedBy parameter
-                const response = await axios.put(`https://apiv2.medleb.org/batchserial/inspect/${batchLot.BatchSerialNumberId}`, {
+                const endpoint = type === 'importation'
+                    ? `https://apiv2.medleb.org/importation-batchserial/inspect/${batchLot.BatchSerialNumberId}`
+                    : `https://apiv2.medleb.org/batchserial/inspect/${batchLot.BatchSerialNumberId}`;
+                const response = await axios.put(endpoint, {
                     inspectedBy: 'Box' // Adding inspectedBy parameter
                 });
                 
@@ -153,7 +188,7 @@ useEffect(() => {
             if (alreadyRejected) {
                 Alert.alert('Error', 'You have some already rejected packs.');
             } else {
-                await markBoxAsInspected(boxId);
+                await markBoxAsInspected(boxId, type);
                 Alert.alert('Success', 'Selected packs inspected successfully.');
             }
     
@@ -170,7 +205,10 @@ useEffect(() => {
                 const batchLot = batchLots[index];
     
                 // Call the API to reject each selected pack using batchSerialNumberId
-                const response = await axios.put(`https://apiv2.medleb.org/batchserial/reject/${batchLot.BatchSerialNumberId}`);
+                const endpoint = type === 'importation'
+                    ? `https://apiv2.medleb.org/importation-batchserial/reject/${batchLot.BatchSerialNumberId}`
+                    : `https://apiv2.medleb.org/batchserial/reject/${batchLot.BatchSerialNumberId}`;
+                const response = await axios.put(endpoint);
     
                 if (response.data.message) {
                     Alert.alert('Notice', response.data.message); 

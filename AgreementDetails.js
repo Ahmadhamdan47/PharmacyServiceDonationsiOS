@@ -1,5 +1,3 @@
-"use client"
-
 import { useState, useEffect, useCallback } from "react"
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from "react-native"
 import AsyncStorage from "@react-native-async-storage/async-storage"

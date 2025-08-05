@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
 import BottomNavBarRecipient from './BottomNavBarRecipient'; // Import the BottomNavBar for Recipient
+import HeaderProfile from './HeaderProfile'; // Import HeaderProfile component
 import * as Font from 'expo-font';
 
 const RecipientList = () => {
@@ -40,12 +41,7 @@ const RecipientList = () => {
                 </TouchableOpacity>
             ),
             headerRight: () => (
-                <View style={styles.profileContainer}>
-                    <View style={styles.circle}>
-                        <Text style={styles.circleText}>{username.charAt(0).toUpperCase()}</Text>
-                    </View>
-                    <Text style={styles.profileText}>{username}</Text>
-                </View>
+                <HeaderProfile username={username} />
             ),
             headerTitleAlign: 'center',
            
@@ -242,48 +238,33 @@ const styles = StyleSheet.create({
         marginRight:30,
     },
     profileContainer: {
-        width: 47,
-        height: 16,
-        backgroundColor: '#f9f9f9',
-        fontSize: 14,
-        fontFamily: 'Roboto Condensed',
-        fontWeight: '400',
-        marginRight:24,
-        marginLeft: 103,
-        marginBottom:30,
-        
-        position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
-    
+        alignItems: 'center',
+        marginRight: 20,
+        position: 'relative',
       },
       circle: {
-        backgroundColor: '#f9f9f9',
         width: 40,
         height: 40,
-        borderRadius: 25,
+        borderRadius: 20,
         borderWidth: 2,
         borderColor: '#00A651',
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 2,
-        marginLeft:5,
+        backgroundColor: 'transparent',
+        marginBottom: 4,
       },
       circleText: {
-        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
-    
-        fontSize: 20,
+        fontSize: 18,
         color: '#00A651',
+        fontFamily: 'RobotoCondensed-Bold',
         fontWeight: 'bold',
-        marginBottom:2,
       },
       profileText: {
-        backgroundColor: 'transparent', // Ensure the text has no background to see the parent container's background
         fontFamily: 'RobotoCondensed-Bold',
-
-        fontSize: 14,
+        fontSize: 12,
         color: '#000',
-        fontWeight: '400',
-        textAlign: 'left',
-        
+        textAlign: 'center',
+        maxWidth: 60,
       },
           backButton: {
         fontSize: 16,

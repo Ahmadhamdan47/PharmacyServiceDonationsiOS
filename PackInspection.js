@@ -37,7 +37,7 @@ const PackInspection = ({ route }) => {
 
                 // Fetch DonorName
                 if (donationData.DonorId) {
-                    const donorResponse = await fetch(`https://apiv2.medleb.org/donor/${donationData.DonorId}`);
+                    const donorResponse = await fetch(`https://apiv2.medleb.org/Donor/${donationData.DonorId}`);
                     const donorData = await donorResponse.json();
                     setDonorName(donorData.DonorName);
                 }

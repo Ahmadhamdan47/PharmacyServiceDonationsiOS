@@ -4,6 +4,8 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBar from './BottomNavBar'; // Import BottomNavBar for Donor
 import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomNavBarInspection for Admin
+import HeaderProfile from './HeaderProfile'; // Import HeaderProfile component
+import * as Font from 'expo-font';
 
 const DonationDetails = ({ route, navigation }) => {
     const { donation } = route.params;
@@ -40,12 +42,7 @@ const DonationDetails = ({ route, navigation }) => {
             </TouchableOpacity>
         ),
         headerRight: () => (
-            <View style={styles.profileContainer}>
-                <View style={styles.circle}>
-                    <Text style={styles.circleText}>{username.charAt(0).toUpperCase()}</Text>  
-                </View>
-                <Text style={styles.profileText}>{username}</Text> 
-            </View>
+            <HeaderProfile username={username} />
         ),
         headerTitleAlign: 'center',
         headerTitleStyle: {
@@ -110,6 +107,23 @@ const DonationDetails = ({ route, navigation }) => {
             });
         }
     };
+
+    const handleStartDonation = () => {
+        // Navigate to Donate screen to continue the donation process
+        const selectedRecipientName = donation.RecipientName;
+        const donationDate = new Date().toISOString().replace(/:/g, '-');
+        
+        navigation.navigate('Donate', {
+            donorId: donation.DonorId,
+            recipientId: donation.RecipientId,
+            donorName: donation.DonorName,
+            recipientName: selectedRecipientName,
+            donationPurpose: donation.DonationPurpose,
+            donationTitle: donation.DonationTitle,
+            donationDate,
+            donationId: donation.DonationId,
+        });
+    };
     
 
     return (
@@ -121,6 +135,20 @@ const DonationDetails = ({ route, navigation }) => {
                 <Text>Loading...</Text>
             ) : (
                 <ScrollView style={styles.scrollView}>
+                    {/* Show "Start Donation" button for donors when no boxes exist */}
+                    {userRole !== 'Admin' && boxes.filter(box => box.NumberOfPacks > 0).length === 0 && (
+                        <TouchableOpacity style={styles.startDonationButton} onPress={handleStartDonation}>
+                            <Text style={styles.startDonationButtonText}>Start Donation Process</Text>
+                        </TouchableOpacity>
+                    )}
+                    
+                    {/* Show "Add More Items" button for donors when boxes exist */}
+                    {userRole !== 'Admin' && boxes.filter(box => box.NumberOfPacks > 0).length > 0 && (
+                        <TouchableOpacity style={styles.addMoreButton} onPress={handleStartDonation}>
+                            <Text style={styles.addMoreButtonText}>Add More Items</Text>
+                        </TouchableOpacity>
+                    )}
+
                     {boxes
                         .filter(box => box.NumberOfPacks > 0) // Filter out boxes with 0 packs
                         .map((box, index) => (
@@ -234,6 +262,36 @@ const styles = StyleSheet.create({
         height: 15,
         marginLeft: 10,
         marginTop:30,
+      },
+      startDonationButton: {
+        backgroundColor: '#00A651',
+        paddingVertical: 15,
+        paddingHorizontal: 30,
+        borderRadius: 25,
+        marginHorizontal: 30,
+        marginVertical: 20,
+        alignItems: 'center',
+      },
+      startDonationButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontFamily: 'RobotoCondensed-Bold',
+        fontWeight: 'bold',
+      },
+      addMoreButton: {
+        backgroundColor: '#00A651',
+        paddingVertical: 12,
+        paddingHorizontal: 25,
+        borderRadius: 20,
+        marginHorizontal: 30,
+        marginVertical: 10,
+        alignItems: 'center',
+      },
+      addMoreButtonText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontFamily: 'RobotoCondensed-Bold',
+        fontWeight: 'bold',
       },
 });
 
