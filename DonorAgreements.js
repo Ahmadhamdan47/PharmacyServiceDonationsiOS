@@ -101,7 +101,10 @@ const DonorAgreement = () => {
     const fetchAgreements = async () => {
         try {
             console.log(`Fetching agreements for donor ID: ${donorId}`);
-            const response = await axios.get(`https://apiv2.medleb.org/RecipientAgreements/Donor/${donorId}`);
+            const token = await AsyncStorage.getItem('token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            
+            const response = await axios.get(`https://apiv2.medleb.org/RecipientAgreements/Donor/${donorId}`, { headers });
             console.log('Agreements response:', response);
             if (response.data && Array.isArray(response.data.data)) {
                 console.log('Agreements found:', response.data.data);

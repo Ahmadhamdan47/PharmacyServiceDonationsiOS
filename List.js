@@ -85,10 +85,14 @@ const List = () => {
     };
 
     const fetchData = async () => {
+        const token = await AsyncStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        
         if (selectedType === 'Donations') {
             setDonations([]);
             try {
                 const response = await axios.get('https://apiv2.medleb.org/donation/filtered', {
+                    headers,
                     params: {
                         donorId,
                         recipientId,
@@ -112,6 +116,7 @@ const List = () => {
             setImportations([]);
             try {
                 const response = await axios.get('https://apiv2.medleb.org/importation/filtered', {
+                    headers,
                     params: {
                         status: status === 'All' ? '' : status,
                         fromDate: fromDate ? fromDate.toISOString().split('T')[0] : '',
@@ -134,7 +139,10 @@ const List = () => {
 
     const fetchDonors = async () => {
         try {
-            const response = await axios.get('https://apiv2.medleb.org/donor/all');
+            const token = await AsyncStorage.getItem('token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            
+            const response = await axios.get('https://apiv2.medleb.org/donor/all', { headers });
             setDonors(response.data);
         } catch (error) {
             console.error('Error fetching donors:', error);
@@ -143,7 +151,10 @@ const List = () => {
 
     const fetchRecipients = async () => {
         try {
-            const response = await axios.get('https://apiv2.medleb.org/recipient/all');
+            const token = await AsyncStorage.getItem('token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            
+            const response = await axios.get('https://apiv2.medleb.org/recipient/all', { headers });
             setRecipients(response.data);
         } catch (error) {
             console.error('Error fetching recipients:', error);

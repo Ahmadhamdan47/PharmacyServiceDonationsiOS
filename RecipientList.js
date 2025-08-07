@@ -93,7 +93,11 @@ const RecipientList = () => {
 
     const fetchDonations = async () => {
         try {
+            const token = await AsyncStorage.getItem('token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            
             const response = await axios.get('https://apiv2.medleb.org/donation/filtered', {
+                headers,
                 params: {
                     recipientId,
                     fromDate: fromDate ? fromDate.toISOString().split('T')[0] : '',

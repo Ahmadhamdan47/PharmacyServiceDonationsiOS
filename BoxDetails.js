@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, TouchableOpacity, Image, useWindowDimensions } from 'react-native';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Table, Row, Rows } from 'react-native-table-component';
 import BottomNavBar from './BottomNavBar';
 import * as FileSystem from 'expo-file-system';
@@ -74,7 +75,10 @@ const BoxDetails = ({ route, navigation }) => {
 
     const fetchSerialNumbers = async () => {
         try {
-            const response = await axios.get(`https://apiv2.medleb.org/batchserial/byBox/${box.BoxId}`);
+            const token = await AsyncStorage.getItem('token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            
+            const response = await axios.get(`https://apiv2.medleb.org/batchserial/byBox/${box.BoxId}`, { headers });
             const data = response.data.data;
             console.log(data);
             if (Array.isArray(data)) {

@@ -43,7 +43,10 @@ const Landing = () => {
 
     const checkPendingAgreements = async () => {
         try {
-            const response = await axios.get(`https://apiv2.medleb.org/RecipientAgreements/Donor/${donorId}`);
+            const token = await AsyncStorage.getItem('token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            
+            const response = await axios.get(`https://apiv2.medleb.org/RecipientAgreements/Donor/${donorId}`, { headers });
             if (response.data && Array.isArray(response.data.data)) {
                 const agreements = response.data.data;
                 const pendingCount = agreements.filter(agreement => agreement.Agreed_Upon === 'pending').length;

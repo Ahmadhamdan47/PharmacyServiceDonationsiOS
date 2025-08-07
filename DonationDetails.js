@@ -82,7 +82,10 @@ const DonationDetails = ({ route, navigation }) => {
     const fetchBoxes = async () => {
         setLoading(true);
         try {
-            const response = await axios.get(`https://apiv2.medleb.org/boxes/byDonation/${donation.DonationId}`);
+            const token = await AsyncStorage.getItem('token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            
+            const response = await axios.get(`https://apiv2.medleb.org/boxes/byDonation/${donation.DonationId}`, { headers });
             setBoxes(response.data);
         } catch (error) {
             console.error('Error fetching boxes:', error);

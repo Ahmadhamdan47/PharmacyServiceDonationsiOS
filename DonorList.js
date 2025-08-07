@@ -98,7 +98,10 @@ const DonorList = ({ navigation }) => {
     const fetchDonations = async () => {
         setLoading(true);
         try {
-            const response = await axios.get(`https://apiv2.medleb.org/donation/byDonor/${donorId}`);
+            const token = await AsyncStorage.getItem('token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            
+            const response = await axios.get(`https://apiv2.medleb.org/donation/byDonor/${donorId}`, { headers });
             const allDonations = response.data;
             
             // Filter donations to only show those with agreed agreements
@@ -106,7 +109,7 @@ const DonorList = ({ navigation }) => {
             
             try {
                 // Check agreements for this donor
-                const agreementResponse = await axios.get(`https://apiv2.medleb.org/RecipientAgreements/Donor/${donorId}`);
+                const agreementResponse = await axios.get(`https://apiv2.medleb.org/RecipientAgreements/Donor/${donorId}`, { headers });
                 if (agreementResponse.data && Array.isArray(agreementResponse.data.data)) {
                     const agreements = agreementResponse.data.data;
                     

@@ -107,7 +107,10 @@ export const DonationProvider = ({ children }) => {
 
   const fetchDrugNames = async () => {
     try {
-      const response = await axios.get("https://apiv2.medleb.org/drugs/all");
+      const token = await AsyncStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      const response = await axios.get("https://apiv2.medleb.org/drugs/all", { headers });
       const drugsData = response.data;
       const drugNames = drugsData.map((drug) => drug.DrugName);
 
@@ -154,7 +157,10 @@ export const DonationProvider = ({ children }) => {
 
   const fetchDonations = async () => {
     try {
-      const response = await axios.get("https://apiv2.medleb.org/donation/all");
+      const token = await AsyncStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      const response = await axios.get("https://apiv2.medleb.org/donation/all", { headers });
       const data = response.data.map((donation) => ({
         ...donation,
         DonationDate: new Date(donation.DonationDate).toLocaleDateString(
@@ -175,7 +181,10 @@ export const DonationProvider = ({ children }) => {
 
   const fetchDonors = async () => {
     try {
-      const response = await axios.get("https://apiv2.medleb.org/donor/all");
+      const token = await AsyncStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      const response = await axios.get("https://apiv2.medleb.org/donor/all", { headers });
       const donorsData = response.data;
 
       setDonors(donorsData);
@@ -195,7 +204,10 @@ export const DonationProvider = ({ children }) => {
 
   const fetchRecipients = async () => {
     try {
-      const response = await axios.get("https://apiv2.medleb.org/recipient/all");
+      const token = await AsyncStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      const response = await axios.get("https://apiv2.medleb.org/recipient/all", { headers });
       const recipientsData = response.data;
 
       const mappedRecipients = recipientsData.map((recipient) => ({
@@ -300,7 +312,10 @@ export const DonationProvider = ({ children }) => {
 
   const fetchDrugs = async () => {
     try {
-      const response = await axios.get("https://apiv2.medleb.org/drugs/all");
+      const token = await AsyncStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      const response = await axios.get("https://apiv2.medleb.org/drugs/all", { headers });
       const drugsData = response.data;
 
       setDrugs(drugsData);

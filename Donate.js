@@ -624,7 +624,10 @@ const Donate = ({ route }) => {
 
   const checkDrugNameInAPI = async (index, selectedValue) => {
     try {
-      const response = await axios.get(`https://apiv2.medleb.org/drugs/checkDrugNameInAPI/${selectedValue}`)
+      const token = await AsyncStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      const response = await axios.get(`https://apiv2.medleb.org/drugs/checkDrugNameInAPI/${selectedValue}`, { headers })
       const drugExists = response.data.exists
       const updatedBatchLots = [...batchLots]
       updatedBatchLots[index].drugValid = drugExists

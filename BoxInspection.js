@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, TouchableOpacity, Image, useWindowDimensions } from 'react-native';
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Table, Row } from 'react-native-table-component';
 import BottomNavBarInspection from './BottomNavBarInspection';
 import * as FileSystem from 'expo-file-system';
@@ -38,10 +39,13 @@ const [isFontLoaded, setIsFontLoaded] = useState(false);
 useEffect(() => {
     const fetchBoxDetails = async () => {
         try {
+            const token = await AsyncStorage.getItem('token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            
             let boxData;
             // Fetch box details based on type
             if (type === 'importation') {
-                const boxResponse = await axios.get(`https://apiv2.medleb.org/importation-boxes/${boxId}`);
+                const boxResponse = await axios.get(`https://apiv2.medleb.org/importation-boxes/${boxId}`, { headers });
                 boxData = boxResponse.data;
                 console.log('Importation Box Data:', boxData);
                 setBoxLabel(boxData.BoxLabel);
@@ -52,25 +56,25 @@ useEffect(() => {
                 setRecipientName('N/A');
             } else {
                 // Original donation logic
-                const boxResponse = await axios.get(`https://apiv2.medleb.org/boxes/${boxId}`);
+                const boxResponse = await axios.get(`https://apiv2.medleb.org/boxes/${boxId}`, { headers });
                 boxData = boxResponse.data;
                 console.log('Box Data:', boxData);
                 setBoxLabel(boxData.BoxLabel);
 
                 // Fetch donation details
-                const donationResponse = await axios.get(`https://apiv2.medleb.org/donation/${boxData.DonationId}`);
+                const donationResponse = await axios.get(`https://apiv2.medleb.org/donation/${boxData.DonationId}`, { headers });
                 const donationData = donationResponse.data;
                 console.log('Donation Data:', donationData);
                 setDonationTitle(donationData.DonationTitle);
 
                 // Fetch donor details
-                const donorResponse = await axios.get(`https://apiv2.medleb.org/Donor/${donationData.DonorId}`);
+                const donorResponse = await axios.get(`https://apiv2.medleb.org/Donor/${donationData.DonorId}`, { headers });
                 const donorData = donorResponse.data;
                 console.log('Donor Data:', donorData);
                 setDonorName(donorData.DonorName);
 
                 // Fetch recipient details
-                const recipientResponse = await axios.get(`https://apiv2.medleb.org/recipient/${donationData.RecipientId}`);
+                const recipientResponse = await axios.get(`https://apiv2.medleb.org/recipient/${donationData.RecipientId}`, { headers });
                 const recipientData = recipientResponse.data;
                 console.log('Recipient Data:', recipientData);
                 setRecipientName(recipientData.RecipientName);
@@ -79,9 +83,9 @@ useEffect(() => {
             // Fetch batch serial numbers
             let batchesResponse;
             if (type === 'importation') {
-                batchesResponse = await axios.get(`https://apiv2.medleb.org/importation-batchserial/byBox/${boxId}`);
+                batchesResponse = await axios.get(`https://apiv2.medleb.org/importation-batchserial/byBox/${boxId}`, { headers });
             } else {
-                batchesResponse = await axios.get(`https://apiv2.medleb.org/batchserial/byBox/${boxId}`);
+                batchesResponse = await axios.get(`https://apiv2.medleb.org/batchserial/byBox/${boxId}`, { headers });
             }
             const batchesData = batchesResponse.data.data;
             console.log('Batch Lots Data:', batchesData);
@@ -226,11 +230,14 @@ useEffect(() => {
 
     const handleReport = async () => {
         try {
+            const token = await AsyncStorage.getItem('token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            
             for (let index of selectedRows) {
                 const batchLot = batchLots[index];
     
                 // Call the API to report each selected pack using batchSerialNumberId
-                const response = await axios.put(`https://apiv2.medleb.org/batchserial/report/${batchLot.BatchSerialNumberId}`);
+                const response = await axios.put(`https://apiv2.medleb.org/batchserial/report/${batchLot.BatchSerialNumberId}`, {}, { headers });
     
                 if (response.data.message) {
                     Alert.alert('Notice', response.data.message); 
