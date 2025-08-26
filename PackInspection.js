@@ -185,7 +185,7 @@ const PackInspection = ({ route }) => {
     
     return (
         <View style={styles.container}> 
-            <StatusBar backgroundColor="#f9f9f9"/>
+            <StatusBar backgroundColor="#f9f9f9" barStyle="dark-content"/>
             <View style={styles.infoContainer}>
             
             <View style={styles.BarcodeDetailsContainer}>

@@ -16,6 +16,8 @@ const RecipientAgreements = () => {
     const scrollViewRef = useRef(null);
     const navigation = useNavigation();
     const [isFontLoaded, setIsFontLoaded] = useState(false);
+    const [statusFilter, setStatusFilter] = useState('All');
+    const [showStatusPicker, setShowStatusPicker] = useState(false);
 
     const fetchFonts = async () => {
         await Font.loadAsync({
@@ -100,8 +102,14 @@ const RecipientAgreements = () => {
             const response = await axios.get(`https://apiv2.medleb.org/RecipientAgreements/Recipient/${recipientId}`);
             console.log('Agreements response:', response);
             if (response.data && Array.isArray(response.data.data)) {
-                console.log('Agreements found:', response.data.data);
-                setAgreements(response.data.data);
+                const items = response.data.data;
+                const sorted = [...items].sort((a, b) => {
+                    const parse = (d) => (d ? Date.parse(d) : 0);
+                    const aDate = parse(a?.Donation?.DonationDate) || parse(a?.CreatedDate) || parse(a?.created_at);
+                    const bDate = parse(b?.Donation?.DonationDate) || parse(b?.CreatedDate) || parse(b?.created_at);
+                    return (bDate || 0) - (aDate || 0);
+                });
+                setAgreements(sorted);
             } else {
                 console.error('Unexpected response structure:', response.data);
                 setAgreements([]);
@@ -124,12 +132,36 @@ const RecipientAgreements = () => {
         return 'orange';
     };
 
+    const filteredAgreements = (agreements || []).filter(a => {
+        if (!statusFilter || statusFilter === 'All') return true;
+        return (a?.Agreed_Upon || '').toLowerCase() === statusFilter.toLowerCase();
+    });
+
     return (
         <View style={styles.container}>
-            <StatusBar backgroundColor="#f9f9f9" />
+            <StatusBar backgroundColor="#f9f9f9" barStyle="dark-content" />
 
             <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-                {/* Date Range Filters */}
+                {/* Filters Row: Status */}
+                <View style={styles.filterRow}>
+                    <View style={styles.filterColumn}>
+                        <Text style={styles.filterLabel}>Status</Text>
+                        <TouchableOpacity onPress={() => setShowStatusPicker(!showStatusPicker)} style={styles.filterButton}>
+                            <Text style={styles.filterText}>{statusFilter}</Text>
+                        </TouchableOpacity>
+                        {showStatusPicker && (
+                            <View style={styles.dropdown}>
+                                <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
+                                    {['All', 'Pending', 'Agreed', 'Refused'].map((s) => (
+                                        <TouchableOpacity key={s} onPress={() => { setStatusFilter(s); setShowStatusPicker(false); }}>
+                                            <Text style={styles.dropdownText}>{s}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        )}
+                    </View>
+                </View>
     
                 {/* Search Button */}
                 <TouchableOpacity style={styles.searchButton} onPress={fetchAgreements}>
@@ -138,11 +170,11 @@ const RecipientAgreements = () => {
 
                 {/* Results Count */}
                 <Image source={require('./assets/separator-green.png')} style={styles.separator} />
-                <Text style={styles.resultCount}>Number of result(s): {agreements.length}</Text>
+                <Text style={styles.resultCount}>Number of result(s): {filteredAgreements.length}</Text>
 
                 {/* Agreements List */}
                 <ScrollView>
-                    {agreements.map((agreement, index) => (
+                    {filteredAgreements.map((agreement, index) => (
                         <TouchableOpacity
                             key={index}
                             style={styles.card}
@@ -158,6 +190,8 @@ const RecipientAgreements = () => {
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                                     {/* Left Column */}
                                     <View style={{ flex: 1, marginRight: 10, marginLeft: 10 }}>
+                                        <Text style={[styles.cardTitle]}>Donation Title</Text>
+                                        <Text style={[styles.cardText]}>{agreement?.Donation?.DonationTitle || 'N/A'}</Text>
                                         <Text style={[styles.cardTitle]}>Donor</Text>
                                         <Text style={[styles.cardText]}>{agreement.donor.DonorName}</Text>
                                     </View>
@@ -236,6 +270,65 @@ const styles = StyleSheet.create({
         fontWeight: 'light',
         color: '#121212',
         fontFamily: 'RobotoCondensed-Regular',
+    },
+    filterRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    filterColumn: {
+        flex: 1,
+        marginHorizontal: 5,
+    },
+    filterLabel: {
+        fontSize: 14,
+        fontFamily: 'RobotoCondensed-Bold',
+        color: '#A9A9A9',
+        marginLeft: 10,
+        marginBottom: 5,
+    },
+    filterButton: {
+        borderWidth: 1,
+        borderColor: '#00A651',
+        borderRadius: 20,
+        paddingVertical: 10,
+        alignItems: 'center',
+        height: 45,
+        backgroundColor: '#fff',
+    },
+    filterText: {
+        fontSize: 14,
+        fontFamily: 'RobotoCondensed-Regular',
+        color: '#121212',
+    },
+    dropdown: {
+        position: 'absolute',
+        top: 75,
+        left: 0,
+        right: 0,
+        backgroundColor: '#ffffff',
+        borderRadius: 15,
+        minWidth: 160,
+        paddingVertical: 8,
+        elevation: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        borderWidth: 1,
+        borderColor: '#e8e8e8',
+        zIndex: 1000,
+    },
+    dropdownScroll: {
+        maxHeight: 200,
+        paddingHorizontal: 10,
+    },
+    dropdownText: {
+        paddingVertical: 12,
+        textAlign: 'center',
+        fontSize: 14,
+        fontFamily: 'RobotoCondensed-Regular',
+        color: '#121212',
     },
     card: {
         backgroundColor: '#fff',

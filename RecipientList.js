@@ -152,7 +152,7 @@ const RecipientList = () => {
 
     return (
         <View style={styles.container}>
-            <StatusBar backgroundColor="#f9f9f9" />
+            <StatusBar backgroundColor="#f9f9f9" barStyle="dark-content" />
 
             <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
                 {/* Date Range Filters */}

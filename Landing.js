@@ -185,12 +185,7 @@ const Landing = () => {
       ),
       headerRight: () => (
       <TouchableOpacity onPress={toggleDropdown}>
-        <HeaderProfile username={username} />
-        {userRole === 'Donor' && pendingAgreement && (
-          <View style={styles.pendingBadge}>
-          <Text style={styles.pendingBadgeText}>{pendingAgreementCount}</Text>
-          </View>
-        )}
+        <HeaderProfile username={username} notificationCount={pendingAgreement ? pendingAgreementCount : 0} />
       </TouchableOpacity>
       ),
       headerTitle: '',  // Leave the header title empty
@@ -206,7 +201,7 @@ const Landing = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor="#f9f9f9" />
+      <StatusBar backgroundColor="#f9f9f9" barStyle="dark-content" />
       {dropdownVisible && (
         <>
           <TouchableOpacity 
@@ -288,7 +283,7 @@ const styles = StyleSheet.create({
   },
   containerLeft: {
     marginLeft: 20,
-    marginTop: 49,
+    marginTop: 10,
     width: 200,
     height: 108,
     backgroundColor: '#f9f9f9',
@@ -371,17 +366,20 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -5,
     right: -5,
-    backgroundColor: '#00A651',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
+  backgroundColor: '#FF0000',
+  borderRadius: 10,
+  minWidth: 20,
+  height: 20,
     justifyContent: 'center',
     alignItems: 'center',
+  borderWidth: 1,
+  borderColor: '#FFFFFF',
   },
   pendingBadgeText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
+  color: '#FFFFFF',
+  fontSize: 12,
+  fontWeight: 'bold',
+  fontFamily: 'RobotoCondensed-Bold',
   },
 });
 

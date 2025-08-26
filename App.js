@@ -121,7 +121,10 @@ const App = () => {
 
   return (
     <NavigationContainer ref={navigationRef}>
-      <Stack.Navigator initialRouteName={isLoggedIn ? 'Landing' : 'SignIn'}>
+      <Stack.Navigator
+        initialRouteName={isLoggedIn ? 'Landing' : 'SignIn'}
+        screenOptions={{ headerTitleAlign: 'center' }}
+      >
         <Stack.Screen name="Landing" component={Landing} options={{ title: 'Home' }} />
         <Stack.Screen name="SignIn" component={SignIn} options={{ title: 'Sign In' }} />
         <Stack.Screen name="SignUp" component={SignUp} options={{ title: 'Sign Up' }} />

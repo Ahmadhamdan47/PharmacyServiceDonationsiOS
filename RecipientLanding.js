@@ -3,6 +3,7 @@ import { StyleSheet, View, Image, TouchableOpacity, Text, BackHandler, ToastAndr
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBar from './BottomNavBar'; // Import BottomNavBar
+import HeaderProfile from './HeaderProfile'; // Unified header profile with badge
 import axios from 'axios';
 
 const RecipientLanding = () => {
@@ -73,13 +74,12 @@ const RecipientLanding = () => {
             headerTitle: () => (
                 <View style={styles.headerContainer}>
                     <Image source={require("./assets/medleblogo.png")} style={styles.logo} />
-                    <TouchableOpacity onPress={toggleDropdown} style={styles.profileContainer}>
-                        <View style={styles.circle}>
-                            <Text style={styles.circleText}>{username.charAt(0).toUpperCase()}</Text>
-                        </View>
-                        <Text style={styles.profileText}>{username.substring(0, 4)}</Text>
-                    </TouchableOpacity>
                 </View>
+            ),
+            headerRight: () => (
+                <TouchableOpacity onPress={toggleDropdown}>
+                    <HeaderProfile username={username} />
+                </TouchableOpacity>
             ),
             headerTitleAlign: 'center', // Center align the custom title
         });
@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
     },
     headerContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'center',
         alignItems: 'center',
         width: '100%',
         paddingHorizontal: 20,
@@ -151,31 +151,7 @@ const styles = StyleSheet.create({
         height: 150,
         resizeMode: "contain",
     },
-    profileContainer: {
-        alignItems: 'center', // Center align the icon and username
-        marginLeft: 'auto',  // Push the profile container to the right
-        marginTop: 50,
-    },
-    circle: {
-        width: 40, // Increase the size of the circle
-        height: 40,
-        borderRadius: 25,
-        borderWidth: 2,
-        borderColor: '#00A651',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 5, // Space between the circle and the username
-    },
-    circleText: {
-        fontSize: 20, // Increase the font size of the letter in the circle
-        color: '#00A651',
-        fontWeight: 'bold',
-    },
-    profileText: {
-        fontSize: 14,
-        color: '#000',
-        fontWeight: 'bold',
-    },
+        // HeaderProfile handles its own styling for the circle and text
     dropdown: {
         position: 'absolute',
         top: 10,

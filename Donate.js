@@ -74,7 +74,7 @@ const BatchLotForm = React.forwardRef(
 
     return (
       <View ref={ref} key={index} style={styles.formContainer}>
-        <StatusBar backgroundColor="#f9f9f9" />
+        <StatusBar backgroundColor="#f9f9f9" barStyle="dark-content" />
 
         {index > 0 && (
           <View style={styles.newDrugSeparator}>
@@ -192,7 +192,7 @@ const BatchLotForm = React.forwardRef(
             borderRadius: 20,
             padding: 5,
             paddingLeft: 10,
-            minHeight: 30, // Set height to 30px
+            minHeight: 50, // Set height to 50px
             marginBottom: 10,
             backgroundColor: "#FFFCFC",
             marginLeft: 35,
@@ -1027,7 +1027,7 @@ const Donate = ({ route }) => {
                   borderRadius: 20,
                   padding: 5,
                   paddingLeft: 10,
-                  minHeight: 30, // Set height to 30px
+                  minHeight: 50, // Set height to 50px
                   marginBottom: 10,
                   backgroundColor: "#FFFCFC",
                   marginLeft: 35,
@@ -1265,7 +1265,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 5,
     paddingLeft: 10,
-    height: 35, // Set height to 30px
+    height: 50, // Set height to 50px
     marginBottom: 5,
     backgroundColor: "#FFFCFC",
     marginLeft: 35,
@@ -1485,7 +1485,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 5,
     paddingLeft: 10,
-    height: 30, // Keep height as before
+    height: 50, // Keep height as 50px
     marginBottom: 10,
     backgroundColor: "#FFFCFC",
     marginLeft: 35,

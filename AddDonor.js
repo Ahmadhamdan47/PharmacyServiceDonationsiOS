@@ -205,9 +205,6 @@ const AddDonor = () => {
       const token = await AsyncStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-      // First check if there's an existing agreement between donor and recipient
-      const existingAgreement = await checkExistingAgreement(donorId, selectedRecipient, headers);
-      
       // Create the donation first
       const response = await axios.post("https://apiv2.medleb.org/donation/add", {
         DonorId: donorId,
@@ -219,17 +216,9 @@ const AddDonor = () => {
       
       const donationId = response.data.DonationId;
 
-      if (existingAgreement && existingAgreement.Agreed_Upon === 'agreed') {
-        // Agreement exists and is agreed - go to agreements to proceed
-        navigation.navigate('DonorAgreements', { username: donorName });
-      } else if (existingAgreement && existingAgreement.Agreed_Upon === 'pending') {
-        // Agreement exists but is still pending - go to agreements
-        navigation.navigate('DonorAgreements', { username: donorName });
-      } else {
-        // No existing agreement or agreement was refused - create new agreement then go to agreements
-        await createNewAgreement(donorId, selectedRecipient, donationId, headers);
-        navigation.navigate('DonorAgreements', { username: donorName });
-      }
+      // Always create a new agreement for each donation
+      await createNewAgreement(donorId, selectedRecipient, donationId, headers);
+      navigation.navigate('DonorAgreements', { username: donorName });
     } catch (error) {
       console.error("Error creating donation or agreement:", error);
       Alert.alert('Error', 'Failed to create donation. Please try again.');
@@ -241,7 +230,7 @@ const AddDonor = () => {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'} // Adjust for iOS vs Android
     >
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+  <ScrollView contentContainerStyle={{ flexGrow: 1 }} nestedScrollEnabled={true} keyboardShouldPersistTaps="handled">
         <View style={styles.formContainer}>
           <Text style={styles.label}>Donor</Text>
           <TextInput
@@ -249,10 +238,10 @@ const AddDonor = () => {
             value={donorName}
             editable={false}
           />
-          <StatusBar backgroundColor="#f9f9f9" />
+          <StatusBar backgroundColor="#f9f9f9" barStyle="dark-content" />
 
           <Text style={styles.label}>Recipient*</Text>
-          <View style={{ zIndex: 10 }}>
+      <View style={{ zIndex: 3000 }}>
             <DropDownPicker
               open={recipientOpen}
               value={selectedRecipient}
@@ -265,9 +254,20 @@ const AddDonor = () => {
               onOpen={() => setIsInputFocused(true)}
               onClose={() => setIsInputFocused(false)}
               style={styles.picker}
-              dropDownContainerStyle={styles.dropDownContainer}
+        dropDownContainerStyle={styles.dropDownContainer}
               searchable={true}
               searchPlaceholder="Search recipients..."
+              listMode="MODAL"
+              modalProps={{ animationType: 'slide' }}
+              modalTitle="Select Recipient"
+              modalTitleStyle={styles.modalTitle}
+              textStyle={styles.dropdownText}
+              listItemLabelStyle={styles.dropdownText}
+              selectedItemLabelStyle={styles.dropdownSelectedText}
+              placeholderStyle={styles.dropdownPlaceholder}
+              searchTextInputStyle={styles.searchInput}
+              searchPlaceholderTextColor="#A9A9A9"
+              dropDownDirection="AUTO"
             />
           </View>
 
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 5,
     paddingLeft: 10,
-    height: 35,
+    height: 50,
     marginBottom: 10,
     backgroundColor: '#f0f0f0',
     color: '#00a651',
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 5,
     paddingLeft: 10,
-    height: 35,
+    height: 50,
     marginBottom: 10,
     backgroundColor: '#fff',
     fontFamily: 'RobotoCondensed-Regular',
@@ -387,14 +387,14 @@ const styles = StyleSheet.create({
   },
   dropdown: {
     marginBottom: 10,
-    minHeight: 30,
-    
+    minHeight: 50,
+  zIndex: 3000,
   },
   picker: {
     borderColor: '#00a651',
     borderWidth: 1,
     borderRadius: 20,
-    minHeight: 35,
+    minHeight: 50,
     
     
   },
@@ -402,9 +402,37 @@ const styles = StyleSheet.create({
     borderColor: '#00a651',
     borderWidth: 1,
     borderRadius: 20,
-    minHeight: 30,
+    minHeight: 50,
+  maxHeight: 250,
+  zIndex: 3000,
+  elevation: 1000,
     
-    
+  // Typography for dropdown modal
+  modalTitle: {
+    fontFamily: 'RobotoCondensed-Bold',
+    fontSize: 16,
+    color: '#121212',
+  },
+  dropdownText: {
+    fontFamily: 'RobotoCondensed-Regular',
+    fontSize: 14,
+    color: '#121212',
+  },
+  dropdownSelectedText: {
+    fontFamily: 'RobotoCondensed-Bold',
+    fontSize: 14,
+    color: '#121212',
+  },
+  dropdownPlaceholder: {
+    fontFamily: 'RobotoCondensed-Regular',
+    fontSize: 14,
+    color: '#A9A9A9',
+  },
+  searchInput: {
+    fontFamily: 'RobotoCondensed-Regular',
+    fontSize: 14,
+    color: '#121212',
+  },
   },
   button: {
     backgroundColor: '#00a651',

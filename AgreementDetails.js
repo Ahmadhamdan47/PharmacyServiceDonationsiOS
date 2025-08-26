@@ -184,6 +184,13 @@ const AgreementDetails = ({ route }) => {
         <View style={styles.agreementContainer}>
           <Text style={styles.agreementTitle}>Medication Donation Agreement</Text>
 
+          {/* Donation metadata */}
+          <Text style={styles.sectionTitle}>Donation</Text>
+          <View style={styles.partiesContainer}>
+            <Text style={styles.partyLabel}>Donation Title:</Text>
+            <Text style={styles.partyText}>{agreement?.Donation?.DonationTitle || "N/A"}</Text>
+          </View>
+
           <Text style={styles.sectionTitle}>Parties</Text>
 
           <View style={styles.partiesContainer}>

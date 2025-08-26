@@ -1,17 +1,61 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 
-const HeaderProfile = ({ username, notificationCount = 0 }) => {
+const HeaderProfile = ({ username, notificationCount }) => {
+  const [autoCount, setAutoCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchCount = async () => {
+      try {
+        const [token, donorId, recipientId] = await Promise.all([
+          AsyncStorage.getItem('token'),
+          AsyncStorage.getItem('donorId'),
+          AsyncStorage.getItem('recipientId'),
+        ]);
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+        let count = 0;
+        if (donorId) {
+          const resp = await axios.get(`https://apiv2.medleb.org/RecipientAgreements/Donor/${parseInt(donorId, 10)}`, { headers });
+          if (resp.data && Array.isArray(resp.data.data)) {
+            count = resp.data.data.filter(a => a.Agreed_Upon === 'pending').length;
+          }
+        } else if (recipientId) {
+          const resp = await axios.get(`https://apiv2.medleb.org/RecipientAgreements/Recipient/${parseInt(recipientId, 10)}`);
+          if (resp.data && Array.isArray(resp.data.data)) {
+            count = resp.data.data.filter(a => a.Agreed_Upon === 'pending').length;
+          }
+        }
+        if (!cancelled) setAutoCount(count);
+      } catch (e) {
+        if (!cancelled) setAutoCount(0);
+      }
+    };
+
+    // Only auto-fetch if a count wasn't explicitly provided
+    if (notificationCount == null) {
+      fetchCount();
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [notificationCount, username]);
+
+  const shownCount = notificationCount == null ? autoCount : notificationCount;
+
   return (
     <View style={styles.profileContainer}>
       <View style={styles.circle}>
         <Text style={styles.circleText}>
           {username ? username.charAt(0).toUpperCase() : ''}
         </Text>
-        {notificationCount > 0 && (
+        {shownCount > 0 && (
           <View style={styles.notificationBadge}>
             <Text style={styles.notificationText}>
-              {notificationCount > 99 ? '99+' : notificationCount}
+              {shownCount > 99 ? '99+' : shownCount}
             </Text>
           </View>
         )}

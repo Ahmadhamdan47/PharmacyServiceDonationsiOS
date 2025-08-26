@@ -9,6 +9,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native'; // Imp
 import BottomNavBar from './BottomNavBar'; // Import BottomNavBar
 import HeaderProfile from './HeaderProfile'; // Import HeaderProfile component
 import * as Font from 'expo-font';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const DonorList = ({ navigation }) => {
     const [donations, setDonations] = useState([]);
@@ -16,6 +17,16 @@ const DonorList = ({ navigation }) => {
     const [donorId, setDonorId] = useState(null);
     const [username, setUsername] = useState('');
     const [isFontLoaded, setIsFontLoaded] = useState(false);
+    const [error, setError] = useState(null); // capture fetch errors for display
+    // Filters state
+    const [fromDate, setFromDate] = useState(null);
+    const [toDate, setToDate] = useState(null);
+    const [showFromDatePicker, setShowFromDatePicker] = useState(false);
+    const [showToDatePicker, setShowToDatePicker] = useState(false);
+    const [status, setStatus] = useState('All');
+    const [showStatusPicker, setShowStatusPicker] = useState(false);
+    // Keep unfiltered list separate
+    const [allDonations, setAllDonations] = useState([]);
     const fetchFonts = async () => {
       await Font.loadAsync({
         'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
@@ -25,9 +36,10 @@ const DonorList = ({ navigation }) => {
       setIsFontLoaded(true);
     };
   
-    useEffect(() => {
-      fetchFonts(); // Load fonts on component mount
-    }, []);
+        useEffect(() => {
+            console.log('[DonorList] mounted');
+            fetchFonts(); // Load fonts on component mount
+        }, []);
     
     useEffect(() => {
         // Set up the header with the user icon and name
@@ -66,9 +78,25 @@ const DonorList = ({ navigation }) => {
 
     useEffect(() => {
         if (donorId) {
+            console.log('[DonorList] donorId ready, fetching donations for donorId=', donorId);
             fetchDonations();
+        } else {
+            console.log('[DonorList] donorId not set yet.');
         }
     }, [donorId]);
+
+    // Log donation counts and visibility when donations update
+    useEffect(() => {
+        if (!donations) return;
+        const total = donations.length;
+        const visible = donations.filter(d => (d?.NumberOfBoxes ?? 0) > 0 || ((d?.BatchLotTrackings ?? []).length > 0)).length;
+        const withBoxes = donations.filter(d => (d?.NumberOfBoxes ?? 0) > 0).length;
+        const withPacks = donations.filter(d => ((d?.BatchLotTrackings ?? []).length > 0)).length;
+        console.log('[DonorList] donations state updated. total:', total, ' visible:', visible, ' withBoxes:', withBoxes, ' withPacks:', withPacks);
+        if (total > 0 && visible === 0) {
+            console.log('[DonorList] Note: Donations exist but none have boxes/packs populated. Showing all to avoid empty UI.');
+        }
+    }, [donations]);
 
     const handleBackPress = () => {
         navigation.navigate('Landing'); // Navigate back to Landing
@@ -79,6 +107,7 @@ const DonorList = ({ navigation }) => {
         try {
             const storedUsername = await AsyncStorage.getItem('username');
             const storedDonorId = await AsyncStorage.getItem('donorId');
+            console.log('[DonorList] fetchDonorId username:', storedUsername, ' donorId:', storedDonorId);
             
             if (storedUsername) {
                 setUsername(storedUsername); // Set the username state
@@ -87,22 +116,28 @@ const DonorList = ({ navigation }) => {
             if (storedDonorId) {
                 setDonorId(parseInt(storedDonorId));
             } else {
+                setError('Donor information not found. Please login again.');
                 Alert.alert('Error', 'Donor information not found. Please login again.');
             }
         } catch (error) {
             console.error('Failed to load donor info:', error);
+            setError('Failed to load donor information.');
             Alert.alert('Error', 'Failed to load donor information.');
         }
     };
 
     const fetchDonations = async () => {
         setLoading(true);
+        setError(null);
         try {
             const token = await AsyncStorage.getItem('token');
             const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            console.log('[DonorList] Starting donations fetch. donorId=', donorId, ' token?', !!token);
             
             const response = await axios.get(`https://apiv2.medleb.org/donation/byDonor/${donorId}`, { headers });
+            console.log('[DonorList] donations GET status:', response.status, ' url:', response.config?.url);
             const allDonations = response.data;
+            console.log('[DonorList] donations received count:', Array.isArray(allDonations) ? allDonations.length : 'not array');
             
             // Filter donations to only show those with agreed agreements
             const donationsWithAgreements = [];
@@ -110,8 +145,10 @@ const DonorList = ({ navigation }) => {
             try {
                 // Check agreements for this donor
                 const agreementResponse = await axios.get(`https://apiv2.medleb.org/RecipientAgreements/Donor/${donorId}`, { headers });
+                console.log('[DonorList] agreements GET status:', agreementResponse.status, ' url:', agreementResponse.config?.url);
                 if (agreementResponse.data && Array.isArray(agreementResponse.data.data)) {
                     const agreements = agreementResponse.data.data;
+                    console.log('[DonorList] agreements count:', agreements.length);
                     
                     for (const donation of allDonations) {
                         const hasAgreedAgreement = agreements.some(agreement => 
@@ -126,19 +163,80 @@ const DonorList = ({ navigation }) => {
             } catch (agreementError) {
                 // Handle 404 error (no agreements found) as normal case
                 if (agreementError.response && agreementError.response.status === 404) {
-                    console.log('No agreements found for this donor - showing no donations');
+                    console.log('[DonorList] No agreements found for this donor - showing no donations');
                 } else {
-                    console.error('Error checking agreements:', agreementError);
+                    console.error('[DonorList] Error checking agreements:', {
+                        message: agreementError.message,
+                        status: agreementError.response?.status,
+                        url: agreementError.config?.url,
+                        data: agreementError.response?.data,
+                    });
                 }
                 // If we can't check agreements or no agreements exist, show no donations
             }
             
-            setDonations(donationsWithAgreements);
+            console.log('[DonorList] donations after filter by agreed agreements:', donationsWithAgreements.length);
+            setAllDonations(donationsWithAgreements);
+            // Apply current filters immediately
+            const filtered = applyFilters(donationsWithAgreements, { fromDate, toDate, status });
+            setDonations(filtered);
         } catch (error) {
-            console.error("Error fetching donations:", error);
+            const errInfo = {
+                message: error.message,
+                status: error.response?.status,
+                url: error.config?.url,
+                method: error.config?.method,
+                data: error.response?.data,
+            };
+            console.error('[DonorList] Error fetching donations:', errInfo);
+            setError(`Failed to load donations${errInfo.status ? ` (HTTP ${errInfo.status})` : ''}.`);
             Alert.alert("Error", "Failed to load donations.");
         }
         setLoading(false);
+    };
+
+    const parseDateSafe = (value) => {
+        if (!value) return null;
+        try {
+            const d = new Date(value);
+            return isNaN(d.getTime()) ? null : d;
+        } catch {
+            return null;
+        }
+    };
+
+    const applyFilters = (data, { fromDate, toDate, status }) => {
+        let out = Array.isArray(data) ? [...data] : [];
+        // Status filter
+        const st = (status || 'All').toLowerCase();
+        if (st !== 'all') {
+            out = out.filter(d => (d?.status || '').toLowerCase() === st);
+        }
+        // Date range filter on DonationDate
+        const start = fromDate ? new Date(new Date(fromDate).setHours(0, 0, 0, 0)) : null;
+        const end = toDate ? new Date(new Date(toDate).setHours(23, 59, 59, 999)) : null;
+        if (start || end) {
+            out = out.filter(d => {
+                const dd = parseDateSafe(d?.DonationDate);
+                if (!dd) return false; // exclude items without a valid date when filtering by date
+                if (start && dd < start) return false;
+                if (end && dd > end) return false;
+                return true;
+            });
+        }
+        console.log('[DonorList] applyFilters -> input:', data?.length || 0, ' output:', out.length, ' status:', status, ' from:', fromDate, ' to:', toDate);
+        return out;
+    };
+
+    const onSearch = () => {
+        // Validate date range
+        if (fromDate && toDate && new Date(fromDate) > new Date(toDate)) {
+            Alert.alert('Invalid range', 'From date cannot be after To date.');
+            return;
+        }
+        const filtered = applyFilters(allDonations, { fromDate, toDate, status });
+        setDonations(filtered);
+        setShowStatusPicker(false);
     };
 
     const handlePressDonation = (donation) => {
@@ -191,43 +289,136 @@ const DonorList = ({ navigation }) => {
 
     return (
         <View style={styles.fullContainer}>
-            <StatusBar backgroundColor="#f9f9f9" />
+            <StatusBar backgroundColor="#f9f9f9" barStyle="dark-content" />
     
             {loading ? (
                 <ActivityIndicator size="large" color="#0000ff" />
             ) : (
-                <ScrollView contentContainerStyle={styles.scrollViewContainer}>
-                    {donations
-                        .filter(donation => donation.NumberOfBoxes > 0 && donation.BatchLotTrackings.length > 0) // Filter donations
-                        .map((donation, index) => (
-                            <TouchableOpacity key={index} style={styles.cardContainer} onPress={() => handlePressDonation(donation)}>
-                                <Text style={[styles.statusText, donation.status === 'pending' ? styles.pendingText : styles.approvedText]}>
-                                    {donation.status === 'pending' ? 'Pending' : 'Approved'}
-                                </Text>
-                                <View style={styles.cardContent}>
-                                    <View style={styles.infoContainer}>
-                                        <Text style={styles.infoTitle}>Donation Title:</Text>
-                                        <Text style={styles.infoText}>{donation.DonationTitle}</Text>
-                                        <Text style={styles.infoTo}>To:</Text>
-                                        <Text style={styles.infoText}>{donation.RecipientName}</Text>
-                                    </View>
-                                    <View style={styles.detailsContainer}>
-                                        <View style={styles.detailItem}>
-                                            <Text style={styles.detailsText}>Date:</Text>
-                                            <Text style={styles.detailValue}>{donation.DonationDate}</Text>
-                                        </View>
-                                        <View style={styles.detailItem}>
-                                            <Text style={styles.detailsText}>nb of box(es):</Text>
-                                            <Text style={styles.detailValue}>{donation.NumberOfBoxes}</Text>
-                                        </View>
-                                        <View style={styles.detailItem}>
-                                            <Text style={styles.detailsText}>nb of pack(s):</Text>
-                                            <Text style={styles.detailValue}>{donation.BatchLotTrackings.length}</Text>
-                                        </View>
-                                    </View>
-                                </View>
+                <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+                    {/* First Row: Date Filters */}
+                    <View style={styles.dateRangeContainer}>
+                        <TouchableOpacity style={styles.dateContainer} onPress={() => setShowFromDatePicker(true)}>
+                            <Text style={styles.dateText}>From</Text>
+                            <Text style={styles.dateValue}>{fromDate ? new Date(fromDate).toISOString().split('T')[0] : '01/01/24'}</Text>
+                        </TouchableOpacity>
+                        <View style={styles.dateIcon}>
+                            <Image source={require('./assets/calendar.png')} style={styles.calendarIcon} />
+                        </View>
+                        <TouchableOpacity style={styles.dateContainer} onPress={() => setShowToDatePicker(true)}>
+                            <Text style={styles.dateText}>To</Text>
+                            <Text style={styles.dateValue}>{toDate ? new Date(toDate).toISOString().split('T')[0] : '01/08/24'}</Text>
+                        </TouchableOpacity>
+                    </View>
+                    {showFromDatePicker && (
+                        <DateTimePicker
+                            value={fromDate ? new Date(fromDate) : new Date()}
+                            mode="date"
+                            display="default"
+                            onChange={(event, selectedDate) => {
+                                setShowFromDatePicker(false);
+                                if (event.type !== 'dismissed') setFromDate(selectedDate);
+                            }}
+                        />
+                    )}
+                    {showToDatePicker && (
+                        <DateTimePicker
+                            value={toDate ? new Date(toDate) : new Date()}
+                            mode="date"
+                            display="default"
+                            onChange={(event, selectedDate) => {
+                                setShowToDatePicker(false);
+                                if (event.type !== 'dismissed') setToDate(selectedDate);
+                            }}
+                        />
+                    )}
+
+                    {/* Second Row: Status */}
+                    <View style={styles.filterRow}>
+                        <View style={styles.filterColumn}>
+                            <Text style={styles.filterLabel}>Status</Text>
+                            <TouchableOpacity onPress={() => setShowStatusPicker(!showStatusPicker)} style={styles.filterButton}>
+                                <Text style={styles.filterText}>{status}</Text>
                             </TouchableOpacity>
-                        ))}
+                            {showStatusPicker && (
+                                <View style={styles.dropdown}>
+                                    <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
+                                        {['All', 'Pending', 'Approved', 'Inspect'].map((s) => (
+                                            <TouchableOpacity key={s} onPress={() => { setStatus(s); setShowStatusPicker(false); }}>
+                                                <Text style={styles.dropdownText}>{s}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+
+                    {/* Third Row: Filter Button */}
+                    <TouchableOpacity style={styles.searchButton} onPress={onSearch}>
+                        <Image source={require('./assets/search.png')} style={styles.searchIcon} resizeMode="contain" />
+                    </TouchableOpacity>
+
+                    {/* Results Count */}
+                    <Image source={require('./assets/separator-green.png')} style={styles.separator} />
+                    <Text style={styles.resultCount}>number of result(s): {donations.length}</Text>
+
+                    {/* Error or Empty Notices */}
+                    {error && (
+                        <View style={styles.stateContainer}>
+                            <Text style={styles.errorText}>{error}</Text>
+                        </View>
+                    )}
+                    {(() => {
+                        const filtered = donations.filter(d => (d?.NumberOfBoxes ?? 0) > 0 || ((d?.BatchLotTrackings ?? []).length > 0));
+                        const toRender = filtered.length > 0 ? filtered : donations;
+                        if (!error && donations.length === 0) {
+                            return (
+                                <View style={styles.stateContainer}>
+                                    <Text style={styles.emptyText}>No donations to display.</Text>
+                                </View>
+                            );
+                        }
+                        if (!error && donations.length > 0 && filtered.length === 0) {
+                            return (
+                                <View style={styles.stateContainer}>
+                                    <Text style={styles.emptyText}>Donations found but no boxes/packs yet. Displaying all.</Text>
+                                </View>
+                            );
+                        }
+                        return (
+                            <ScrollView>
+                                {toRender.map((donation, index) => (
+                                    <TouchableOpacity key={index} style={styles.cardContainer} onPress={() => handlePressDonation(donation)}>
+                                        <Text style={[styles.statusText, { color: getStatusColor(donation?.status) }]}>
+                                            {donation?.status || 'N/A'}
+                                        </Text>
+                                        <View style={styles.cardContent}>
+                                            <View style={styles.infoContainer}>
+                                                <Text style={styles.infoTitle}>Donation Title:</Text>
+                                                <Text style={styles.infoText}>{donation.DonationTitle || 'Untitled'}</Text>
+                                                <Text style={styles.infoTo}>To:</Text>
+                                                <Text style={styles.infoText}>{donation.RecipientName || 'N/A'}</Text>
+                                            </View>
+                                            <View style={styles.detailsContainer}>
+                                                <View style={styles.detailItem}>
+                                                    <Text style={styles.detailsText}>Date:</Text>
+                                                    <Text style={styles.detailValue}>{donation.DonationDate || 'N/A'}</Text>
+                                                </View>
+                                                <View style={styles.detailItem}>
+                                                    <Text style={styles.detailsText}>nb of box(es):</Text>
+                                                    <Text style={styles.detailValue}>{donation.NumberOfBoxes ?? 0}</Text>
+                                                </View>
+                                                <View style={styles.detailItem}>
+                                                    <Text style={styles.detailsText}>nb of pack(s):</Text>
+                                                    <Text style={styles.detailValue}>{(donation.BatchLotTrackings ?? []).length}</Text>
+                                                </View>
+                                            </View>
+                                        </View>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        );
+                    })()}
                 </ScrollView>
             )}
     
@@ -238,6 +429,20 @@ const DonorList = ({ navigation }) => {
     
 };
 
+const getStatusColor = (status) => {
+    if (!status) return '#121212';
+    switch (String(status).toLowerCase()) {
+        case 'pending':
+            return '#DB7B2B';
+        case 'approved':
+            return '#00A651';
+        case 'inspect':
+            return '#B00020';
+        default:
+            return '#121212';
+    }
+};
+
 const styles = StyleSheet.create({
     fullContainer: {
         flex: 1,
@@ -245,8 +450,145 @@ const styles = StyleSheet.create({
         paddingTop:10,
         
     },
+    scrollView: {
+        flex: 1,
+    },
+    contentContainer: {
+        paddingBottom: 80,
+        marginTop: 40,
+        marginLeft: 30,
+        marginRight: 30,
+    },
+    filterContainer: {
+        paddingHorizontal: 30,
+        marginTop: 10,
+    },
+    dateRangeContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#00A651',
+        borderRadius: 20,
+        paddingVertical: 10,
+        paddingHorizontal: 10,
+        height: 45,
+        backgroundColor: '#fff',
+    },
+    dateContainer: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    dateText: {
+        fontSize: 13,
+        fontFamily: 'RobotoCondensed-Bold',
+        color: '#707070',
+    },
+    dateValue: {
+        fontSize: 13,
+        fontFamily: 'RobotoCondensed-Bold',
+        color: '#000',
+    },
+    dateIcon: {
+        width: 30,
+        height: 30,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    calendarIcon: {
+        width: 45,
+        height: 44,
+    },
+    statusFilterRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginVertical: 10,
+    },
+    filterColumn: {
+        flex: 0,
+        marginHorizontal: 5,
+    },
+    filterLabel: {
+        fontSize: 12,
+        fontFamily: 'RobotoCondensed-Regular',
+        color: '#707070',
+        textAlign: 'center',
+        marginBottom: 4,
+    },
+    filterButton: {
+        borderWidth: 1,
+        borderColor: '#00A651',
+        borderRadius: 20,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        backgroundColor: '#fff',
+    },
+    filterText: {
+        color: '#00A651',
+        fontSize: 16,
+        fontFamily: 'RobotoCondensed-Bold',
+        textAlign: 'center',
+    },
+    dropdown: {
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 5,
+        position: 'absolute',
+        width: 150,
+        maxHeight: 140,
+        zIndex: 10,
+    },
+    dropdownScroll: {
+        maxHeight: 140,
+    },
+    dropdownText: {
+        fontSize: 14,
+        padding: 10,
+        color: '#000',
+        fontFamily: 'RobotoCondensed-Bold',
+    },
+    searchButton: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 50,
+    },
+    searchIcon: {
+        marginTop: 10,
+        width: 320,
+        height: 39,
+        borderRadius: 50,
+    },
+    separator: {
+        alignSelf: 'center',
+        marginTop: 6,
+        marginBottom: 2,
+    },
     scrollViewContainer: {
         paddingBottom: 20,
+    },
+    resultCount: {
+        textAlign: 'center',
+        marginVertical: 10,
+        fontSize: 10,
+        color: '#121212',
+        fontFamily: 'RobotoCondensed-Regular',
+    },
+    stateContainer: {
+        paddingHorizontal: 20,
+        marginTop: 20,
+        alignItems: 'center',
+    },
+    errorText: {
+        color: '#B00020',
+        fontFamily: 'RobotoCondensed-Bold',
+        fontSize: 14,
+        textAlign: 'center',
+    },
+    emptyText: {
+        color: '#666',
+        fontFamily: 'RobotoCondensed-Regular',
+        fontSize: 14,
+        textAlign: 'center',
     },
     cardContainer: {
         marginTop:20,

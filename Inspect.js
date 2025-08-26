@@ -423,7 +423,7 @@ const fetchImportationBoxLabel = async (boxId) => {
     
     return (
         <View style={styles.container}>
-            <StatusBar backgroundColor="#f9f9f9"/>
+            <StatusBar backgroundColor="#f9f9f9" barStyle="dark-content"/>
 
             {isCameraOpen ? (
                 <CameraView
@@ -608,7 +608,7 @@ const styles = StyleSheet.create({
         borderRadius: 25,
         padding: 10,
         marginBottom: 10,
-        height:35,
+        height:50,
         fontFamily: 'RobotoCondensed-Bold',
 
     },

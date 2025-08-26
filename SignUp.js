@@ -3,8 +3,10 @@ import { View, TextInput, Text, StyleSheet, Alert, Image, TouchableOpacity, Scro
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import DropDownPicker from 'react-native-dropdown-picker';
-import CountryPicker from '@realtril/react-native-country-picker-modal';
+import { CountryPicker } from 'react-native-country-codes-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import * as DocumentPicker from 'expo-document-picker';
 
 const SignUp = () => {
     const [userType, setUserType] = useState('Donor'); // Toggle between Donor and Recipient
@@ -25,7 +27,7 @@ const SignUp = () => {
     const [open, setOpen] = useState(false);
     const [organizationType, setOrganizationType] = useState(null);
     const [items, setItems] = useState([
-        { label: 'Organisation', value: 'Organisation' },
+        { label: 'Organization', value: 'organization' },
         { label: 'Individual', value: 'Individual' },
     ]);
     const [organizationCategoryOpen, setOrganizationCategoryOpen] = useState(false);
@@ -51,18 +53,28 @@ const SignUp = () => {
     const [countryCode, setCountryCode] = useState('');
     const [country, setCountry] = useState('');
     const [countryVisible, setCountryVisible] = useState(false);
+    const [validationErrors, setValidationErrors] = useState([]);
+    const [selectedDocument, setSelectedDocument] = useState(null);
+    const [documentUploading, setDocumentUploading] = useState(false);
 
     useLayoutEffect(() => {
         navigation.setOptions({
             headerTitle: 'Sign Up',
-            headerTitleAlign: 'center',  // Center the logo horizontally
-            headerLeft: () => null,      // Remove the back button
+            headerTitleAlign: 'center',
+            headerLeft: () => null,
+            headerRight: () => null,
             headerStyle: {
-                           // Adjust the height of the header
                 backgroundColor: '#f9f9f9',
             },
             headerTitleStyle: {
-                         // Distance from the top (50px)
+                fontWeight: 'bold',
+                fontSize: 18,
+                color: '#333',
+                textAlign: 'center',
+                alignSelf: 'center',
+                flex: 1,
+                paddingRight: 60,
+                marginTop: 20,
             },
         });
     }, [navigation]);
@@ -73,6 +85,7 @@ const SignUp = () => {
         setCountryCode(country.cca2);
         setCountry(country.name);
         setCountryVisible(false);
+        clearFieldError('country');
     };
 
     const getOrganizationCategoryLabel = (value) => {
@@ -129,6 +142,7 @@ const SignUp = () => {
                                 onPress={() => {
                                     setOrganizationCategory(item.value);
                                     setCategoryPickerVisible(false);
+                                    clearFieldError('organizationCategory');
                                 }}
                             >
                                 <Text style={[
@@ -177,6 +191,7 @@ const SignUp = () => {
                                 onPress={() => {
                                     setOrganizationSubType(item.value);
                                     setSubTypePickerVisible(false);
+                                    clearFieldError('organizationSubType');
                                 }}
                             >
                                 <Text style={[
@@ -275,32 +290,302 @@ const SignUp = () => {
     };
 
     const validatePassword = () => {
+        const errors = [];
+        
         if (password.length < 8) {
-            Alert.alert('Error', 'Password must be at least 8 characters long');
+            Alert.alert('Invalid Password', 'Password must be at least 8 characters long', [
+                { text: 'OK', style: 'default' }
+            ]);
+            errors.push('password');
+            setValidationErrors(['password']);
             return false;
         }
         if (password !== confirmPassword) {
-            Alert.alert('Error', 'Passwords do not match');
+            Alert.alert('Password Mismatch', 'Passwords do not match', [
+                { text: 'OK', style: 'default' }
+            ]);
+            errors.push('password', 'confirmPassword');
+            setValidationErrors(['password', 'confirmPassword']);
             return false;
         }
+        return true;
+    };
+
+    const validateEmail = (email) => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    };
+
+    const hasFieldError = (fieldName) => {
+        return validationErrors.includes(fieldName);
+    };
+
+    const clearFieldError = (fieldName) => {
+        setValidationErrors(prev => prev.filter(error => error !== fieldName));
+    };
+
+    const clearAllFields = () => {
+        // Clear all form fields
+        setName('');
+        setLastName('');
+        setOrganizationName('');
+        setDecreeNumber('');
+        setRegistrationDate('');
+        setWebsite('');
+        setContactPersonName('');
+        setAddress('');
+        setCity('');
+        setPhoneNumber('');
+        setEmail('');
+        setPassword('');
+        setConfirmPassword('');
+        setOrganizationType(null);
+        setOrganizationCategory(null);
+        setOrganizationSubType(null);
+        setCountry('');
+        setCountryCode('');
+        setSelectedDocument(null);
+        setDocumentUploading(false);
+        setValidationErrors([]);
+        setUserAnswer('');
+        
+        // Reset picker states
+        setOpen(false);
+        setOrganizationCategoryOpen(false);
+        setOrganizationSubTypeOpen(false);
+        setCategoryPickerVisible(false);
+        setSubTypePickerVisible(false);
+        setCountryVisible(false);
+        setShowDatePicker(false);
+        setIsCaptchaVisible(false);
+        
+        // Reset date
+        setSelectedDate(new Date());
+        
+        // Generate new CAPTCHA
+        generateCaptcha();
+    };
+
+    const selectDocument = async () => {
+        try {
+            console.log('Starting document selection...');
+            const result = await DocumentPicker.getDocumentAsync({
+                type: ['application/pdf', 'image/*', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+                copyToCacheDirectory: true,
+                multiple: false,
+            });
+            
+            console.log('Document picker result:', JSON.stringify(result, null, 2));
+            
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                // For newer versions of expo-document-picker (v11+)
+                const selectedFile = result.assets[0];
+                console.log('Document selected (new format):', selectedFile.name);
+                setSelectedDocument(selectedFile);
+                clearFieldError('document');
+                Alert.alert('Success', `Document "${selectedFile.name}" selected successfully!`);
+            } else if (result.type === 'success') {
+                // For older versions of expo-document-picker
+                console.log('Document selected (old format):', result.name);
+                setSelectedDocument(result);
+                clearFieldError('document');
+                Alert.alert('Success', `Document "${result.name}" selected successfully!`);
+            } else {
+                console.log('Document selection cancelled or failed');
+            }
+        } catch (err) {
+            console.error('Document selection error:', err);
+            Alert.alert('Error', `Failed to select document: ${err.message}`);
+        }
+    };
+
+    const uploadDocument = async () => {
+        if (!selectedDocument) {
+            Alert.alert('Error', 'Please select a document first');
+            return null;
+        }
+
+        setDocumentUploading(true);
+        
+        try {
+            const formData = new FormData();
+            
+            // Handle different document structures from expo-document-picker
+            const documentUri = selectedDocument.uri;
+            const documentType = selectedDocument.mimeType || selectedDocument.type;
+            const documentName = selectedDocument.name || selectedDocument.filename || 'document';
+            const documentSize = selectedDocument.size;
+            
+            formData.append('file', {
+                uri: documentUri,
+                type: documentType,
+                name: documentName,
+            });
+            
+            const metadata = {
+                originalName: documentName,
+                size: documentSize,
+                type: documentType,
+                uploadedBy: organizationType === 'Individual' ? `${name} ${lastName}` : organizationName,
+                purpose: 'registration_document'
+            };
+            
+            formData.append('metadata', JSON.stringify(metadata));
+
+            const response = await axios.post('https://apiv2.medleb.org/files/upload', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
+
+            setDocumentUploading(false);
+            return response.data;
+        } catch (error) {
+            setDocumentUploading(false);
+            console.error('Document upload error:', error);
+            
+            let errorMessage = 'Failed to upload document';
+            if (error.response) {
+                if (error.response.status === 400) {
+                    errorMessage = 'Invalid file format or file too large';
+                } else if (error.response.status === 403) {
+                    errorMessage = 'Access denied for file upload';
+                } else if (error.response.data?.message) {
+                    errorMessage = error.response.data.message;
+                }
+            }
+            
+            Alert.alert('Upload Error', errorMessage);
+            return null;
+        }
+    };
+
+    const validateRequiredFields = () => {
+        const missingFields = [];
+        const errors = [];
+
+        // Common validations for all user types
+        if (!organizationType) {
+            missingFields.push(`${userType} Type`);
+            errors.push('organizationType');
+        }
+        if (!country) {
+            missingFields.push('Country');
+            errors.push('country');
+        }
+        if (!email) {
+            missingFields.push('Email');
+            errors.push('email');
+        } else if (!validateEmail(email)) {
+            Alert.alert('Invalid Email', 'Please enter a valid email address', [
+                { text: 'OK', style: 'default' }
+            ]);
+            errors.push('email');
+            setValidationErrors(['email']);
+            return false;
+        }
+        if (!phoneNumber) {
+            missingFields.push('Phone Number');
+            errors.push('phoneNumber');
+        }
+        if (!address) {
+            missingFields.push('Address');
+            errors.push('address');
+        }
+        if (!password) {
+            missingFields.push('Password');
+            errors.push('password');
+        }
+        if (!confirmPassword) {
+            missingFields.push('Confirm Password');
+            errors.push('confirmPassword');
+        }
+
+        // Individual specific validations
+        if (organizationType === 'Individual') {
+            if (!name) {
+                missingFields.push('Name');
+                errors.push('name');
+            }
+            if (!lastName) {
+                missingFields.push('Last Name');
+                errors.push('lastName');
+            }
+            
+            // Recipient Individual specific validation
+            if (userType === 'Recipient' && !city) {
+                missingFields.push('City');
+                errors.push('city');
+            }
+        }
+
+        // Organization specific validations
+        if (organizationType === 'organization') {
+            if (!organizationCategory) {
+                missingFields.push('Organization Category');
+                errors.push('organizationCategory');
+            }
+            if (!organizationSubType) {
+                missingFields.push('Organization Type');
+                errors.push('organizationSubType');
+            }
+            if (!organizationName) {
+                missingFields.push('Organization Name');
+                errors.push('organizationName');
+            }
+
+            // Donor Organization specific validations
+            if (userType === 'Donor') {
+                if (!decreeNumber) {
+                    missingFields.push('Decree Number');
+                    errors.push('decreeNumber');
+                }
+                if (!registrationDate) {
+                    missingFields.push('Registration Date');
+                    errors.push('registrationDate');
+                }
+                if (!contactPersonName) {
+                    missingFields.push('Contact Person Name');
+                    errors.push('contactPersonName');
+                }
+                if (!selectedDocument) {
+                    missingFields.push('Document');
+                    errors.push('document');
+                }
+            }
+
+            // Recipient Organization specific validations
+            if (userType === 'Recipient') {
+                if (!contactPersonName) {
+                    missingFields.push('Contact Person Name');
+                    errors.push('contactPersonName');
+                }
+                if (!city) {
+                    missingFields.push('City');
+                    errors.push('city');
+                }
+            }
+        }
+
+        if (missingFields.length > 0) {
+            setValidationErrors(errors);
+            const fieldsList = missingFields.join(', ');
+            Alert.alert(
+                'Missing Required Fields', 
+                `Please fill in the following required fields:\n\n${fieldsList}`,
+                [{ text: 'OK', style: 'default' }]
+            );
+            return false;
+        }
+
+        setValidationErrors([]);
         return true;
     };
     
 
     const handleSignUp = () => {
+        if (!validateRequiredFields()) return;
         if (!validatePassword()) return;
-        
-        // Validate organization fields if organization type is selected
-        if (organizationType === 'Organisation') {
-            if (!organizationCategory) {
-                Alert.alert('Error', 'Please select an organization category');
-                return;
-            }
-            if (!organizationSubType) {
-                Alert.alert('Error', 'Please select an organization type');
-                return;
-            }
-        }
         
         generateCaptcha(); // Generate a CAPTCHA question
         setIsCaptchaVisible(true); // Show the CAPTCHA modal
@@ -312,6 +597,16 @@ const SignUp = () => {
         setIsCaptchaVisible(false); // Hide the CAPTCHA modal
 
         try {
+            let uploadedDocumentData = null;
+            
+            // Upload document if it's a donor organization
+            if (userType === 'Donor' && organizationType === 'organization' && selectedDocument) {
+                uploadedDocumentData = await uploadDocument();
+                if (!uploadedDocumentData) {
+                    return; // Stop if document upload failed
+                }
+            }
+
             if (userType === 'Donor') {
                 const donorData = {
                     DonorName: organizationType === 'Individual' ? `${name} ${lastName}` : organizationName,
@@ -321,9 +616,13 @@ const SignUp = () => {
                     Email: email,
                     DonorCountry: country,
                     IsActive: null,
-                    ...(organizationType === 'Organisation' && {
+                    ...(organizationType === 'organization' && {
                         OrganizationCategory: organizationCategory,
                         OrganizationSubType: organizationSubType,
+                        ...(uploadedDocumentData && {
+                            DocumentId: uploadedDocumentData.fileId || uploadedDocumentData.id,
+                            DocumentUrl: uploadedDocumentData.url || uploadedDocumentData.fileUrl
+                        })
                     }),
                 };
 
@@ -341,10 +640,10 @@ const SignUp = () => {
                     Address: address,
                     City: city,
                     Country: country,
-                    ContactPerson: organizationType === 'Organisation' ? contactPersonName : '',
+                    ContactPerson: organizationType === 'organization' ? contactPersonName : '',
                     ContactNumber: phoneNumber,
                     IsActive: null,
-                    ...(organizationType === 'Organisation' && {
+                    ...(organizationType === 'organization' && {
                         OrganizationCategory: organizationCategory,
                         OrganizationSubType: organizationSubType,
                     }),
@@ -364,7 +663,30 @@ const SignUp = () => {
             ]);
         } catch (error) {
             console.error(error);
-            Alert.alert('Error', 'Failed to sign up');
+            
+            let errorMessage = "Failed to sign up"
+            
+            if (error.response) {
+                // Server responded with error status
+                if (error.response.status === 401) {
+                    errorMessage = "Authorization failed. Please check your credentials."
+                } else if (error.response.status === 400) {
+                    errorMessage = error.response.data?.error || error.response.data?.message || "Invalid data provided. Please check all fields."
+                } else if (error.response.status === 409) {
+                    errorMessage = "User already exists. Please try a different username or email."
+                } else if (error.response.data?.message) {
+                    errorMessage = error.response.data.message
+                } else if (error.response.data?.error) {
+                    errorMessage = error.response.data.error
+                } else {
+                    errorMessage = `Server error: ${error.response.status}`
+                }
+            } else if (error.request) {
+                // Network error
+                errorMessage = "Network error. Please check your connection."
+            }
+            
+            Alert.alert('Sign Up Failed', errorMessage);
         }
     };
 
@@ -372,52 +694,121 @@ const SignUp = () => {
         <>
             <Text style={styles.label}>Country*</Text>
             <TouchableOpacity 
-                style={styles.countryPickerButton} 
+                style={hasFieldError('country') ? styles.countryPickerButtonError : styles.countryPickerButton} 
                 onPress={() => setCountryVisible(true)}
             >
-                <Text style={[styles.countryPickerText, !country && styles.placeholder]}>
-                    {country || 'Select Country'}
-                </Text>
+                <View style={styles.pickerContent}>
+                    <Text 
+                        style={[styles.countryPickerText, !country && styles.placeholder]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                    >
+                        {country || 'Select Country'}
+                    </Text>
+                    <View style={styles.pickerIconsContainer}>
+                        {country && (
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    setCountry('');
+                                    setCountryCode('');
+                                }}
+                                style={styles.clearButton}
+                            >
+                                <MaterialCommunityIcons name="close" size={16} color="#000000ff" />
+                            </TouchableOpacity>
+                        )}
+                        <MaterialCommunityIcons name="chevron-down" size={22} color="#000000ff" />
+                    </View>
+                </View>
             </TouchableOpacity>
             
             {countryVisible && (
-                <CountryPicker
-                    visible={countryVisible}
-                    onSelect={onSelectCountry}
-                    onClose={() => setCountryVisible(false)}
-                    withFilter
-                    withFlag
-                    withCountryNameButton
-                    withAlphaFilter
-                    withCallingCode
-                    countryCode={countryCode || 'LB'}
-                    excludeCountries={['IL']}
-                />
+                <>
+                    <CountryPicker
+                        show={countryVisible}
+                        onBackdropPress={() => setCountryVisible(false)}
+                        inputPlaceholder="Search countries..."
+                        searchMessage="Search countries..."
+                        enableModalAvoiding={true}
+                        androidWindowSoftInputMode="adjustResize"
+                        excludedCountries={['IL']}
+                        style={{
+                            modal: {
+                                height: '85%',
+                                marginTop: '15%',
+                            },
+                            textInput: { 
+                                height: 48, 
+                                borderRadius: 12, 
+                                paddingHorizontal: 12,
+                                marginHorizontal: 10,
+                                marginTop: 10,
+                                marginBottom: 10,
+                                borderWidth: 1,
+                                borderColor: '#e0e0e0',
+                            },
+                            itemsList: { 
+                                maxHeight: '90%',
+                                paddingHorizontal: 0,
+                            },
+                            countryButtonStyles: {
+                                height: 50,
+                                marginHorizontal: 10,
+                            },
+                        }}
+                        pickerButtonOnPress={(item) => {
+                            onSelectCountry({ name: item.name.en, cca2: item.code });
+                            setCountryVisible(false);
+                        }}
+                    />
+
+                    {/* Overlay close button above the library's modal */}
+                    <Modal visible={countryVisible} transparent animationType="none">
+                        <View style={{ flex: 1 }} pointerEvents="box-none">
+                            <TouchableOpacity
+                                onPress={() => setCountryVisible(false)}
+                                style={styles.countryCloseFab}
+                                activeOpacity={0.8}
+                            >
+                                <MaterialCommunityIcons name="close" size={22} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                    </Modal>
+                </>
             )}
 
             <Text style={styles.label}>Name*</Text>
             <TextInput
-                style={styles.input}
+                style={hasFieldError('name') ? styles.inputError : styles.input}
                 value={name}
-                onChangeText={setName}
+                onChangeText={(text) => {
+                    setName(text);
+                    if (text.trim()) clearFieldError('name');
+                }}
                 placeholder="First Name"
                 placeholderTextColor="#A9A9A9"
             />
 
             <Text style={styles.label}>Last Name*</Text>
             <TextInput
-                style={styles.input}
+                style={hasFieldError('lastName') ? styles.inputError : styles.input}
                 value={lastName}
-                onChangeText={setLastName}
+                onChangeText={(text) => {
+                    setLastName(text);
+                    if (text.trim()) clearFieldError('lastName');
+                }}
                 placeholder="Last Name"
                 placeholderTextColor="#A9A9A9"
             />
 
             <Text style={styles.label}>Email*</Text>
             <TextInput
-                style={styles.input}
+                style={hasFieldError('email') ? styles.inputError : styles.input}
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(text) => {
+                    setEmail(text);
+                    if (text.trim()) clearFieldError('email');
+                }}
                 placeholder="Email"
                 placeholderTextColor="#A9A9A9"
                 keyboardType="email-address"
@@ -425,9 +816,12 @@ const SignUp = () => {
 
             <Text style={styles.label}>Phone Number*</Text>
             <TextInput
-                style={styles.input}
+                style={hasFieldError('phoneNumber') ? styles.inputError : styles.input}
                 value={phoneNumber}
-                onChangeText={setPhoneNumber}
+                onChangeText={(text) => {
+                    setPhoneNumber(text);
+                    if (text.trim()) clearFieldError('phoneNumber');
+                }}
                 placeholder="Phone Number"
                 placeholderTextColor="#A9A9A9"
                 keyboardType="phone-pad"
@@ -435,9 +829,12 @@ const SignUp = () => {
 
             <Text style={styles.label}>Address*</Text>
             <TextInput
-                style={styles.input}
+                style={hasFieldError('address') ? styles.inputError : styles.input}
                 value={address}
-                onChangeText={setAddress}
+                onChangeText={(text) => {
+                    setAddress(text);
+                    if (text.trim()) clearFieldError('address');
+                }}
                 placeholder="Address"
                 placeholderTextColor="#A9A9A9"
             />
@@ -451,24 +848,80 @@ const SignUp = () => {
                 style={styles.countryPickerButton} 
                 onPress={() => setCountryVisible(true)}
             >
-                <Text style={[styles.countryPickerText, !country && styles.placeholder]}>
-                    {country || 'Select Country'}
-                </Text>
+                <View style={styles.pickerContent}>
+                    <Text style={[styles.countryPickerText, !country && styles.placeholder]}>
+                        {country || 'Select Country'}
+                    </Text>
+                    <View style={styles.pickerIconsContainer}>
+                        {country && (
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    setCountry('');
+                                    setCountryCode('');
+                                }}
+                                style={styles.clearButton}
+                            >
+                                <MaterialCommunityIcons name="close" size={16} color="#000000ff" />
+                            </TouchableOpacity>
+                        )}
+                        <MaterialCommunityIcons name="chevron-down" size={22} color="#000000ff" />
+                    </View>
+                </View>
             </TouchableOpacity>
             
             {countryVisible && (
-                <CountryPicker
-                    visible={countryVisible}
-                    onSelect={onSelectCountry}
-                    onClose={() => setCountryVisible(false)}
-                    withFilter
-                    withFlag
-                    withCountryNameButton
-                    withAlphaFilter
-                    withCallingCode
-                    countryCode={countryCode || 'LB'}
-                    excludeCountries={['IL']}
-                />
+                <>
+                    <CountryPicker
+                        show={countryVisible}
+                        onBackdropPress={() => setCountryVisible(false)}
+                        inputPlaceholder="Search countries..."
+                        searchMessage="Search countries..."
+                        enableModalAvoiding={true}
+                        androidWindowSoftInputMode="adjustResize"
+                        excludedCountries={['IL']}
+                        style={{
+                            modal: {
+                                height: '85%',
+                                marginTop: '15%',
+                            },
+                            textInput: { 
+                                height: 48, 
+                                borderRadius: 12, 
+                                paddingHorizontal: 12,
+                                marginHorizontal: 10,
+                                marginTop: 10,
+                                marginBottom: 10,
+                                borderWidth: 1,
+                                borderColor: '#e0e0e0',
+                            },
+                            itemsList: { 
+                                maxHeight: '90%',
+                                paddingHorizontal: 0,
+                            },
+                            countryButtonStyles: {
+                                height: 50,
+                                marginHorizontal: 10,
+                            },
+                        }}
+                        pickerButtonOnPress={(item) => {
+                            onSelectCountry({ name: item.name.en, cca2: item.code });
+                            setCountryVisible(false);
+                        }}
+                    />
+
+                    {/* Overlay close button above the library's modal */}
+                    <Modal visible={countryVisible} transparent animationType="none">
+                        <View style={{ flex: 1 }} pointerEvents="box-none">
+                            <TouchableOpacity
+                                onPress={() => setCountryVisible(false)}
+                                style={styles.countryCloseFab}
+                                activeOpacity={0.8}
+                            >
+                                <MaterialCommunityIcons name="close" size={22} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                    </Modal>
+                </>
             )}
 
             <Text style={styles.label}>Organization Category*</Text>
@@ -476,9 +929,29 @@ const SignUp = () => {
                 style={styles.pickerButton} 
                 onPress={() => setCategoryPickerVisible(true)}
             >
-                <Text style={[styles.pickerButtonText, !organizationCategory && styles.placeholder]}>
-                    {getOrganizationCategoryLabel(organizationCategory)}
-                </Text>
+                <View style={styles.pickerContent}>
+                    <Text 
+                        style={[styles.pickerButtonText, !organizationCategory && styles.placeholder]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                    >
+                        {getOrganizationCategoryLabel(organizationCategory)}
+                    </Text>
+                    <View style={styles.pickerIconsContainer}>
+                        {organizationCategory && (
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    setOrganizationCategory(null);
+                                    setOrganizationSubType(null);
+                                }}
+                                style={styles.clearButton}
+                            >
+                                <MaterialCommunityIcons name="close" size={16} color="#000000ff" />
+                            </TouchableOpacity>
+                        )}
+                        <MaterialCommunityIcons name="chevron-down" size={22} color="#000000ff" />
+                    </View>
+                </View>
             </TouchableOpacity>
 
             {organizationCategory && (
@@ -488,39 +961,82 @@ const SignUp = () => {
                         style={styles.pickerButton} 
                         onPress={() => setSubTypePickerVisible(true)}
                     >
-                        <Text style={[styles.pickerButtonText, !organizationSubType && styles.placeholder]}>
-                            {getOrganizationSubTypeLabel(organizationSubType)}
-                        </Text>
+                        <View style={styles.pickerContent}>
+                            <Text 
+                                style={[styles.pickerButtonText, !organizationSubType && styles.placeholder]}
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                            >
+                                {getOrganizationSubTypeLabel(organizationSubType)}
+                            </Text>
+                            <View style={styles.pickerIconsContainer}>
+                                {organizationSubType && (
+                                    <TouchableOpacity 
+                                        onPress={() => setOrganizationSubType(null)}
+                                        style={styles.clearButton}
+                                    >
+                                        <MaterialCommunityIcons name="close" size={16} color="#000000ff" />
+                                    </TouchableOpacity>
+                                )}
+                                <MaterialCommunityIcons name="chevron-down" size={22} color="#000000ff" />
+                            </View>
+                        </View>
                     </TouchableOpacity>
                 </>
             )}
 
             <Text style={styles.label}>Organization Name*</Text>
             <TextInput
-                style={styles.input}
+                style={hasFieldError('organizationName') ? styles.inputError : styles.input}
                 value={organizationName}
-                onChangeText={setOrganizationName}
+                onChangeText={(text) => {
+                    setOrganizationName(text);
+                    if (text.trim()) clearFieldError('organizationName');
+                }}
                 placeholder="Organization Name"
                 placeholderTextColor="#A9A9A9"
             />
 
             <Text style={styles.label}>Decree Number*</Text>
             <TextInput
-                style={styles.input}
+                style={hasFieldError('decreeNumber') ? styles.inputError : styles.input}
                 value={decreeNumber}
-                onChangeText={setDecreeNumber}
+                onChangeText={(text) => {
+                    setDecreeNumber(text);
+                    if (text.trim()) clearFieldError('decreeNumber');
+                }}
                 placeholder="Decree Number"
                 placeholderTextColor="#A9A9A9"
             />
 
             <Text style={styles.label}>Registration Date*</Text>
             <TouchableOpacity 
-                style={styles.datePickerButton} 
+                style={hasFieldError('registrationDate') ? styles.datePickerButtonError : styles.datePickerButton} 
                 onPress={() => setShowDatePicker(true)}
             >
-                <Text style={[styles.datePickerText, !registrationDate && styles.placeholder]}>
-                    {registrationDate || 'Select Registration Date'}
-                </Text>
+                <View style={styles.pickerContent}>
+                    <Text 
+                        style={[styles.datePickerText, !registrationDate && styles.placeholder]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                    >
+                        {registrationDate || 'Select Registration Date'}
+                    </Text>
+                    <View style={styles.pickerIconsContainer}>
+                        {registrationDate && (
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    setRegistrationDate('');
+                                    clearFieldError('registrationDate');
+                                }}
+                                style={styles.clearButton}
+                            >
+                                <MaterialCommunityIcons name="close" size={16} color="#000000ff" />
+                            </TouchableOpacity>
+                        )}
+                        <MaterialCommunityIcons name="chevron-down" size={22} color="#000000ff" />
+                    </View>
+                </View>
             </TouchableOpacity>
 
             {showDatePicker && (
@@ -534,8 +1050,34 @@ const SignUp = () => {
             )}
 
             <Text style={styles.label}>Attach Document*</Text>
-            <TouchableOpacity style={styles.fileUploadButton}>
-                <Text style={styles.fileUploadText}>Choose File</Text>
+            <TouchableOpacity 
+                style={[
+                    styles.fileUploadButton,
+                    hasFieldError('document') && styles.fileUploadButtonError,
+                    selectedDocument && styles.fileUploadButtonSelected
+                ]} 
+                onPress={selectDocument}
+                disabled={documentUploading}
+            >
+                <View style={styles.fileUploadContent}>
+                    <MaterialCommunityIcons 
+                        name={selectedDocument ? "file-check" : "file-upload"} 
+                        size={20} 
+                        color={selectedDocument ? "#00a651" : "#666"} 
+                        style={styles.fileUploadIcon}
+                    />
+                    <Text style={[
+                        styles.fileUploadText,
+                        selectedDocument && styles.fileUploadTextSelected
+                    ]}>
+                        {selectedDocument ? (selectedDocument.name || selectedDocument.filename || 'File Selected') : 'Choose File'}
+                    </Text>
+                </View>
+                {documentUploading && (
+                    <View style={styles.uploadingIndicator}>
+                        <Text style={styles.uploadingText}>Uploading...</Text>
+                    </View>
+                )}
             </TouchableOpacity>
 
             <Text style={styles.label}>Website (Optional)</Text>
@@ -550,18 +1092,24 @@ const SignUp = () => {
 
             <Text style={styles.label}>Contact Person Name*</Text>
             <TextInput
-                style={styles.input}
+                style={hasFieldError('contactPersonName') ? styles.inputError : styles.input}
                 value={contactPersonName}
-                onChangeText={setContactPersonName}
+                onChangeText={(text) => {
+                    setContactPersonName(text);
+                    if (text.trim()) clearFieldError('contactPersonName');
+                }}
                 placeholder="Contact Person Name"
                 placeholderTextColor="#A9A9A9"
             />
 
             <Text style={styles.label}>Email*</Text>
             <TextInput
-                style={styles.input}
+                style={hasFieldError('email') ? styles.inputError : styles.input}
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(text) => {
+                    setEmail(text);
+                    if (text.trim()) clearFieldError('email');
+                }}
                 placeholder="Email"
                 placeholderTextColor="#A9A9A9"
                 keyboardType="email-address"
@@ -569,9 +1117,12 @@ const SignUp = () => {
 
             <Text style={styles.label}>Phone Number*</Text>
             <TextInput
-                style={styles.input}
+                style={hasFieldError('phoneNumber') ? styles.inputError : styles.input}
                 value={phoneNumber}
-                onChangeText={setPhoneNumber}
+                onChangeText={(text) => {
+                    setPhoneNumber(text);
+                    if (text.trim()) clearFieldError('phoneNumber');
+                }}
                 placeholder="Phone Number"
                 placeholderTextColor="#A9A9A9"
                 keyboardType="phone-pad"
@@ -579,9 +1130,12 @@ const SignUp = () => {
 
             <Text style={styles.label}>Address*</Text>
             <TextInput
-                style={styles.input}
+                style={hasFieldError('address') ? styles.inputError : styles.input}
                 value={address}
-                onChangeText={setAddress}
+                onChangeText={(text) => {
+                    setAddress(text);
+                    if (text.trim()) clearFieldError('address');
+                }}
                 placeholder="Address"
                 placeholderTextColor="#A9A9A9"
             />
@@ -595,24 +1149,80 @@ const SignUp = () => {
                 style={styles.countryPickerButton} 
                 onPress={() => setCountryVisible(true)}
             >
-                <Text style={[styles.countryPickerText, !country && styles.placeholder]}>
-                    {country || 'Select Country'}
-                </Text>
+                <View style={styles.pickerContent}>
+                    <Text style={[styles.countryPickerText, !country && styles.placeholder]}>
+                        {country || 'Select Country'}
+                    </Text>
+                    <View style={styles.pickerIconsContainer}>
+                        {country && (
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    setCountry('');
+                                    setCountryCode('');
+                                }}
+                                style={styles.clearButton}
+                            >
+                                <MaterialCommunityIcons name="close" size={16} color="#000000ff" />
+                            </TouchableOpacity>
+                        )}
+                        <MaterialCommunityIcons name="chevron-down" size={22} color="#000000ff" />
+                    </View>
+                </View>
             </TouchableOpacity>
             
             {countryVisible && (
-                <CountryPicker
-                    visible={countryVisible}
-                    onSelect={onSelectCountry}
-                    onClose={() => setCountryVisible(false)}
-                    withFilter
-                    withFlag
-                    withCountryNameButton
-                    withAlphaFilter
-                    withCallingCode
-                    countryCode={countryCode || 'LB'}
-                    excludeCountries={['IL']}
-                />
+                <>
+                    <CountryPicker
+                        show={countryVisible}
+                        onBackdropPress={() => setCountryVisible(false)}
+                        inputPlaceholder="Search countries..."
+                        searchMessage="Search countries..."
+                        enableModalAvoiding={true}
+                        androidWindowSoftInputMode="adjustResize"
+                        excludedCountries={['IL']}
+                        style={{
+                            modal: {
+                                height: '85%',
+                                marginTop: '15%',
+                            },
+                            textInput: { 
+                                height: 48, 
+                                borderRadius: 12, 
+                                paddingHorizontal: 12,
+                                marginHorizontal: 10,
+                                marginTop: 10,
+                                marginBottom: 10,
+                                borderWidth: 1,
+                                borderColor: '#e0e0e0',
+                            },
+                            itemsList: { 
+                                maxHeight: '90%',
+                                paddingHorizontal: 0,
+                            },
+                            countryButtonStyles: {
+                                height: 50,
+                                marginHorizontal: 10,
+                            },
+                        }}
+                        pickerButtonOnPress={(item) => {
+                            onSelectCountry({ name: item.name.en, cca2: item.code });
+                            setCountryVisible(false);
+                        }}
+                    />
+
+                    {/* Overlay close button above the library's modal */}
+                    <Modal visible={countryVisible} transparent animationType="none">
+                        <View style={{ flex: 1 }} pointerEvents="box-none">
+                            <TouchableOpacity
+                                onPress={() => setCountryVisible(false)}
+                                style={styles.countryCloseFab}
+                                activeOpacity={0.8}
+                            >
+                                <MaterialCommunityIcons name="close" size={22} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                    </Modal>
+                </>
             )}
 
             <Text style={styles.label}>Name*</Text>
@@ -670,24 +1280,80 @@ const SignUp = () => {
                 style={styles.countryPickerButton} 
                 onPress={() => setCountryVisible(true)}
             >
-                <Text style={[styles.countryPickerText, !country && styles.placeholder]}>
-                    {country || 'Select Country'}
-                </Text>
+                <View style={styles.pickerContent}>
+                    <Text style={[styles.countryPickerText, !country && styles.placeholder]}>
+                        {country || 'Select Country'}
+                    </Text>
+                    <View style={styles.pickerIconsContainer}>
+                        {country && (
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    setCountry('');
+                                    setCountryCode('');
+                                }}
+                                style={styles.clearButton}
+                            >
+                                <MaterialCommunityIcons name="close" size={16} color="#000000ff" />
+                            </TouchableOpacity>
+                        )}
+                        <MaterialCommunityIcons name="chevron-down" size={22} color="#000000ff" />
+                    </View>
+                </View>
             </TouchableOpacity>
             
             {countryVisible && (
-                <CountryPicker
-                    visible={countryVisible}
-                    onSelect={onSelectCountry}
-                    onClose={() => setCountryVisible(false)}
-                    withFilter
-                    withFlag
-                    withCountryNameButton
-                    withAlphaFilter
-                    withCallingCode
-                    countryCode={countryCode || 'LB'}
-                    excludeCountries={['IL']}
-                />
+                <>
+                    <CountryPicker
+                        show={countryVisible}
+                        onBackdropPress={() => setCountryVisible(false)}
+                        inputPlaceholder="Search countries..."
+                        searchMessage="Search countries..."
+                        enableModalAvoiding={true}
+                        androidWindowSoftInputMode="adjustResize"
+                        excludedCountries={['IL']}
+                        style={{
+                            modal: {
+                                height: '85%',
+                                marginTop: '15%',
+                            },
+                            textInput: { 
+                                height: 48, 
+                                borderRadius: 12, 
+                                paddingHorizontal: 12,
+                                marginHorizontal: 10,
+                                marginTop: 10,
+                                marginBottom: 10,
+                                borderWidth: 1,
+                                borderColor: '#e0e0e0',
+                            },
+                            itemsList: { 
+                                maxHeight: '90%',
+                                paddingHorizontal: 0,
+                            },
+                            countryButtonStyles: {
+                                height: 50,
+                                marginHorizontal: 10,
+                            },
+                        }}
+                        pickerButtonOnPress={(item) => {
+                            onSelectCountry({ name: item.name.en, cca2: item.code });
+                            setCountryVisible(false);
+                        }}
+                    />
+
+                    {/* Overlay close button above the library's modal */}
+                    <Modal visible={countryVisible} transparent animationType="none">
+                        <View style={{ flex: 1 }} pointerEvents="box-none">
+                            <TouchableOpacity
+                                onPress={() => setCountryVisible(false)}
+                                style={styles.countryCloseFab}
+                                activeOpacity={0.8}
+                            >
+                                <MaterialCommunityIcons name="close" size={22} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+                    </Modal>
+                </>
             )}
 
             <Text style={styles.label}>Organization Category*</Text>
@@ -695,9 +1361,29 @@ const SignUp = () => {
                 style={styles.pickerButton} 
                 onPress={() => setCategoryPickerVisible(true)}
             >
-                <Text style={[styles.pickerButtonText, !organizationCategory && styles.placeholder]}>
-                    {getOrganizationCategoryLabel(organizationCategory)}
-                </Text>
+                <View style={styles.pickerContent}>
+                    <Text 
+                        style={[styles.pickerButtonText, !organizationCategory && styles.placeholder]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                    >
+                        {getOrganizationCategoryLabel(organizationCategory)}
+                    </Text>
+                    <View style={styles.pickerIconsContainer}>
+                        {organizationCategory && (
+                            <TouchableOpacity 
+                                onPress={() => {
+                                    setOrganizationCategory(null);
+                                    setOrganizationSubType(null);
+                                }}
+                                style={styles.clearButton}
+                            >
+                                <MaterialCommunityIcons name="close" size={16} color="#000000ff" />
+                            </TouchableOpacity>
+                        )}
+                        <MaterialCommunityIcons name="chevron-down" size={22} color="#000000ff" />
+                    </View>
+                </View>
             </TouchableOpacity>
 
             {organizationCategory && (
@@ -707,9 +1393,26 @@ const SignUp = () => {
                         style={styles.pickerButton} 
                         onPress={() => setSubTypePickerVisible(true)}
                     >
-                        <Text style={[styles.pickerButtonText, !organizationSubType && styles.placeholder]}>
-                            {getOrganizationSubTypeLabel(organizationSubType)}
-                        </Text>
+                        <View style={styles.pickerContent}>
+                            <Text 
+                                style={[styles.pickerButtonText, !organizationSubType && styles.placeholder]}
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                            >
+                                {getOrganizationSubTypeLabel(organizationSubType)}
+                            </Text>
+                            <View style={styles.pickerIconsContainer}>
+                                {organizationSubType && (
+                                    <TouchableOpacity 
+                                        onPress={() => setOrganizationSubType(null)}
+                                        style={styles.clearButton}
+                                    >
+                                        <MaterialCommunityIcons name="close" size={16} color="#000000ff" />
+                                    </TouchableOpacity>
+                                )}
+                                <MaterialCommunityIcons name="chevron-down" size={22} color="#000000ff" />
+                            </View>
+                        </View>
                     </TouchableOpacity>
                 </>
             )}
@@ -769,7 +1472,12 @@ const SignUp = () => {
                 <View style={styles.toggleContainer}>
                     <TouchableOpacity
                         style={[styles.toggleButton, userType === 'Donor' && styles.activeToggleButton]}
-                        onPress={() => setUserType('Donor')}
+                        onPress={() => {
+                            if (userType !== 'Donor') {
+                                clearAllFields();
+                                setUserType('Donor');
+                            }
+                        }}
                     >
                         <Text
                             style={[
@@ -782,7 +1490,12 @@ const SignUp = () => {
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.toggleButton, userType === 'Recipient' && styles.activeToggleButton]}
-                        onPress={() => setUserType('Recipient')}
+                        onPress={() => {
+                            if (userType !== 'Recipient') {
+                                clearAllFields();
+                                setUserType('Recipient');
+                            }
+                        }}
                     >
                         <Text
                             style={[
@@ -803,13 +1516,21 @@ const SignUp = () => {
                             value={organizationType}
                             items={items}
                             setOpen={setOpen}
-                            setValue={setOrganizationType}
+                            setValue={(callback) => {
+                                setOrganizationType(callback);
+                                if (callback) clearFieldError('organizationType');
+                            }}
                             setItems={setItems}
                             placeholder="Select Donor Type"
                             placeholderStyle={styles.placeholder}
-                            style={styles.input}
-                            containerStyle={styles.dropdownContainer}
-                            dropDownContainerStyle={styles.dropdownMenuContainer}
+                            style={hasFieldError('organizationType') ? styles.inputError : styles.input}
+                            containerStyle={hasFieldError('organizationType') ? styles.dropdownContainerError : styles.dropdownContainer}
+                            dropDownContainerStyle={hasFieldError('organizationType') ? styles.dropdownMenuContainerError : styles.dropdownMenuContainer}
+                            ArrowDownIconComponent={() => <MaterialCommunityIcons name="chevron-down" size={22} color="#000000ff" />}
+                            ArrowUpIconComponent={() => <MaterialCommunityIcons name="chevron-up" size={22} color="#000000ff" />}
+                            showTickIcon={false}
+                            closeAfterSelecting={true}
+                            searchable={false}
                         />
                     </>
                 )}
@@ -822,43 +1543,55 @@ const SignUp = () => {
                             value={organizationType}
                             items={items}
                             setOpen={setOpen}
-                            setValue={setOrganizationType}
+                            setValue={(callback) => {
+                                setOrganizationType(callback);
+                                if (callback) clearFieldError('organizationType');
+                            }}
                             setItems={setItems}
                             placeholder="Select Recipient Type"
                             placeholderStyle={styles.placeholder}
-                            style={styles.input}
-                            containerStyle={styles.dropdownContainer}
-                            dropDownContainerStyle={styles.dropdownMenuContainer}
+                            style={hasFieldError('organizationType') ? styles.inputError : styles.input}
+                            containerStyle={hasFieldError('organizationType') ? styles.dropdownContainerError : styles.dropdownContainer}
+                            dropDownContainerStyle={hasFieldError('organizationType') ? styles.dropdownMenuContainerError : styles.dropdownMenuContainer}
+                            ArrowDownIconComponent={() => <MaterialCommunityIcons name="chevron-down" size={22} color="#000000ff" />}
+                            ArrowUpIconComponent={() => <MaterialCommunityIcons name="chevron-up" size={22} color="#000000ff" />}
+                            showTickIcon={false}
+                            closeAfterSelecting={true}
+                            searchable={false}
                         />
                     </>
                 )}
 
                 {userType === 'Donor' && organizationType === 'Individual' && renderIndividualFields()}
-                {userType === 'Donor' && organizationType === 'Organisation' && renderOrganizationFields()}
+                {userType === 'Donor' && organizationType === 'organization' && renderOrganizationFields()}
                 {userType === 'Recipient' && organizationType === 'Individual' && renderRecipientIndividualFields()}
-                {userType === 'Recipient' && organizationType === 'Organisation' && renderRecipientOrganizationFields()}
+                {userType === 'Recipient' && organizationType === 'organization' && renderRecipientOrganizationFields()}
 
-                <Text style={styles.label}>Password*</Text>
-                <TextInput
-                    style={styles.input}
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder="Password (min 8 characters)"
-                    placeholderTextColor="#A9A9A9"
-                    secureTextEntry
-                />
+            <Text style={styles.label}>Password*</Text>
+            <TextInput
+                style={hasFieldError('password') ? styles.inputError : styles.input}
+                value={password}
+                onChangeText={(text) => {
+                    setPassword(text);
+                    if (text.trim()) clearFieldError('password');
+                }}
+                placeholder="Password (min 8 characters)"
+                placeholderTextColor="#A9A9A9"
+                secureTextEntry
+            />
 
-                <Text style={styles.label}>Confirm Password*</Text>
-                <TextInput
-                    style={styles.input}
-                    value={confirmPassword}
-                    onChangeText={setConfirmPassword}
-                    placeholder="Confirm Password"
-                    placeholderTextColor="#A9A9A9"
-                    secureTextEntry
-                />
-
-                <TouchableOpacity style={styles.button} onPress={handleSignUp}>
+            <Text style={styles.label}>Confirm Password*</Text>
+            <TextInput
+                style={hasFieldError('confirmPassword') ? styles.inputError : styles.input}
+                value={confirmPassword}
+                onChangeText={(text) => {
+                    setConfirmPassword(text);
+                    if (text.trim()) clearFieldError('confirmPassword');
+                }}
+                placeholder="Confirm Password"
+                placeholderTextColor="#A9A9A9"
+                secureTextEntry
+            />                <TouchableOpacity style={styles.button} onPress={handleSignUp}>
                     <Text style={styles.buttonText}>Sign Up</Text>
                 </TouchableOpacity>
 
@@ -907,6 +1640,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         padding: 20,
         backgroundColor: '#f9f9f9',
+        paddingBottom: 130,
     },
     label: {
         fontSize: 14,
@@ -921,8 +1655,18 @@ const styles = StyleSheet.create({
         paddingLeft: 10,
         marginBottom: 20,
         borderRadius: 20,
-        height: 40,
+        height: 50,
         backgroundColor: '#f9f9f9',
+    },
+    inputError: {
+        borderWidth: 2,
+        borderColor: '#ff4444',
+        padding: 5,
+        paddingLeft: 10,
+        marginBottom: 20,
+        borderRadius: 20,
+        height: 50,
+        backgroundColor: '#fff5f5',
     },
     placeholder: {
         color: '#A9A9A9',
@@ -931,17 +1675,29 @@ const styles = StyleSheet.create({
         marginBottom: 20,
         height: 40,
     },
+    dropdownContainerError: {
+        marginBottom: 20,
+        height: 40,
+    },
     dropdownMenuContainer: {
         borderColor: '#00a651',
+        backgroundColor: '#f9f9f9',
+    },
+    dropdownMenuContainerError: {
+        borderColor: '#ff4444',
+        backgroundColor: '#f9f9f9',
     },
     button: {
         backgroundColor: '#00a651',
         paddingVertical: 10,
-        paddingHorizontal: 15,
+        paddingHorizontal: 40,
         borderRadius: 25,
         marginTop: 20,
         justifyContent: 'center',
         alignItems: 'center',
+        height: 50,
+        alignSelf: 'center',
+        minWidth: 150,
     },
     buttonText: {
         color: 'white',
@@ -998,14 +1754,52 @@ const styles = StyleSheet.create({
         padding: 10,
         marginBottom: 20,
         borderRadius: 20,
-        height: 40,
+        height: 50,
         backgroundColor: '#f9f9f9',
         justifyContent: 'center',
         alignItems: 'center',
     },
+    fileUploadButtonError: {
+        borderColor: '#ff4444',
+        backgroundColor: '#fff5f5',
+    },
+    fileUploadButtonSelected: {
+        borderStyle: 'solid',
+        backgroundColor: '#e8f5e8',
+    },
+    fileUploadContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    fileUploadIcon: {
+        marginRight: 8,
+    },
     fileUploadText: {
         color: '#00a651',
         fontSize: 14,
+        flex: 1,
+        textAlign: 'center',
+    },
+    fileUploadTextSelected: {
+        color: '#00a651',
+        fontWeight: 'bold',
+    },
+    uploadingIndicator: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 166, 81, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 20,
+    },
+    uploadingText: {
+        color: '#00a651',
+        fontSize: 12,
+        fontWeight: 'bold',
     },
     countryPickerButton: {
         borderWidth: 1,
@@ -1014,13 +1808,27 @@ const styles = StyleSheet.create({
         paddingLeft: 10,
         marginBottom: 20,
         borderRadius: 20,
-        height: 40,
+        height: 50,
         backgroundColor: '#f9f9f9',
+        justifyContent: 'center',
+    },
+    countryPickerButtonError: {
+        borderWidth: 2,
+        borderColor: '#ff4444',
+        padding: 10,
+        paddingLeft: 10,
+        marginBottom: 20,
+        borderRadius: 20,
+        height: 50,
+        backgroundColor: '#fff5f5',
         justifyContent: 'center',
     },
     countryPickerText: {
         fontSize: 14,
         color: '#000',
+        flex: 1,
+        marginRight: 8,
+        numberOfLines: 1,
     },
     pickerButton: {
         borderWidth: 1,
@@ -1029,13 +1837,48 @@ const styles = StyleSheet.create({
         paddingLeft: 10,
         marginBottom: 20,
         borderRadius: 20,
-        height: 40,
+        height: 50,
         backgroundColor: '#f9f9f9',
         justifyContent: 'center',
     },
+    pickerButtonError: {
+        borderWidth: 2,
+        borderColor: '#ff4444',
+        padding: 10,
+        paddingLeft: 10,
+        marginBottom: 20,
+        borderRadius: 20,
+        height: 50,
+        backgroundColor: '#fff5f5',
+        justifyContent: 'center',
+    },
     pickerButtonText: {
-        fontSize: 14,
+        fontSize: 13,
         color: '#000',
+    },
+    pickerContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flex: 1,
+    },
+    pickerIconsContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexShrink: 0,
+    },
+    pickerButtonText: {
+        fontSize: 13,
+        color: '#000',
+        flex: 1,
+        marginRight: 8,
+        numberOfLines: 1,
+    },
+    clearButton: {
+        marginRight: 8,
+        padding: 2,
+        justifySelf: 'flex-start',
+    
     },
     datePickerButton: {
         borderWidth: 1,
@@ -1044,13 +1887,27 @@ const styles = StyleSheet.create({
         paddingLeft: 10,
         marginBottom: 20,
         borderRadius: 20,
-        height: 40,
+        height: 50,
         backgroundColor: '#f9f9f9',
+        justifyContent: 'center',
+    },
+    datePickerButtonError: {
+        borderWidth: 2,
+        borderColor: '#ff4444',
+        padding: 10,
+        paddingLeft: 10,
+        marginBottom: 20,
+        borderRadius: 20,
+        height: 50,
+        backgroundColor: '#fff5f5',
         justifyContent: 'center',
     },
     datePickerText: {
         fontSize: 14,
         color: '#000',
+        flex: 1,
+        marginRight: 8,
+        numberOfLines: 1,
     },
     pickerModalContainer: {
         flex: 1,
@@ -1112,6 +1969,17 @@ const styles = StyleSheet.create({
     selectedPickerItemText: {
         color: '#00a651',
         fontWeight: 'bold',
+    },
+    countryCloseFab: {
+        position: 'absolute',
+        top: 40,
+        right: 20,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 });
 

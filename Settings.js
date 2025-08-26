@@ -14,7 +14,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import CountryPicker from '@realtril/react-native-country-picker-modal';
+import { CountryPicker } from 'react-native-country-codes-picker';
 
 const Settings = () => {
     const navigation = useNavigation();
@@ -855,12 +855,13 @@ const Settings = () => {
             
             {countryVisible && (
                 <CountryPicker
-                    visible={countryVisible}
-                    onSelect={onSelectDonorCountry}
-                    onClose={() => setCountryVisible(false)}
-                    withFilter
-                    withFlag
-                    withCountryNameButton
+                    show={countryVisible}
+                    pickerButtonOnPress={(item) => {
+                        onSelectDonorCountry({ name: item.name.en });
+                        setCountryVisible(false);
+                    }}
+                    onBackdropPress={() => setCountryVisible(false)}
+                    searchMessage="Search countries..."
                 />
             )}
         </>
@@ -936,12 +937,13 @@ const Settings = () => {
             
             {recipientCountryVisible && (
                 <CountryPicker
-                    visible={recipientCountryVisible}
-                    onSelect={onSelectRecipientCountry}
-                    onClose={() => setRecipientCountryVisible(false)}
-                    withFilter
-                    withFlag
-                    withCountryNameButton
+                    show={recipientCountryVisible}
+                    pickerButtonOnPress={(item) => {
+                        onSelectRecipientCountry({ name: item.name.en });
+                        setRecipientCountryVisible(false);
+                    }}
+                    onBackdropPress={() => setRecipientCountryVisible(false)}
+                    searchMessage="Search countries..."
                 />
             )}
         </>
@@ -1041,7 +1043,7 @@ const styles = StyleSheet.create({
         paddingLeft: 10,
         marginBottom: 20,
         borderRadius: 20,
-        height: 40,
+        height: 50,
         backgroundColor: '#f9f9f9',
     },
     placeholder: {
@@ -1078,7 +1080,7 @@ const styles = StyleSheet.create({
         paddingLeft: 10,
         marginBottom: 20,
         borderRadius: 20,
-        height: 40,
+        height: 50,
         backgroundColor: '#f9f9f9',
         justifyContent: 'center',
     },
