@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
     headText: {
         margin: 6,
         textAlign: 'center',
-        color: '#fff',
+        color: '#f9f9f9',
         fontFamily: 'RobotoCondensed-Bold', 
         fontSize: 12,
     },
@@ -428,7 +428,7 @@ const styles = StyleSheet.create({
 
     },
     row: {
-        backgroundColor: '#fff',
+        backgroundColor: '#f9f9f9',
     },
     selectedRow: {
         backgroundColor: '#d0f0c0', // Light green color for selected rows
@@ -472,7 +472,7 @@ const styles = StyleSheet.create({
         borderRadius: 5,
     },
     buttonText: {
-        color: '#fff',
+        color: '#f9f9f9',
         fontWeight: 'bold',
     },
     selectAllButton: {

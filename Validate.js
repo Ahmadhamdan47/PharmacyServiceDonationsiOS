@@ -4,7 +4,6 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
-import HeaderProfile from './HeaderProfile'; // Import HeaderProfile component
 import * as Font from 'expo-font';
 
 const Validate = () => {
@@ -63,9 +62,7 @@ const Validate = () => {
                     <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
                 </TouchableOpacity>
             ),
-            headerRight: () => (
-                <HeaderProfile username={username} />
-            ),
+        headerRight: () => null,
             headerTitleAlign: 'center',
             headerStyle: {
                 backgroundColor: '#f9f9f9', // Set the background color of the whole navigation bar
@@ -75,7 +72,7 @@ const Validate = () => {
           },
         });
     
-    }, [navigation, username]);
+    }, [navigation]);
 
     const getUsername = async () => {
         try {
@@ -363,7 +360,7 @@ const styles = StyleSheet.create({
         fontFamily: 'RobotoCondensed-Bold',
     },
     dropdown: {
-        backgroundColor: '#fff',
+        backgroundColor: '#f9f9f9',
         borderWidth: 1,
         borderColor: '#ccc',
         borderRadius: 5,
@@ -389,7 +386,7 @@ const styles = StyleSheet.create({
            color: "#121212"
     },
     card: {
-        backgroundColor: '#fff',
+        backgroundColor: '#f9f9f9',
         borderRadius: 25,
         padding: 15,
         marginVertical: 10,

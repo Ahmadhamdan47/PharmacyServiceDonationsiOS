@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
         paddingBottom:5,
         height: 35,
         marginBottom: 5,
-        backgroundColor: '#FFFCFC',
+        backgroundColor: '#f9f9f9CFC',
         marginLeft: 35,
         marginRight: 35,
         fontFamily: 'RobotoCondensed-Bold',
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
         marginHorizontal:10,
     },
     inspectButtonText: {
-        color: '#fff',
+        color: '#f9f9f9',
         fontSize: 16,
         fontFamily: 'RobotoCondensed-Bold',
     },

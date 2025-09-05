@@ -172,7 +172,7 @@ const Landing = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#fff",
+        backgroundColor: "#f9f9f9",
     },
     headerContainer: {
         flexDirection: 'row',
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 10,
         right: 10,
-        backgroundColor: '#ffffff',
+        backgroundColor: '#f9f9f9',
         borderRadius: 15,
         minWidth: 160,
         paddingVertical: 8,
@@ -306,10 +306,10 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#FFFFFF',
+    borderColor: '#f9f9f9',
     },
     pendingBadgeText: {
-    color: '#FFFFFF',
+    color: '#f9f9f9',
     fontSize: 12,
     fontWeight: 'bold',
     fontFamily: 'RobotoCondensed-Bold',

@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from "react"
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from "react-native"
 import AsyncStorage from "@react-native-async-storage/async-storage"
-import { useNavigation } from "@react-navigation/native"
+import { useNavigation, useFocusEffect } from "@react-navigation/native"
 import axios from "axios"
 import * as Font from "expo-font"
 import { FontAwesome5 } from "@expo/vector-icons"
 
 const AgreementDetails = ({ route }) => {
-  const { agreement } = route.params
+  const { agreement, requireDonorSign } = route.params || {}
   const navigation = useNavigation()
   const [username, setUsername] = useState("")
   const [userRole, setUserRole] = useState("")
@@ -16,6 +16,8 @@ const AgreementDetails = ({ route }) => {
   const [agreementStatus, setAgreementStatus] = useState(agreement.Agreed_Upon)
   const [isLoading, setIsLoading] = useState(false)
   const [expenses_on, setexpenses_on] = useState(agreement.expenses_on) // Add state for expenses_on
+  const [donorSigned, setDonorSigned] = useState(requireDonorSign ? false : true)
+  const [donationTitle, setDonationTitle] = useState(agreement?.Donation?.DonationTitle || "")
 
   const fetchFonts = useCallback(async () => {
     await Font.loadAsync({
@@ -31,6 +33,20 @@ const AgreementDetails = ({ route }) => {
       await fetchFonts()
       await getUsername()
       console.log("Agreement:", agreement)
+      // Fetch the Donation record to get the authoritative DonationTitle
+      try {
+        if (agreement?.DonationId) {
+          const token = await AsyncStorage.getItem("token")
+          const headers = token ? { Authorization: `Bearer ${token}` } : {}
+          const resp = await axios.get(`https://apiv2.medleb.org/donation/${agreement.DonationId}`, { headers })
+          if (resp?.data && (resp.data.DonationTitle || resp.data.data?.DonationTitle)) {
+            const title = resp.data.DonationTitle || resp.data.data?.DonationTitle
+            if (title) setDonationTitle(title)
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to fetch donation title, falling back to passed agreement.Donation:", e?.message)
+      }
     }
 
     loadData()
@@ -45,7 +61,24 @@ const AgreementDetails = ({ route }) => {
     navigation.setOptions({
       headerTitle: "Agreement Details",
       headerLeft: () => (
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
+        <TouchableOpacity
+          onPress={() => {
+            if (requireDonorSign && !donorSigned) {
+              Alert.alert(
+                "Leave without signing?",
+                "Are you sure you want to quit without signing?",
+                [
+                  { text: "Stay", style: "cancel" },
+                  { text: "Quit", style: "destructive", onPress: () => navigation.navigate('DonorAgreements') },
+                ],
+                { cancelable: true },
+              )
+              return
+            }
+            navigation.navigate('DonorAgreements')
+          }}
+          style={styles.backButtonContainer}
+        >
           <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
         </TouchableOpacity>
       ),
@@ -57,7 +90,28 @@ const AgreementDetails = ({ route }) => {
         borderBottomWidth: 0,
       },
     })
-  }, [navigation, username])
+  }, [navigation, username, requireDonorSign, donorSigned])
+
+  // Block accidental leave if donor must sign and status still pending
+  useFocusEffect(
+    useCallback(() => {
+      const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+        if (!requireDonorSign || donorSigned) return
+        e.preventDefault()
+        Alert.alert(
+          "Leave without signing?",
+          "Are you sure you want to quit without signing?",
+          [
+            { text: "Stay", style: "cancel" },
+            { text: "Quit", style: "destructive", onPress: () => navigation.navigate('DonorAgreements') },
+          ],
+        )
+      })
+      return () => {
+        if (typeof unsubscribe === 'function') unsubscribe()
+      }
+    }, [navigation, requireDonorSign, donorSigned])
+  )
 
   const getUsername = async () => {
     try {
@@ -167,7 +221,6 @@ const AgreementDetails = ({ route }) => {
         { cancelable: true },
       )
     } else {
-      // If not a recipient, show the current status
       Alert.alert(
         "Agreement Status",
         `The recipient has ${
@@ -176,6 +229,36 @@ const AgreementDetails = ({ route }) => {
         [{ text: "OK" }],
       )
     }
+  }
+
+  const handleDonorSignaturePress = () => {
+    if (userRole !== "Donor" || !requireDonorSign || donorSigned) return
+    Alert.alert(
+      "Sign Agreement",
+      "By signing you are confirming that you read and agree on the terms of the agreement.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "OK", 
+          style: "default", 
+          onPress: () => {
+            setDonorSigned(true)
+            // Show informational popup after signing
+            setTimeout(() => {
+              Alert.alert(
+                "Agreement Signed",
+                "You have successfully signed the agreement. Please wait for the recipient to sign before you can start the donation process.",
+                [{ 
+                  text: "OK", 
+                  onPress: () => navigation.navigate('DonorAgreements')
+                }],
+              )
+            }, 100)
+          }
+        },
+      ],
+      { cancelable: true },
+    )
   }
 
   return (
@@ -187,19 +270,25 @@ const AgreementDetails = ({ route }) => {
           {/* Donation metadata */}
           <Text style={styles.sectionTitle}>Donation</Text>
           <View style={styles.partiesContainer}>
-            <Text style={styles.partyLabel}>Donation Title:</Text>
-            <Text style={styles.partyText}>{agreement?.Donation?.DonationTitle || "N/A"}</Text>
+          
+            <Text style={styles.partyText}>{donationTitle || agreement?.Donation?.DonationTitle || "N/A"}</Text>
           </View>
+
+          {/* Separator */}
+          <View style={styles.separator} />
 
           <Text style={styles.sectionTitle}>Parties</Text>
 
           <View style={styles.partiesContainer}>
             <Text style={styles.partyLabel}>Donor:</Text>
-            <Text style={styles.partyText}>{agreement.donor.DonorName}</Text>
+            <Text style={styles.partyText}>{agreement?.donor?.DonorName || "Donor"}</Text>
 
             <Text style={styles.partyLabel}>Receiver:</Text>
-            <Text style={styles.partyText}>{agreement.Recipient.RecipientName}</Text>
+            <Text style={styles.partyText}>{agreement?.Recipient?.RecipientName || "Recipient"}</Text>
           </View>
+
+          {/* Separator */}
+          <View style={styles.separator} />
 
           <Text style={styles.sectionTitle}>Terms and Conditions</Text>
 
@@ -254,24 +343,37 @@ const AgreementDetails = ({ route }) => {
             the issue, including rectifying or mitigating any harm caused.
           </Text>
 
+          {/* Separator */}
+          <View style={styles.separator} />
+
           <Text style={styles.sectionTitle}>Signatures</Text>
 
           <View style={styles.signatureContainer}>
             <View style={styles.signatureRow}>
               <Text style={styles.signatureLabel}>Donor:</Text>
               <View style={styles.signatureContent}>
-                <Text style={styles.signatureName}>{agreement.donor.DonorName}</Text>
-                <View style={styles.signatureBox}>
-                  <FontAwesome5 name="check" size={24} color="#00A651" />
-                </View>
-                <Text style={styles.signatureDate}>{currentDate}</Text>
+                <Text style={styles.signatureName}>{agreement?.donor?.DonorName || "Donor"}</Text>
+                {userRole === "Donor" && requireDonorSign ? (
+                  <TouchableOpacity style={styles.signatureBox} onPress={handleDonorSignaturePress} disabled={donorSigned}>
+                    {donorSigned ? (
+                      <FontAwesome5 name="check" size={24} color="#00A651" />
+                    ) : (
+                      <Text style={styles.pendingText}>Tap to sign</Text>
+                    )}
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.signatureBox}>
+                    <FontAwesome5 name="check" size={24} color="#00A651" />
+                  </View>
+                )}
+                <Text style={styles.signatureDate}>{donorSigned ? currentDate : "Pending"}</Text>
               </View>
             </View>
 
             <View style={styles.signatureRow}>
               <Text style={styles.signatureLabel}>Receiver:</Text>
               <View style={styles.signatureContent}>
-                <Text style={styles.signatureName}>{agreement.Recipient.RecipientName}</Text>
+                <Text style={styles.signatureName}>{agreement?.Recipient?.RecipientName || "Recipient"}</Text>
                 <TouchableOpacity style={styles.signatureBox} onPress={handleSignatureBoxPress} disabled={isLoading}>
                   {agreementStatus === "agreed" ? (
                     <FontAwesome5 name="check" size={24} color="#00A651" />
@@ -304,7 +406,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40, // Add padding to the bottom
   },
   agreementContainer: {
-    backgroundColor: "#fff",
+    backgroundColor: "#f9f9f9",
     borderRadius: 10,
     padding: 20,
     borderWidth: 1,
@@ -312,41 +414,41 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   agreementTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontFamily: "RobotoCondensed-Bold",
     color: "#00A651",
     textAlign: "center",
     marginBottom: 20,
   },
   agreementText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: "RobotoCondensed-Regular",
     marginBottom: 10,
-    lineHeight: 20,
+    lineHeight: 24,
   },
   partiesContainer: {
     marginVertical: 15,
   },
   partyLabel: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: "RobotoCondensed-Bold",
     marginBottom: 5,
   },
   partyText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: "RobotoCondensed-Regular",
     marginBottom: 15,
     marginLeft: 10,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontFamily: "RobotoCondensed-Bold",
     marginTop: 15,
     marginBottom: 10,
     color: "#00A651",
   },
   sectionSubtitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: "RobotoCondensed-Bold",
     marginTop: 10,
     marginBottom: 5,
@@ -359,7 +461,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   signatureLabel: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: "RobotoCondensed-Bold",
     width: 80,
   },
@@ -367,7 +469,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   signatureName: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: "RobotoCondensed-Regular",
     marginBottom: 5,
   },
@@ -386,9 +488,16 @@ const styles = StyleSheet.create({
     tintColor: "#00A651",
   },
   signatureDate: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: "RobotoCondensed-Regular",
     color: "#666",
+  },
+  separator: {
+    height: 1,
+    backgroundColor: "#00A651",
+    marginVertical: 15,
+    opacity: 0.3,
+    marginHorizontal:25,
   },
   refusedText: {
     color: "red",

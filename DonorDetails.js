@@ -4,7 +4,6 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomNavBarInspection
-import HeaderProfile from './HeaderProfile'; // Import HeaderProfile component
 
 const DonorDetails = ({ route, navigation }) => {
     const { donor } = route.params;
@@ -23,9 +22,7 @@ const DonorDetails = ({ route, navigation }) => {
                     <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
                 </TouchableOpacity>
             ),
-            headerRight: () => (
-                <HeaderProfile username={username} />
-            ),
+        headerRight: () => null,
             headerTitleAlign: 'center',
             headerStyle: {
                 backgroundColor: '#f9f9f9', // Set the background color of the whole navigation bar
@@ -35,7 +32,7 @@ const DonorDetails = ({ route, navigation }) => {
           },
         });
     
-    }, [navigation, username]);
+    }, [navigation]);
 
     const getUsername = async () => {
         try {
@@ -121,7 +118,7 @@ const styles = StyleSheet.create({
         height: 50,  // Set height to 50px
         marginBottom: 20,
         marginTop: 5,
-        backgroundColor: '#FFFCFC',
+        backgroundColor: '#f9f9f9CFC',
         marginLeft:35,
         marginRight:35,
   
@@ -141,7 +138,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     rejectButton: {
-        backgroundColor: '#fff',          // White background
+        backgroundColor: '#f9f9f9',          // White background
         borderColor: 'red',           // Green border
         borderWidth: 2,                   // Border width of 2px
         borderRadius: 20,                 // Same border radius as the original button
@@ -165,7 +162,7 @@ const styles = StyleSheet.create({
         marginHorizontal: 5, // Add
     },
     buttonText: {
-        color: '#fff',
+        color: '#f9f9f9',
         fontSize: 18,
         fontWeight: 'bold',
     },

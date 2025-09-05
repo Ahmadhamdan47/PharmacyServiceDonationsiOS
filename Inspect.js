@@ -4,7 +4,6 @@ import { CameraView } from 'expo-camera';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomNavBarInspection
-import HeaderProfile from './HeaderProfile'; // Import HeaderProfile component
 import axios from 'axios';
 import * as Font from 'expo-font';
 
@@ -74,9 +73,7 @@ const Inspect = ({ route }) => {
                     <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
                 </TouchableOpacity>
             ),
-            headerRight: () => (
-                <HeaderProfile username={username} />
-            ),
+            headerRight: () => null,
             headerTitleAlign: 'center',
             headerTitleStyle: 
             {    fontFamily: 'RobotoCondensed-Bold',
@@ -89,7 +86,7 @@ const Inspect = ({ route }) => {
               borderBottomWidth: 0,  
             },
         });
-    }, [navigation, username]);
+    }, [navigation]);
 
     useEffect(() => {
         const keyboardDidHideListener = Keyboard.addListener(
@@ -585,7 +582,7 @@ const styles = StyleSheet.create({
     },
     typeButtonText: {
         fontSize: 16,
-        color: '#fff',
+        color: '#f9f9f9',
         fontFamily: 'RobotoCondensed-Bold',
     },
     dropdownButtonText: {
@@ -630,7 +627,7 @@ const styles = StyleSheet.create({
         marginTop: 20,
     },
     checkButtonText: {
-        color: '#fff',
+        color: '#f9f9f9',
         fontFamily: 'RobotoCondensed-Bold',
         textAlign: 'center',
     },

@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, StatusBar } from 'react-native';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
 import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomNavBarInspection
-import HeaderProfile from './HeaderProfile'; // Import HeaderProfile component
 import * as Font from 'expo-font';
 
 const List = () => {
@@ -25,6 +25,7 @@ const List = () => {
     const [showRecipientPicker, setShowRecipientPicker] = useState(false);
     const [showStatusPicker, setShowStatusPicker] = useState(false);
     const [username, setUsername] = useState('');
+    const [sortAsc, setSortAsc] = useState(true);
     const scrollViewRef = useRef(null);
     const navigation = useNavigation();
     const [isFontLoaded, setIsFontLoaded] = useState(false);
@@ -58,9 +59,7 @@ const List = () => {
                     <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
                 </TouchableOpacity>
             ),
-            headerRight: () => (
-                <HeaderProfile username={username} />
-            ),
+            headerRight: () => null,
             headerTitleAlign: 'center',
            
             headerStyle: {
@@ -225,8 +224,7 @@ const List = () => {
                 {showToDatePicker && renderDatePicker('to')}    
            
 
-                {/* Second Row: Donor, Recipient, Status */}
-                {/* Donor, Recipient, and Status Fields in a Row */}
+                {/* Second Row: Donor & Recipient (for Donations) */}
                 <View style={styles.filterRow}>
                     {/* Donor - Only show for Donations */}
                     {selectedType === 'Donations' && (
@@ -280,11 +278,17 @@ const List = () => {
                         </View>
                     )}
 
-                    {/* Status */}
-                    <View style={styles.filterColumn}>
+                </View>
+
+                {/* Third Row: Status + Search (inline, like DonorAgreements) */}
+                <View style={styles.filterRow}>
+                    <View style={styles.filterColumnInline}>
                         <Text style={styles.filterLabel}>Status</Text>
                         <TouchableOpacity onPress={() => setShowStatusPicker(!showStatusPicker)} style={styles.filterButton}>
-                            <Text style={styles.filterText}>{status}</Text>
+                            <View style={styles.pickerContent}>
+                                <Text style={styles.filterText} numberOfLines={1} ellipsizeMode='tail'>{status}</Text>
+                                <MaterialCommunityIcons name={showStatusPicker ? 'chevron-up' : 'chevron-down'} size={20} color="#000000ff" />
+                            </View>
                         </TouchableOpacity>
                         {showStatusPicker && (
                             <View style={styles.dropdown}>
@@ -298,23 +302,38 @@ const List = () => {
                             </View>
                         )}
                     </View>
+                    <View style={styles.filterColumnInline}>
+                        <Text style={styles.filterLabel}>Search</Text>
+                        <TouchableOpacity style={styles.searchButton} onPress={fetchData}>
+                            <Image source={require('./assets/search.png')} style={[styles.searchIcon, styles.searchIconInline]} />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
 
-                {/* Third Row: Filter Button */}
-                <TouchableOpacity style={styles.searchButton} onPress={fetchData}>
-                    <Image source={require('./assets/search.png')} style={styles.searchIcon} />
-                </TouchableOpacity>
-
-
-                {/* Results Count */}
-                <Image source={require('./assets/separator-green.png')} style={styles.separator} />
+                {/* Separator with inline sort arrows */}
+                <View style={styles.separatorRow}>
+                    <Image source={require('./assets/separator-green.png')} style={styles.separatorFlex} />
+                    <View style={styles.sortInline}>
+                        <TouchableOpacity onPress={() => setSortAsc(true)} style={styles.sortIconButton}>
+                            <MaterialCommunityIcons name={'arrow-up'} size={16} color={sortAsc ? '#00A651' : '#A9A9A9'} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setSortAsc(false)} style={styles.sortIconButton}>
+                            <MaterialCommunityIcons name={'arrow-down'} size={16} color={!sortAsc ? '#FF8C00' : '#A9A9A9'} />
+                        </TouchableOpacity>
+                    </View>
+                </View>
                 <Text style={styles.resultCount}>number of result(s): {selectedType === 'Donations' ? donations.length : importations.length}</Text>
 
                 {/* Data List */}
                 <ScrollView>
                     {selectedType === 'Donations' ? (
-                        donations.map((donation, index) => (
+                        [...donations].sort((a,b)=>{
+                            const parse=(d)=> (d? Date.parse(d):0);
+                            const ad=parse(a?.DonationDate)||parse(a?.CreatedDate)||0;
+                            const bd=parse(b?.DonationDate)||parse(b?.CreatedDate)||0;
+                            return sortAsc? (ad-bd):(bd-ad);
+                        }).map((donation, index) => (
                             <TouchableOpacity 
                                 key={index} 
                                 style={styles.card} 
@@ -350,7 +369,12 @@ const List = () => {
                             </TouchableOpacity>
                         ))
                     ) : (
-                        importations.map((importation, index) => (
+                        [...importations].sort((a,b)=>{
+                            const parse=(d)=> (d? Date.parse(d):0);
+                            const ad=parse(a?.ImportationDate)||parse(a?.CreatedDate)||0;
+                            const bd=parse(b?.ImportationDate)||parse(b?.CreatedDate)||0;
+                            return sortAsc? (ad-bd):(bd-ad);
+                        }).map((importation, index) => (
                             <TouchableOpacity 
                                 key={index} 
                                 style={styles.card} 
@@ -427,6 +451,10 @@ const styles = StyleSheet.create({
         flex: 0,
         marginHorizontal: 5,
     },
+    filterColumnInline: {
+        flex: 1,
+        marginHorizontal: 5,
+    },
     
     filterText: {
         fontSize: 14,
@@ -435,24 +463,33 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     dropdown: {
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 5,
         position: 'absolute',
-        width: 150,
-        maxHeight: 120,
-        zIndex: 10,
+        top: 75,
+        left: 0,
+        right: 0,
+        backgroundColor: '#f9f9f9',
+        borderRadius: 15,
+        minWidth: 160,
+        paddingVertical: 8,
+        elevation: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        borderWidth: 1,
+        borderColor: '#e8e8e8',
+        zIndex: 1000,
     },
     dropdownScroll: {
-        maxHeight: 120,
+        maxHeight: 200,
+        paddingHorizontal: 10,
     },
     dropdownText: {
+        paddingVertical: 12,
+        textAlign: 'center',
         fontSize: 14,
-        padding: 10,
-        color: '#000',
-        fontFamily: 'RobotoCondensed-Bold',
-
+        fontFamily: 'RobotoCondensed-Regular',
+        color: '#121212',
     },
     filterButtonText: {
         color: '#00A651',
@@ -468,24 +505,25 @@ const styles = StyleSheet.create({
         fontFamily: 'RobotoCondensed-Regular',
     },
     card: {
-        backgroundColor: '#fff',
+        backgroundColor: '#f9f9f9',
         borderWidth: 1,
         borderColor: '#00A651',
         borderRadius: 50,
         padding: 15,
         marginVertical: 10,
-        height:140,
-
+        minHeight: 140,
+    },
+    cardHeader: {
+        marginBottom: 10,
     },
     statusText: {
         fontSize: 14,
         fontWeight: 'bold',
         textAlign: 'left',
         marginLeft: 10,
-     
     },
     cardContent: {
-     
+        flex: 1,
     },
     cardTitle: {
         fontSize: 12,
@@ -556,24 +594,45 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#00A651',
         borderRadius: 20,
-        paddingVertical: 8,
-        paddingHorizontal: 15,
-        minWidth:100,
+        paddingVertical: 10,
+        alignItems: 'center',
+        height: 45,
+        backgroundColor: '#f9f9f9',
     },
     searchButton: {
         justifyContent: 'center',
         alignItems: 'center',
-        borderRadius: 50, // Optional: for round button
-        
+        borderRadius: 50,
     },
     searchIcon: {
-        width: 320,  // Set the width of the search icon
-        height: 39,   
+        width: 320,
+        height: 39,
         borderRadius: 50,
-     },  
+     },
+     searchIconInline: {
+        width: '100%',
+     },
     separator:{
         marginTop:10,
         
+    },
+    separatorRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    separatorFlex: {
+        flex: 1,
+        resizeMode: 'contain',
+    },
+    sortInline: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginLeft: 8,
+    },
+    sortIconButton: {
+        paddingHorizontal: 4,
+        paddingVertical: 6,
     },
     typeButton: {
         backgroundColor: '#00A651',
@@ -587,9 +646,16 @@ const styles = StyleSheet.create({
     },
     typeButtonText: {
         fontSize: 16,
-        color: '#fff',
+        color: '#f9f9f9',
         fontFamily: 'RobotoCondensed-Bold',
         textAlign: 'center',
+    },
+    pickerContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+        paddingHorizontal: 10,
     },
 });
 

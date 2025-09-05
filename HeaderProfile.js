@@ -103,10 +103,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#FFFFFF',
+    borderColor: '#f9f9f9',
   },
   notificationText: {
-    color: '#FFFFFF',
+    color: '#f9f9f9',
     fontSize: 12,
     fontFamily: 'RobotoCondensed-Bold',
     fontWeight: 'bold',

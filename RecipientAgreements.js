@@ -4,7 +4,6 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import BottomNavBarRecipient from './BottomNavBarRecipient'; // Import the BottomNavBar for Recipient
-import HeaderProfile from './HeaderProfile'; // Import HeaderProfile component
 import * as Font from 'expo-font';
 
 const RecipientAgreements = () => {
@@ -18,6 +17,7 @@ const RecipientAgreements = () => {
     const [isFontLoaded, setIsFontLoaded] = useState(false);
     const [statusFilter, setStatusFilter] = useState('All');
     const [showStatusPicker, setShowStatusPicker] = useState(false);
+    const [donationTitles, setDonationTitles] = useState({});
 
     const fetchFonts = async () => {
         await Font.loadAsync({
@@ -44,9 +44,7 @@ const RecipientAgreements = () => {
                     <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
                 </TouchableOpacity>
             ),
-            headerRight: () => (
-                <HeaderProfile username={username} />
-            ),
+            headerRight: () => null,
             headerTitleAlign: 'center',
             headerStyle: {
                 backgroundColor: '#f9f9f9',
@@ -110,6 +108,7 @@ const RecipientAgreements = () => {
                     return (bDate || 0) - (aDate || 0);
                 });
                 setAgreements(sorted);
+                fetchDonationTitles(sorted).catch((e) => console.warn('Failed fetching donation titles:', e?.message));
             } else {
                 console.error('Unexpected response structure:', response.data);
                 setAgreements([]);
@@ -119,6 +118,27 @@ const RecipientAgreements = () => {
             setAgreements([]);
         }
     };
+
+    const fetchDonationTitles = async (items = []) => {
+        const token = await AsyncStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const uniqueIds = Array.from(new Set((items || []).map(it => it?.DonationId).filter(Boolean)));
+        const toFetch = uniqueIds.filter(id => !(id in donationTitles));
+        if (toFetch.length === 0) return;
+        const results = await Promise.allSettled(toFetch.map(id => axios.get(`https://apiv2.medleb.org/donation/${id}`, { headers })));
+        const mapUpdate = {};
+        results.forEach((res, idx) => {
+            const id = toFetch[idx];
+            if (res.status === 'fulfilled') {
+                const data = res.value?.data;
+                const title = data?.DonationTitle || data?.data?.DonationTitle;
+                if (title) mapUpdate[id] = title;
+            }
+        });
+        if (Object.keys(mapUpdate).length) setDonationTitles(prev => ({ ...prev, ...mapUpdate }));
+    };
+
+    const getDonationTitle = (agreement) => donationTitles[agreement?.DonationId] || agreement?.Donation?.DonationTitle || 'N/A';
 
     const getAgreedUponText = (agreedUpon) => {
         if (agreedUpon === 'agreed') return 'Agreed';
@@ -191,7 +211,7 @@ const RecipientAgreements = () => {
                                     {/* Left Column */}
                                     <View style={{ flex: 1, marginRight: 10, marginLeft: 10 }}>
                                         <Text style={[styles.cardTitle]}>Donation Title</Text>
-                                        <Text style={[styles.cardText]}>{agreement?.Donation?.DonationTitle || 'N/A'}</Text>
+                                        <Text style={[styles.cardText]}>{getDonationTitle(agreement)}</Text>
                                         <Text style={[styles.cardTitle]}>Donor</Text>
                                         <Text style={[styles.cardText]}>{agreement.donor.DonorName}</Text>
                                     </View>
@@ -294,7 +314,7 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         alignItems: 'center',
         height: 45,
-        backgroundColor: '#fff',
+        backgroundColor: '#f9f9f9',
     },
     filterText: {
         fontSize: 14,
@@ -306,7 +326,7 @@ const styles = StyleSheet.create({
         top: 75,
         left: 0,
         right: 0,
-        backgroundColor: '#ffffff',
+        backgroundColor: '#f9f9f9',
         borderRadius: 15,
         minWidth: 160,
         paddingVertical: 8,
@@ -331,7 +351,7 @@ const styles = StyleSheet.create({
         color: '#121212',
     },
     card: {
-        backgroundColor: '#fff',
+        backgroundColor: '#f9f9f9',
         borderWidth: 1,
         borderColor: '#00A651',
         borderRadius: 50,

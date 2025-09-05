@@ -5,7 +5,6 @@ import DropDownPicker from 'react-native-dropdown-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import BottomNavBar from './BottomNavBar';  // Import BottomNavBar
-import HeaderProfile from './HeaderProfile'; // Import HeaderProfile component
 import * as Font from 'expo-font';
 
 const AddDonor = () => {
@@ -86,9 +85,7 @@ const AddDonor = () => {
                 <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
             </TouchableOpacity>
         ),
-        headerRight: () => (
-            <HeaderProfile username={donorName} notificationCount={pendingAgreementsCount} />
-        ),
+        headerRight: () => null,
         headerTitleAlign: 'center',
         headerTitleStyle: {
           position: 'relative', 
@@ -217,8 +214,24 @@ const AddDonor = () => {
       const donationId = response.data.DonationId;
 
       // Always create a new agreement for each donation
-      await createNewAgreement(donorId, selectedRecipient, donationId, headers);
-      navigation.navigate('DonorAgreements', { username: donorName });
+      const createdAgreement = await createNewAgreement(donorId, selectedRecipient, donationId, headers);
+
+      // Build minimal agreement object compatible with AgreementDetails UI
+      const selectedRecipientName = (recipients.find(r => r.value === selectedRecipient)?.label) || '';
+      const agreementForDetails = {
+        ...(createdAgreement || {}),
+        DonationId: donationId,
+        DonorId: donorId,
+        RecipientId: selectedRecipient,
+        Agreed_Upon: 'pending',
+        expenses_on: 'donor',
+        Donation: { DonationTitle: donationTitle },
+        donor: { DonorName: donorName, DonorId: donorId },
+        Recipient: { RecipientName: selectedRecipientName, RecipientId: selectedRecipient },
+      };
+
+      // Navigate donor directly to Agreement Details to sign
+      navigation.navigate('AgreementDetails', { agreement: agreementForDetails, requireDonorSign: true });
     } catch (error) {
       console.error("Error creating donation or agreement:", error);
       Alert.alert('Error', 'Failed to create donation. Please try again.');
@@ -228,9 +241,9 @@ const AddDonor = () => {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} // Adjust for iOS vs Android
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-  <ScrollView contentContainerStyle={{ flexGrow: 1 }} nestedScrollEnabled={true} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} nestedScrollEnabled={true} keyboardShouldPersistTaps="handled">
         <View style={styles.formContainer}>
           <Text style={styles.label}>Donor</Text>
           <TextInput
@@ -241,7 +254,7 @@ const AddDonor = () => {
           <StatusBar backgroundColor="#f9f9f9" barStyle="dark-content" />
 
           <Text style={styles.label}>Recipient*</Text>
-      <View style={{ zIndex: 3000 }}>
+          <View style={{ zIndex: 3000 }}>
             <DropDownPicker
               open={recipientOpen}
               value={selectedRecipient}
@@ -253,8 +266,14 @@ const AddDonor = () => {
               containerStyle={styles.dropdown}
               onOpen={() => setIsInputFocused(true)}
               onClose={() => setIsInputFocused(false)}
-              style={styles.picker}
-        dropDownContainerStyle={styles.dropDownContainer}
+              style={[
+                styles.picker,
+                { backgroundColor: '#f9f9f9' }, // Always set background
+              ]}
+              dropDownContainerStyle={[
+                styles.dropDownContainer,
+                { backgroundColor: '#f9f9f9' }, // Always set background
+              ]}
               searchable={true}
               searchPlaceholder="Search recipients..."
               listMode="MODAL"
@@ -263,7 +282,10 @@ const AddDonor = () => {
               modalTitleStyle={styles.modalTitle}
               textStyle={styles.dropdownText}
               listItemLabelStyle={styles.dropdownText}
-              selectedItemLabelStyle={styles.dropdownSelectedText}
+              selectedItemLabelStyle={[
+                styles.dropdownSelectedText,
+                { backgroundColor: '#f9f9f9' }, // Always set background
+              ]}
               placeholderStyle={styles.dropdownPlaceholder}
               searchTextInputStyle={styles.searchInput}
               searchPlaceholderTextColor="#A9A9A9"
@@ -299,7 +321,7 @@ const AddDonor = () => {
         </View>
       </ScrollView>
 
-      {!keyboardVisible && <BottomNavBar />}  
+      {!keyboardVisible && <BottomNavBar />}
     </KeyboardAvoidingView>
   );
 };
@@ -355,6 +377,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     marginLeft: 10,
     color: "#A9A9A9",
+    backgroundColor: '#f9f9f9',
   },
   inputDonor: {
     borderWidth: 1,
@@ -377,7 +400,7 @@ const styles = StyleSheet.create({
     paddingLeft: 10,
     height: 50,
     marginBottom: 10,
-    backgroundColor: '#fff',
+    backgroundColor: '#f9f9f9',
     fontFamily: 'RobotoCondensed-Regular',
 
   },
@@ -406,7 +429,8 @@ const styles = StyleSheet.create({
   maxHeight: 250,
   zIndex: 3000,
   elevation: 1000,
-    
+  backgroundColor: '#f9f9f9',
+
   // Typography for dropdown modal
   modalTitle: {
     fontFamily: 'RobotoCondensed-Bold',
@@ -422,6 +446,7 @@ const styles = StyleSheet.create({
     fontFamily: 'RobotoCondensed-Bold',
     fontSize: 14,
     color: '#121212',
+    backgroundColor: '#f9f9f9',
   },
   dropdownPlaceholder: {
     fontFamily: 'RobotoCondensed-Regular',

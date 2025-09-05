@@ -136,7 +136,7 @@ const RecipientLanding = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#fff",
+        backgroundColor: "#f9f9f9",
     },
     headerContainer: {
         flexDirection: 'row',
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 10,
         right: 10,
-        backgroundColor: '#ffffff',
+        backgroundColor: '#f9f9f9',
         borderRadius: 15,
         minWidth: 160,
         paddingVertical: 8,
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
         borderColor: '#00A651',
         borderRadius: 25,
         padding: 10,
-        backgroundColor: '#FFFCFC',
+        backgroundColor: '#f9f9f9CFC',
         position: 'relative',
         height: 120,
     },

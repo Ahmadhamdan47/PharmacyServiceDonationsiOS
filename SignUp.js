@@ -18,6 +18,8 @@ const SignUp = () => {
     const [registrationDate, setRegistrationDate] = useState('');
     const [website, setWebsite] = useState('');
     const [contactPersonName, setContactPersonName] = useState('');
+    const [contactPersonFirstName, setContactPersonFirstName] = useState('');
+    const [contactPersonLastName, setContactPersonLastName] = useState('');
     const [address, setAddress] = useState('');
     const [city, setCity] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
@@ -53,6 +55,9 @@ const SignUp = () => {
     const [countryCode, setCountryCode] = useState('');
     const [country, setCountry] = useState('');
     const [countryVisible, setCountryVisible] = useState(false);
+    const [phoneCountryCode, setPhoneCountryCode] = useState('+1');
+    const [phoneCountryFlag, setPhoneCountryFlag] = useState('US');
+    const [phoneCountryVisible, setPhoneCountryVisible] = useState(false);
     const [validationErrors, setValidationErrors] = useState([]);
     const [selectedDocument, setSelectedDocument] = useState(null);
     const [documentUploading, setDocumentUploading] = useState(false);
@@ -86,6 +91,12 @@ const SignUp = () => {
         setCountry(country.name);
         setCountryVisible(false);
         clearFieldError('country');
+    };
+
+    const onSelectPhoneCountry = (country) => {
+        setPhoneCountryCode(country.dial_code);
+        setPhoneCountryFlag(country.code);
+        setPhoneCountryVisible(false);
     };
 
     const getOrganizationCategoryLabel = (value) => {
@@ -333,6 +344,8 @@ const SignUp = () => {
         setRegistrationDate('');
         setWebsite('');
         setContactPersonName('');
+        setContactPersonFirstName('');
+        setContactPersonLastName('');
         setAddress('');
         setCity('');
         setPhoneNumber('');
@@ -344,6 +357,8 @@ const SignUp = () => {
         setOrganizationSubType(null);
         setCountry('');
         setCountryCode('');
+        setPhoneCountryCode('+1');
+        setPhoneCountryFlag('US');
         setSelectedDocument(null);
         setDocumentUploading(false);
         setValidationErrors([]);
@@ -356,6 +371,7 @@ const SignUp = () => {
         setCategoryPickerVisible(false);
         setSubTypePickerVisible(false);
         setCountryVisible(false);
+        setPhoneCountryVisible(false);
         setShowDatePicker(false);
         setIsCaptchaVisible(false);
         
@@ -544,9 +560,13 @@ const SignUp = () => {
                     missingFields.push('Registration Date');
                     errors.push('registrationDate');
                 }
-                if (!contactPersonName) {
-                    missingFields.push('Contact Person Name');
-                    errors.push('contactPersonName');
+                if (!contactPersonFirstName) {
+                    missingFields.push('Contact Person First Name');
+                    errors.push('contactPersonFirstName');
+                }
+                if (!contactPersonLastName) {
+                    missingFields.push('Contact Person Last Name');
+                    errors.push('contactPersonLastName');
                 }
                 if (!selectedDocument) {
                     missingFields.push('Document');
@@ -556,9 +576,13 @@ const SignUp = () => {
 
             // Recipient Organization specific validations
             if (userType === 'Recipient') {
-                if (!contactPersonName) {
-                    missingFields.push('Contact Person Name');
-                    errors.push('contactPersonName');
+                if (!contactPersonFirstName) {
+                    missingFields.push('Contact Person First Name');
+                    errors.push('contactPersonFirstName');
+                }
+                if (!contactPersonLastName) {
+                    missingFields.push('Contact Person Last Name');
+                    errors.push('contactPersonLastName');
                 }
                 if (!city) {
                     missingFields.push('City');
@@ -612,7 +636,7 @@ const SignUp = () => {
                     DonorName: organizationType === 'Individual' ? `${name} ${lastName}` : organizationName,
                     DonorType: organizationType,
                     Address: address,
-                    PhoneNumber: phoneNumber,
+                    PhoneNumber: `${phoneCountryCode} ${phoneNumber}`,
                     Email: email,
                     DonorCountry: country,
                     IsActive: null,
@@ -640,8 +664,8 @@ const SignUp = () => {
                     Address: address,
                     City: city,
                     Country: country,
-                    ContactPerson: organizationType === 'organization' ? contactPersonName : '',
-                    ContactNumber: phoneNumber,
+                    ContactPerson: organizationType === 'organization' ? `${contactPersonFirstName} ${contactPersonLastName}` : '',
+                    ContactNumber: `${phoneCountryCode} ${phoneNumber}`,
                     IsActive: null,
                     ...(organizationType === 'organization' && {
                         OrganizationCategory: organizationCategory,
@@ -770,7 +794,7 @@ const SignUp = () => {
                                 style={styles.countryCloseFab}
                                 activeOpacity={0.8}
                             >
-                                <MaterialCommunityIcons name="close" size={22} color="#fff" />
+                                <MaterialCommunityIcons name="close" size={22} color="#f9f9f9" />
                             </TouchableOpacity>
                         </View>
                     </Modal>
@@ -815,17 +839,26 @@ const SignUp = () => {
             />
 
             <Text style={styles.label}>Phone Number*</Text>
-            <TextInput
-                style={hasFieldError('phoneNumber') ? styles.inputError : styles.input}
-                value={phoneNumber}
-                onChangeText={(text) => {
-                    setPhoneNumber(text);
-                    if (text.trim()) clearFieldError('phoneNumber');
-                }}
-                placeholder="Phone Number"
-                placeholderTextColor="#A9A9A9"
-                keyboardType="phone-pad"
-            />
+            <View style={hasFieldError('phoneNumber') ? styles.phoneInputContainerError : styles.phoneInputContainer}>
+                <TouchableOpacity 
+                    style={styles.countryCodeButton}
+                    onPress={() => setPhoneCountryVisible(true)}
+                >
+                    <Text style={styles.countryCodeText}>{phoneCountryCode}</Text>
+                    <MaterialCommunityIcons name="chevron-down" size={16} color="#000000ff" />
+                </TouchableOpacity>
+                <TextInput
+                    style={styles.phoneInput}
+                    value={phoneNumber}
+                    onChangeText={(text) => {
+                        setPhoneNumber(text);
+                        if (text.trim()) clearFieldError('phoneNumber');
+                    }}
+                    placeholder="Phone Number"
+                    placeholderTextColor="#A9A9A9"
+                    keyboardType="phone-pad"
+                />
+            </View>
 
             <Text style={styles.label}>Address*</Text>
             <TextInput
@@ -917,7 +950,7 @@ const SignUp = () => {
                                 style={styles.countryCloseFab}
                                 activeOpacity={0.8}
                             >
-                                <MaterialCommunityIcons name="close" size={22} color="#fff" />
+                                <MaterialCommunityIcons name="close" size={22} color="#f9f9f9" />
                             </TouchableOpacity>
                         </View>
                     </Modal>
@@ -1090,15 +1123,27 @@ const SignUp = () => {
                 keyboardType="url"
             />
 
-            <Text style={styles.label}>Contact Person Name*</Text>
+            <Text style={styles.label}>Contact Person First Name*</Text>
             <TextInput
-                style={hasFieldError('contactPersonName') ? styles.inputError : styles.input}
-                value={contactPersonName}
+                style={hasFieldError('contactPersonFirstName') ? styles.inputError : styles.input}
+                value={contactPersonFirstName}
                 onChangeText={(text) => {
-                    setContactPersonName(text);
-                    if (text.trim()) clearFieldError('contactPersonName');
+                    setContactPersonFirstName(text);
+                    if (text.trim()) clearFieldError('contactPersonFirstName');
                 }}
-                placeholder="Contact Person Name"
+                placeholder="Contact Person First Name"
+                placeholderTextColor="#A9A9A9"
+            />
+
+            <Text style={styles.label}>Contact Person Last Name*</Text>
+            <TextInput
+                style={hasFieldError('contactPersonLastName') ? styles.inputError : styles.input}
+                value={contactPersonLastName}
+                onChangeText={(text) => {
+                    setContactPersonLastName(text);
+                    if (text.trim()) clearFieldError('contactPersonLastName');
+                }}
+                placeholder="Contact Person Last Name"
                 placeholderTextColor="#A9A9A9"
             />
 
@@ -1116,17 +1161,26 @@ const SignUp = () => {
             />
 
             <Text style={styles.label}>Phone Number*</Text>
-            <TextInput
-                style={hasFieldError('phoneNumber') ? styles.inputError : styles.input}
-                value={phoneNumber}
-                onChangeText={(text) => {
-                    setPhoneNumber(text);
-                    if (text.trim()) clearFieldError('phoneNumber');
-                }}
-                placeholder="Phone Number"
-                placeholderTextColor="#A9A9A9"
-                keyboardType="phone-pad"
-            />
+            <View style={hasFieldError('phoneNumber') ? styles.phoneInputContainerError : styles.phoneInputContainer}>
+                <TouchableOpacity 
+                    style={styles.countryCodeButton}
+                    onPress={() => setPhoneCountryVisible(true)}
+                >
+                    <Text style={styles.countryCodeText}>{phoneCountryCode}</Text>
+                    <MaterialCommunityIcons name="chevron-down" size={16} color="#000000ff" />
+                </TouchableOpacity>
+                <TextInput
+                    style={styles.phoneInput}
+                    value={phoneNumber}
+                    onChangeText={(text) => {
+                        setPhoneNumber(text);
+                        if (text.trim()) clearFieldError('phoneNumber');
+                    }}
+                    placeholder="Phone Number"
+                    placeholderTextColor="#A9A9A9"
+                    keyboardType="phone-pad"
+                />
+            </View>
 
             <Text style={styles.label}>Address*</Text>
             <TextInput
@@ -1218,7 +1272,7 @@ const SignUp = () => {
                                 style={styles.countryCloseFab}
                                 activeOpacity={0.8}
                             >
-                                <MaterialCommunityIcons name="close" size={22} color="#fff" />
+                                <MaterialCommunityIcons name="close" size={22} color="#f9f9f9" />
                             </TouchableOpacity>
                         </View>
                     </Modal>
@@ -1244,14 +1298,23 @@ const SignUp = () => {
             />
 
             <Text style={styles.label}>Phone Number*</Text>
-            <TextInput
-                style={styles.input}
-                value={phoneNumber}
-                onChangeText={setPhoneNumber}
-                placeholder="Phone Number"
-                placeholderTextColor="#A9A9A9"
-                keyboardType="phone-pad"
-            />
+            <View style={styles.phoneInputContainer}>
+                <TouchableOpacity 
+                    style={styles.countryCodeButton}
+                    onPress={() => setPhoneCountryVisible(true)}
+                >
+                    <Text style={styles.countryCodeText}>{phoneCountryCode}</Text>
+                    <MaterialCommunityIcons name="chevron-down" size={16} color="#000000ff" />
+                </TouchableOpacity>
+                <TextInput
+                    style={styles.phoneInput}
+                    value={phoneNumber}
+                    onChangeText={setPhoneNumber}
+                    placeholder="Phone Number"
+                    placeholderTextColor="#A9A9A9"
+                    keyboardType="phone-pad"
+                />
+            </View>
 
             <Text style={styles.label}>Address*</Text>
             <TextInput
@@ -1349,7 +1412,7 @@ const SignUp = () => {
                                 style={styles.countryCloseFab}
                                 activeOpacity={0.8}
                             >
-                                <MaterialCommunityIcons name="close" size={22} color="#fff" />
+                                <MaterialCommunityIcons name="close" size={22} color="#f9f9f9" />
                             </TouchableOpacity>
                         </View>
                     </Modal>
@@ -1426,24 +1489,48 @@ const SignUp = () => {
                 placeholderTextColor="#A9A9A9"
             />
 
-            <Text style={styles.label}>Contact Person Name*</Text>
+            <Text style={styles.label}>Contact Person First Name*</Text>
             <TextInput
-                style={styles.input}
-                value={contactPersonName}
-                onChangeText={setContactPersonName}
-                placeholder="Contact Person Name"
+                style={hasFieldError('contactPersonFirstName') ? styles.inputError : styles.input}
+                value={contactPersonFirstName}
+                onChangeText={(text) => {
+                    setContactPersonFirstName(text);
+                    if (text.trim()) clearFieldError('contactPersonFirstName');
+                }}
+                placeholder="Contact Person First Name"
+                placeholderTextColor="#A9A9A9"
+            />
+
+            <Text style={styles.label}>Contact Person Last Name*</Text>
+            <TextInput
+                style={hasFieldError('contactPersonLastName') ? styles.inputError : styles.input}
+                value={contactPersonLastName}
+                onChangeText={(text) => {
+                    setContactPersonLastName(text);
+                    if (text.trim()) clearFieldError('contactPersonLastName');
+                }}
+                placeholder="Contact Person Last Name"
                 placeholderTextColor="#A9A9A9"
             />
 
             <Text style={styles.label}>Phone Number*</Text>
-            <TextInput
-                style={styles.input}
-                value={phoneNumber}
-                onChangeText={setPhoneNumber}
-                placeholder="Phone Number"
-                placeholderTextColor="#A9A9A9"
-                keyboardType="phone-pad"
-            />
+            <View style={styles.phoneInputContainer}>
+                <TouchableOpacity 
+                    style={styles.countryCodeButton}
+                    onPress={() => setPhoneCountryVisible(true)}
+                >
+                    <Text style={styles.countryCodeText}>{phoneCountryCode}</Text>
+                    <MaterialCommunityIcons name="chevron-down" size={16} color="#000000ff" />
+                </TouchableOpacity>
+                <TextInput
+                    style={styles.phoneInput}
+                    value={phoneNumber}
+                    onChangeText={setPhoneNumber}
+                    placeholder="Phone Number"
+                    placeholderTextColor="#A9A9A9"
+                    keyboardType="phone-pad"
+                />
+            </View>
 
             <Text style={styles.label}>Address*</Text>
             <TextInput
@@ -1625,6 +1712,61 @@ const SignUp = () => {
 
                 {/* Organization Sub-Type Picker Modal */}
                 {renderSubTypePicker()}
+
+                {/* Phone Country Picker Modal */}
+                {phoneCountryVisible && (
+                    <>
+                        <CountryPicker
+                            show={phoneCountryVisible}
+                            onBackdropPress={() => setPhoneCountryVisible(false)}
+                            inputPlaceholder="Search countries..."
+                            searchMessage="Search countries..."
+                            enableModalAvoiding={true}
+                            androidWindowSoftInputMode="adjustResize"
+                            excludedCountries={['IL']}
+                            style={{
+                                modal: {
+                                    height: '85%',
+                                    marginTop: '15%',
+                                },
+                                textInput: { 
+                                    height: 48, 
+                                    borderRadius: 12, 
+                                    paddingHorizontal: 12,
+                                    marginHorizontal: 10,
+                                    marginTop: 10,
+                                    marginBottom: 10,
+                                    borderWidth: 1,
+                                    borderColor: '#e0e0e0',
+                                },
+                                itemsList: { 
+                                    maxHeight: '90%',
+                                    paddingHorizontal: 0,
+                                },
+                                countryButtonStyles: {
+                                    height: 50,
+                                    marginHorizontal: 10,
+                                },
+                            }}
+                            pickerButtonOnPress={(item) => {
+                                onSelectPhoneCountry({ dial_code: item.dial_code, code: item.code });
+                                setPhoneCountryVisible(false);
+                            }}
+                        />
+
+                        <Modal visible={phoneCountryVisible} transparent animationType="none">
+                            <View style={{ flex: 1 }} pointerEvents="box-none">
+                                <TouchableOpacity
+                                    onPress={() => setPhoneCountryVisible(false)}
+                                    style={styles.countryCloseFab}
+                                    activeOpacity={0.8}
+                                >
+                                    <MaterialCommunityIcons name="close" size={22} color="#f9f9f9" />
+                                </TouchableOpacity>
+                            </View>
+                        </Modal>
+                    </>
+                )}
             </View>
         </ScrollView>
     );
@@ -1657,6 +1799,7 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         height: 50,
         backgroundColor: '#f9f9f9',
+        color: '#000000',
     },
     inputError: {
         borderWidth: 2,
@@ -1666,7 +1809,8 @@ const styles = StyleSheet.create({
         marginBottom: 20,
         borderRadius: 20,
         height: 50,
-        backgroundColor: '#fff5f5',
+        backgroundColor: '#f9f9f95f5',
+        color: '#000000',
     },
     placeholder: {
         color: '#A9A9A9',
@@ -1726,7 +1870,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     activeToggleButtonText: {
-        color: '#fff',
+        color: '#f9f9f9',
     },
     modalContainer: {
         flex: 1,
@@ -1761,7 +1905,7 @@ const styles = StyleSheet.create({
     },
     fileUploadButtonError: {
         borderColor: '#ff4444',
-        backgroundColor: '#fff5f5',
+        backgroundColor: '#f9f9f95f5',
     },
     fileUploadButtonSelected: {
         borderStyle: 'solid',
@@ -1820,7 +1964,7 @@ const styles = StyleSheet.create({
         marginBottom: 20,
         borderRadius: 20,
         height: 50,
-        backgroundColor: '#fff5f5',
+        backgroundColor: '#f9f9f95f5',
         justifyContent: 'center',
     },
     countryPickerText: {
@@ -1849,7 +1993,7 @@ const styles = StyleSheet.create({
         marginBottom: 20,
         borderRadius: 20,
         height: 50,
-        backgroundColor: '#fff5f5',
+        backgroundColor: '#f9f9f95f5',
         justifyContent: 'center',
     },
     pickerButtonText: {
@@ -1899,7 +2043,7 @@ const styles = StyleSheet.create({
         marginBottom: 20,
         borderRadius: 20,
         height: 50,
-        backgroundColor: '#fff5f5',
+        backgroundColor: '#f9f9f95f5',
         justifyContent: 'center',
     },
     datePickerText: {
@@ -1934,7 +2078,7 @@ const styles = StyleSheet.create({
     pickerTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#fff',
+        color: '#f9f9f9',
         flex: 1,
     },
     closeButton: {
@@ -1946,7 +2090,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     closeButtonText: {
-        color: '#fff',
+        color: '#f9f9f9',
         fontSize: 18,
         fontWeight: 'bold',
     },
@@ -1980,6 +2124,47 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.6)',
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    phoneInputContainer: {
+        flexDirection: 'row',
+        borderWidth: 1,
+        borderColor: '#00a651',
+        borderRadius: 20,
+        height: 50,
+        backgroundColor: '#f9f9f9',
+        marginBottom: 20,
+        alignItems: 'center',
+    },
+    phoneInputContainerError: {
+        flexDirection: 'row',
+        borderWidth: 2,
+        borderColor: '#ff4444',
+        borderRadius: 20,
+        height: 50,
+        backgroundColor: '#f9f9f95f5',
+        marginBottom: 20,
+        alignItems: 'center',
+    },
+    countryCodeButton: {
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderRightWidth: 1,
+        borderRightColor: '#e0e0e0',
+        flexDirection: 'row',
+        alignItems: 'center',
+        minWidth: 80,
+    },
+    countryCodeText: {
+        fontSize: 14,
+        color: '#000000',
+        marginRight: 4,
+    },
+    phoneInput: {
+        flex: 1,
+        paddingHorizontal: 10,
+        paddingVertical: 10,
+        fontSize: 14,
+        color: '#000000',
     },
 });
 

@@ -4,7 +4,6 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBar from './BottomNavBar'; // Import BottomNavBar for Donor
 import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomNavBarInspection for Admin
-import HeaderProfile from './HeaderProfile'; // Import HeaderProfile component
 import * as Font from 'expo-font';
 
 const DonationDetails = ({ route, navigation }) => {
@@ -41,9 +40,7 @@ const DonationDetails = ({ route, navigation }) => {
                 <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
             </TouchableOpacity>
         ),
-        headerRight: () => (
-            <HeaderProfile username={username} />
-        ),
+        headerRight: () => null,
         headerTitleAlign: 'center',
         headerTitleStyle: {
           marginTop: 30, // Add margin top of 42px to the header title
@@ -202,7 +199,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         padding: 10,
         marginBottom: 10,
-        backgroundColor: '#fff',
+        backgroundColor: '#f9f9f9',
         marginLeft:30,
         marginRight:30,
     },
@@ -276,7 +273,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
       },
       startDonationButtonText: {
-        color: '#FFFFFF',
+        color: '#f9f9f9',
         fontSize: 16,
         fontFamily: 'RobotoCondensed-Bold',
         fontWeight: 'bold',
@@ -291,7 +288,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
       },
       addMoreButtonText: {
-        color: '#FFFFFF',
+        color: '#f9f9f9',
         fontSize: 14,
         fontFamily: 'RobotoCondensed-Bold',
         fontWeight: 'bold',

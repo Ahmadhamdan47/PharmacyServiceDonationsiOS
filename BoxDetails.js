@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontFamily: 'RobotoCondensed-Bold',
         marginBottom: 5,
-        color:'#fff'
+        color:'#f9f9f9'
     },
     backButtonImage: {
         width: 41,

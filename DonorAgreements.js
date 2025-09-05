@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, StatusBar } from 'react-native';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import BottomNavBar from './BottomNavBar'; // Import the BottomNavBar for Donor
-import HeaderProfile from './HeaderProfile'; // Import HeaderProfile component
 import * as Font from 'expo-font';
 
 const DonorAgreement = () => {
@@ -16,8 +16,12 @@ const DonorAgreement = () => {
     const scrollViewRef = useRef(null);
     const navigation = useNavigation();
     const [isFontLoaded, setIsFontLoaded] = useState(false);
-    const [statusFilter, setStatusFilter] = useState('All');
+    const [statusFilter, setStatusFilter] = useState('Pending');
     const [showStatusPicker, setShowStatusPicker] = useState(false);
+    // Sort: true = oldest→newest, false = newest→oldest
+    const [sortAsc, setSortAsc] = useState(true);
+    // Map of DonationId -> DonationTitle fetched directly from the donation
+    const [donationTitles, setDonationTitles] = useState({});
 
     const fetchFonts = async () => {
         await Font.loadAsync({
@@ -44,9 +48,7 @@ const DonorAgreement = () => {
                     <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
                 </TouchableOpacity>
             ),
-            headerRight: () => (
-                <HeaderProfile username={username} />
-            ),
+            headerRight: () => null,
             headerTitleAlign: 'center',
             headerStyle: {
                 backgroundColor: '#f9f9f9', // Set the background color of the whole navigation bar
@@ -110,14 +112,16 @@ const DonorAgreement = () => {
             console.log('Agreements response:', response);
             if (response.data && Array.isArray(response.data.data)) {
                 const items = response.data.data;
-                // Sort newest first by Donation.DonationDate (fallbacks applied)
-                const sorted = [...items].sort((a, b) => {
-                    const parse = (d) => (d ? Date.parse(d) : 0);
+                // Default: sort oldest -> newest by Donation.DonationDate (fallbacks applied)
+                const parse = (d) => (d ? Date.parse(d) : 0);
+                const sortedAsc = [...items].sort((a, b) => {
                     const aDate = parse(a?.Donation?.DonationDate) || parse(a?.CreatedDate) || parse(a?.created_at);
                     const bDate = parse(b?.Donation?.DonationDate) || parse(b?.CreatedDate) || parse(b?.created_at);
-                    return (bDate || 0) - (aDate || 0);
+                    return (aDate || 0) - (bDate || 0);
                 });
-                setAgreements(sorted);
+                setAgreements(sortedAsc);
+                // Fetch authoritative donation titles for these agreements
+                fetchDonationTitles(sortedAsc).catch((e) => console.warn('Failed fetching donation titles:', e?.message));
             } else {
                 console.error('Unexpected response structure:', response.data);
                 setAgreements([]);
@@ -125,6 +129,29 @@ const DonorAgreement = () => {
         } catch (error) {
             console.error('Error fetching agreements:', error);
             setAgreements([]);
+        }
+    };
+
+    // Fetch donation titles for a list of agreements using their DonationId
+    const fetchDonationTitles = async (items = []) => {
+        const token = await AsyncStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const uniqueIds = Array.from(new Set((items || []).map(it => it?.DonationId).filter(Boolean)));
+        // Filter out IDs we already have cached
+        const toFetch = uniqueIds.filter(id => !(id in donationTitles));
+        if (toFetch.length === 0) return;
+        const results = await Promise.allSettled(toFetch.map(id => axios.get(`https://apiv2.medleb.org/donation/${id}`, { headers })));
+        const mapUpdate = {};
+        results.forEach((res, idx) => {
+            const id = toFetch[idx];
+            if (res.status === 'fulfilled') {
+                const data = res.value?.data;
+                const title = data?.DonationTitle || data?.data?.DonationTitle;
+                if (title) mapUpdate[id] = title;
+            }
+        });
+        if (Object.keys(mapUpdate).length) {
+            setDonationTitles(prev => ({ ...prev, ...mapUpdate }));
         }
     };
 
@@ -148,17 +175,34 @@ const DonorAgreement = () => {
             recipientId: agreement.RecipientId,
             donorName: agreement.donor.DonorName,
             recipientName: agreement.Recipient.RecipientName,
-            donationTitle: agreement.Donation?.DonationTitle || 'Donation',
+            donationTitle: donationTitles[agreement.DonationId] || agreement.Donation?.DonationTitle || 'Donation',
             donationPurpose: agreement.Donation?.DonationPurpose || '',
             donationDate: new Date().toISOString().replace(/:/g, '-'),
             fromAgreement: true
         });
     };
 
-    // Apply status filtering and sort newest first safekeeping
+    const getDonationTitle = (agreement) => {
+        if (!agreement) return 'N/A';
+        return donationTitles[agreement.DonationId] || agreement?.Donation?.DonationTitle || 'N/A';
+    };
+
+    // Apply status filtering only
     const filteredAgreements = (agreements || []).filter(a => {
         if (!statusFilter || statusFilter === 'All') return true;
-        return (a?.Agreed_Upon || '').toLowerCase() === statusFilter.toLowerCase();
+        const val = (a?.Agreed_Upon || '').toLowerCase();
+        const wanted = statusFilter.toLowerCase();
+        if (wanted === 'pending') return val !== 'agreed' && val !== 'refused';
+        return val === wanted;
+    });
+
+    // Apply sorting based on selected sort option
+    const parseDate = (d) => (d ? Date.parse(d) : 0);
+    const getDate = (obj) => parseDate(obj?.Donation?.DonationDate) || parseDate(obj?.CreatedDate) || parseDate(obj?.created_at) || 0;
+    const sortedAgreements = [...filteredAgreements].sort((a, b) => {
+        const aDate = getDate(a);
+        const bDate = getDate(b);
+        return sortAsc ? (aDate || 0) - (bDate || 0) : (bDate || 0) - (aDate || 0);
     });
 
     return (
@@ -166,12 +210,15 @@ const DonorAgreement = () => {
             <StatusBar backgroundColor="#f9f9f9" barStyle="dark-content" />
 
             <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-                {/* Filters Row: Status */}
+                {/* Filters Row: Status + Search */}
                 <View style={styles.filterRow}>
                     <View style={styles.filterColumn}>
                         <Text style={styles.filterLabel}>Status</Text>
-                        <TouchableOpacity onPress={() => setShowStatusPicker(!showStatusPicker)} style={styles.filterButton}>
-                            <Text style={styles.filterText}>{statusFilter}</Text>
+                        <TouchableOpacity onPress={() => { setShowStatusPicker(!showStatusPicker); }} style={styles.filterButton}>
+                            <View style={styles.pickerContent}>
+                                <Text style={styles.filterText} numberOfLines={1} ellipsizeMode="tail">{statusFilter}</Text>
+                                <MaterialCommunityIcons name={showStatusPicker ? 'chevron-up' : 'chevron-down'} size={20} color="#000000ff" />
+                            </View>
                         </TouchableOpacity>
                         {showStatusPicker && (
                             <View style={styles.dropdown}>
@@ -185,20 +232,42 @@ const DonorAgreement = () => {
                             </View>
                         )}
                     </View>
+
+                    <View style={styles.filterColumn}>
+                        <Text style={styles.filterLabel}>Search</Text>
+                        <TouchableOpacity style={styles.searchButton} onPress={fetchAgreements}>
+                            <Image source={require('./assets/search.png')} style={[styles.searchIcon, styles.searchIconInline]} />
+                        </TouchableOpacity>
+                    </View>
                 </View>
-    
-                {/* Search Button */}
-                <TouchableOpacity style={styles.searchButton} onPress={fetchAgreements}>
-                    <Image source={require('./assets/search.png')} style={styles.searchIcon} />
-                </TouchableOpacity>
+
+                {/* Separator with inline sort arrows */}
+                <View style={styles.separatorRow}>
+                    <Image source={require('./assets/separator-green.png')} style={styles.separatorFlex} />
+                    <View style={styles.sortInline}>
+                        <TouchableOpacity onPress={() => setSortAsc(true)} style={styles.sortIconButton}>
+                            <MaterialCommunityIcons
+                                name={'arrow-up'}
+                                size={16}
+                                color={sortAsc ? '#00A651' : '#A9A9A9'}
+                            />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => setSortAsc(false)} style={styles.sortIconButton}>
+                            <MaterialCommunityIcons
+                                name={'arrow-down'}
+                                size={16}
+                                color={!sortAsc ? '#FF8C00' : '#A9A9A9'}
+                            />
+                        </TouchableOpacity>
+                    </View>
+                </View>
 
                 {/* Results Count */}
-                <Image source={require('./assets/separator-green.png')} style={styles.separator} />
-                <Text style={styles.resultCount}>Number of result(s): {filteredAgreements.length}</Text>
+                <Text style={styles.resultCount}>Number of result(s): {sortedAgreements.length}</Text>
 
                 {/* Agreements List */}
                 <ScrollView>
-                    {filteredAgreements.map((agreement, index) => (
+                    {sortedAgreements.map((agreement, index) => (
                         <View key={index} style={styles.card}>
                             <TouchableOpacity
                                 onPress={() => navigation.navigate('AgreementDetails', { agreement })}
@@ -214,7 +283,7 @@ const DonorAgreement = () => {
                                         {/* Left Column */}
                                         <View style={{ flex: 1, marginRight: 10, marginLeft: 10 }}>
                                             <Text style={[styles.cardTitle]}>Donation Title</Text>
-                                            <Text style={[styles.cardText]}>{agreement?.Donation?.DonationTitle || 'N/A'}</Text>
+                                            <Text style={[styles.cardText]}>{getDonationTitle(agreement)}</Text>
                                             <Text style={[styles.cardTitle]}>Donor</Text>
                                             <Text style={[styles.cardText]}>{agreement.donor.DonorName}</Text>
                                         </View>
@@ -312,8 +381,25 @@ const styles = StyleSheet.create({
         height: 39,
         borderRadius: 50,
     },
+    searchIconInline: {
+        width: '100%',
+    },
     separator: {
         marginTop: 10,
+    },
+    separatorRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    separatorFlex: {
+        flex: 1,
+        resizeMode: 'contain',
+    },
+    sortInline: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginLeft: 8,
     },
     resultCount: {
         textAlign: 'center',
@@ -346,19 +432,40 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         alignItems: 'center',
         height: 45,
-        backgroundColor: '#fff',
+        backgroundColor: '#f9f9f9',
+    },
+    sortButton: {
+        borderWidth: 1,
+        borderColor: '#00A651',
+        borderRadius: 20,
+        height: 45,
+        backgroundColor: '#f9f9f9',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+    },
+    sortIconButton: {
+        paddingHorizontal: 4,
+        paddingVertical: 6,
     },
     filterText: {
         fontSize: 14,
         fontFamily: 'RobotoCondensed-Regular',
         color: '#121212',
     },
+    pickerContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+        paddingHorizontal: 10,
+    },  
     dropdown: {
         position: 'absolute',
         top: 75,
         left: 0,
         right: 0,
-        backgroundColor: '#ffffff',
+        backgroundColor: '#f9f9f9',
         borderRadius: 15,
         minWidth: 160,
         paddingVertical: 8,
@@ -383,7 +490,7 @@ const styles = StyleSheet.create({
         color: '#121212',
     },
     card: {
-        backgroundColor: '#fff',
+        backgroundColor: '#f9f9f9',
         borderWidth: 1,
         borderColor: '#00A651',
         borderRadius: 50,

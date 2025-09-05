@@ -5,7 +5,7 @@
     "splash": {
       "image": "./assets/Icons.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#f9f9f9"
     },
     "ios": {
       "bundleIdentifier": "com.anonymous.PharmacyServiceDonations",

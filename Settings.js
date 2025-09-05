@@ -564,7 +564,7 @@ const Settings = () => {
                         disabled={changingPassword}
                     >
                         {changingPassword ? (
-                            <ActivityIndicator color="#FFFFFF" />
+                            <ActivityIndicator color="#f9f9f9" />
                         ) : (
                             <Text style={styles.buttonText}>Change Password</Text>
                         )}
@@ -758,7 +758,7 @@ const Settings = () => {
                             disabled={creatingSubAccount}
                         >
                             {creatingSubAccount ? (
-                                <ActivityIndicator color="#FFFFFF" />
+                                <ActivityIndicator color="#f9f9f9" />
                             ) : (
                                 <Text style={styles.createButtonText}>Create</Text>
                             )}
@@ -975,7 +975,7 @@ const Settings = () => {
                         disabled={saving}
                     >
                         {saving ? (
-                            <ActivityIndicator color="#FFFFFF" />
+                            <ActivityIndicator color="#f9f9f9" />
                         ) : (
                             <Text style={styles.buttonText}>Save Changes</Text>
                         )}
@@ -1071,7 +1071,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     activeToggleButtonText: {
-        color: '#fff',
+        color: '#f9f9f9',
     },
     countryPickerButton: {
         borderWidth: 1,

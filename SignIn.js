@@ -661,7 +661,7 @@ const styles = StyleSheet.create({
   lockedContainer: {
     alignItems: "center",
     padding: 20,
-    backgroundColor: "#fff8e1",
+    backgroundColor: "#f9f9f98e1",
     borderRadius: 10,
     marginVertical: 20,
   },

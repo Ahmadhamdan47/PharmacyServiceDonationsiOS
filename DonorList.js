@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, BackHandler, Image,StatusBar } from 'react-native';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
@@ -7,7 +8,6 @@ import * as Sharing from 'expo-sharing';
 import XLSX from 'xlsx';
 import { useNavigation, useFocusEffect } from '@react-navigation/native'; // Import useNavigation and useFocusEffect
 import BottomNavBar from './BottomNavBar'; // Import BottomNavBar
-import HeaderProfile from './HeaderProfile'; // Import HeaderProfile component
 import * as Font from 'expo-font';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
@@ -25,6 +25,7 @@ const DonorList = ({ navigation }) => {
     const [showToDatePicker, setShowToDatePicker] = useState(false);
     const [status, setStatus] = useState('All');
     const [showStatusPicker, setShowStatusPicker] = useState(false);
+    const [sortAsc, setSortAsc] = useState(true); // true = oldest→newest
     // Keep unfiltered list separate
     const [allDonations, setAllDonations] = useState([]);
     const fetchFonts = async () => {
@@ -51,9 +52,7 @@ const DonorList = ({ navigation }) => {
                     <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
                 </TouchableOpacity>
             ),
-            headerRight: () => (
-                <HeaderProfile username={username} />
-            ),
+            headerRight: () => null,
             headerTitleAlign: 'center',
            headerTitleStyle:{
             fontFamily: 'RobotoCondensed-Bold',
@@ -332,17 +331,20 @@ const DonorList = ({ navigation }) => {
                         />
                     )}
 
-                    {/* Second Row: Status */}
+                    {/* Second Row: Status + Search (inline) */}
                     <View style={styles.filterRow}>
-                        <View style={styles.filterColumn}>
+                        <View style={styles.filterColumnInline}>
                             <Text style={styles.filterLabel}>Status</Text>
                             <TouchableOpacity onPress={() => setShowStatusPicker(!showStatusPicker)} style={styles.filterButton}>
-                                <Text style={styles.filterText}>{status}</Text>
+                                <View style={styles.pickerContent}>
+                                    <Text style={styles.filterText} numberOfLines={1} ellipsizeMode="tail">{status}</Text>
+                                    <MaterialCommunityIcons name={showStatusPicker ? 'chevron-up' : 'chevron-down'} size={20} color="#000000ff" />
+                                </View>
                             </TouchableOpacity>
                             {showStatusPicker && (
                                 <View style={styles.dropdown}>
                                     <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
-                                        {['All', 'Pending', 'Approved', 'Inspect'].map((s) => (
+                                        {['All', 'Pending', 'Approved', 'Inspected', 'refused'].map((s) => (
                                             <TouchableOpacity key={s} onPress={() => { setStatus(s); setShowStatusPicker(false); }}>
                                                 <Text style={styles.dropdownText}>{s}</Text>
                                             </TouchableOpacity>
@@ -351,15 +353,26 @@ const DonorList = ({ navigation }) => {
                                 </View>
                             )}
                         </View>
+                        <View style={styles.filterColumnInline}>
+                            <Text style={styles.filterLabel}>Search</Text>
+                            <TouchableOpacity style={styles.searchButton} onPress={onSearch}>
+                                <Image source={require('./assets/search.png')} style={[styles.searchIcon, styles.searchIconInline]} resizeMode="stretch" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
-                    {/* Third Row: Filter Button */}
-                    <TouchableOpacity style={styles.searchButton} onPress={onSearch}>
-                        <Image source={require('./assets/search.png')} style={styles.searchIcon} resizeMode="contain" />
-                    </TouchableOpacity>
-
-                    {/* Results Count */}
-                    <Image source={require('./assets/separator-green.png')} style={styles.separator} />
+                    {/* Separator with inline sort arrows */}
+                    <View style={styles.separatorRow}>
+                        <Image source={require('./assets/separator-green.png')} style={styles.separatorFlex} />
+                        <View style={styles.sortInline}>
+                            <TouchableOpacity onPress={() => setSortAsc(true)} style={styles.sortIconButton}>
+                                <MaterialCommunityIcons name={'arrow-up'} size={16} color={sortAsc ? '#00A651' : '#A9A9A9'} />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => setSortAsc(false)} style={styles.sortIconButton}>
+                                <MaterialCommunityIcons name={'arrow-down'} size={16} color={!sortAsc ? '#FF8C00' : '#A9A9A9'} />
+                            </TouchableOpacity>
+                        </View>
+                    </View>
                     <Text style={styles.resultCount}>number of result(s): {donations.length}</Text>
 
                     {/* Error or Empty Notices */}
@@ -370,7 +383,13 @@ const DonorList = ({ navigation }) => {
                     )}
                     {(() => {
                         const filtered = donations.filter(d => (d?.NumberOfBoxes ?? 0) > 0 || ((d?.BatchLotTrackings ?? []).length > 0));
-                        const toRender = filtered.length > 0 ? filtered : donations;
+                        const toRenderBase = filtered.length > 0 ? filtered : donations;
+                        const parse = (d) => (d ? Date.parse(d) : 0);
+                        const getDate = (obj) => parse(obj?.DonationDate) || parse(obj?.CreatedDate) || 0;
+                        const toRender = [...toRenderBase].sort((a,b)=>{
+                            const ad = getDate(a); const bd = getDate(b);
+                            return sortAsc ? (ad - bd) : (bd - ad);
+                        });
                         if (!error && donations.length === 0) {
                             return (
                                 <View style={styles.stateContainer}>
@@ -388,33 +407,35 @@ const DonorList = ({ navigation }) => {
                         return (
                             <ScrollView>
                                 {toRender.map((donation, index) => (
-                                    <TouchableOpacity key={index} style={styles.cardContainer} onPress={() => handlePressDonation(donation)}>
-                                        <Text style={[styles.statusText, { color: getStatusColor(donation?.status) }]}>
-                                            {donation?.status || 'N/A'}
-                                        </Text>
-                                        <View style={styles.cardContent}>
-                                            <View style={styles.infoContainer}>
-                                                <Text style={styles.infoTitle}>Donation Title:</Text>
-                                                <Text style={styles.infoText}>{donation.DonationTitle || 'Untitled'}</Text>
-                                                <Text style={styles.infoTo}>To:</Text>
-                                                <Text style={styles.infoText}>{donation.RecipientName || 'N/A'}</Text>
+                                    <View key={index} style={styles.card}>
+                                        <TouchableOpacity onPress={() => handlePressDonation(donation)}>
+                                            <View style={styles.cardHeader}>
+                                                <Text style={[styles.statusText, { color: getStatusColor(donation?.status) }]}>
+                                                    {donation?.status || 'N/A'}
+                                                </Text>
                                             </View>
-                                            <View style={styles.detailsContainer}>
-                                                <View style={styles.detailItem}>
-                                                    <Text style={styles.detailsText}>Date:</Text>
-                                                    <Text style={styles.detailValue}>{donation.DonationDate || 'N/A'}</Text>
-                                                </View>
-                                                <View style={styles.detailItem}>
-                                                    <Text style={styles.detailsText}>nb of box(es):</Text>
-                                                    <Text style={styles.detailValue}>{donation.NumberOfBoxes ?? 0}</Text>
-                                                </View>
-                                                <View style={styles.detailItem}>
-                                                    <Text style={styles.detailsText}>nb of pack(s):</Text>
-                                                    <Text style={styles.detailValue}>{(donation.BatchLotTrackings ?? []).length}</Text>
+
+                                            <View style={styles.cardContent}>
+                                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                                    {/* Left Column */}
+                                                    <View style={{ flex: 1, marginRight: 10, marginLeft: 10 }}>
+                                                        <Text style={[styles.cardTitle]}>Donation Title</Text>
+                                                        <Text style={[styles.cardText]}>{donation.DonationTitle || 'Untitled'}</Text>
+                                                        <Text style={[styles.cardTitle]}>To</Text>
+                                                        <Text style={[styles.cardText]}>{donation.RecipientName || 'N/A'}</Text>
+                                                    </View>
+
+                                                    {/* Right Column */}
+                                                    <View style={{ flex: 1, marginLeft: 10, paddingBottom: 20 }}>
+                                                        <Text style={[styles.cardTitle]}>Date</Text>
+                                                        <Text style={[styles.cardText]}>{donation.DonationDate || 'N/A'}</Text>
+                                                        <Text style={[styles.cardTitle]}>Boxes/Packs</Text>
+                                                        <Text style={[styles.cardText]}>{donation.NumberOfBoxes ?? 0}/{(donation.BatchLotTrackings ?? []).length}</Text>
+                                                    </View>
                                                 </View>
                                             </View>
-                                        </View>
-                                    </TouchableOpacity>
+                                        </TouchableOpacity>
+                                    </View>
                                 ))}
                             </ScrollView>
                         );
@@ -472,7 +493,7 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 10,
         height: 45,
-        backgroundColor: '#fff',
+        backgroundColor: '#f9f9f9',
     },
     dateContainer: {
         flex: 1,
@@ -503,8 +524,18 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         marginVertical: 10,
     },
+    filterRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginTop: 10,
+    },
     filterColumn: {
         flex: 0,
+        marginHorizontal: 5,
+    },
+    filterColumnInline: {
+        flex: 1,
         marginHorizontal: 5,
     },
     filterLabel: {
@@ -518,9 +549,10 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#00A651',
         borderRadius: 20,
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        backgroundColor: '#fff',
+        paddingVertical: 10,
+        alignItems: 'center',
+        height: 45,
+        backgroundColor: '#f9f9f9',
     },
     filterText: {
         color: '#00A651',
@@ -529,39 +561,80 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     dropdown: {
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 5,
         position: 'absolute',
-        width: 150,
-        maxHeight: 140,
-        zIndex: 10,
+        top: 75,
+        left: 0,
+        right: 0,
+        backgroundColor: '#f9f9f9',
+        borderRadius: 15,
+        minWidth: 160,
+        paddingVertical: 8,
+        elevation: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        borderWidth: 1,
+        borderColor: '#e8e8e8',
+        zIndex: 1000,
     },
     dropdownScroll: {
-        maxHeight: 140,
+        maxHeight: 200,
+        paddingHorizontal: 10,
     },
     dropdownText: {
+        paddingVertical: 12,
+        textAlign: 'center',
         fontSize: 14,
-        padding: 10,
-        color: '#000',
-        fontFamily: 'RobotoCondensed-Bold',
+        fontFamily: 'RobotoCondensed-Regular',
+        color: '#121212',
     },
     searchButton: {
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+    height: 39,
+    borderWidth: 1,
+    borderColor: '#00A651',
+    backgroundColor: '#f9f9f9',
     },
-    searchIcon: {
-        marginTop: 10,
+searchIcon: {
         width: 320,
         height: 39,
         borderRadius: 50,
+    },
+    searchIconInline: {
+        width: '100%',
     },
     separator: {
         alignSelf: 'center',
         marginTop: 6,
         marginBottom: 2,
+    },
+    separatorRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    separatorFlex: {
+        flex: 1,
+        resizeMode: 'contain',
+    },
+    sortInline: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginLeft: 8,
+    },
+    sortIconButton: {
+        paddingHorizontal: 4,
+        paddingVertical: 6,
+    },
+    pickerContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+        paddingHorizontal: 10,
     },
     scrollViewContainer: {
         paddingBottom: 20,
@@ -590,71 +663,35 @@ const styles = StyleSheet.create({
         fontSize: 14,
         textAlign: 'center',
     },
-    cardContainer: {
-        marginTop:20,
-        marginHorizontal: 35,
-        marginVertical: 10,
+    card: {
+        backgroundColor: '#f9f9f9',
         borderWidth: 1,
         borderColor: '#00A651',
-        borderRadius: 25,
-        padding: 10,
-        backgroundColor: '#FFFCFC',
-        position: 'relative',
-        height:120,
-        
+        borderRadius: 50,
+        padding: 15,
+        marginVertical: 10,
+        minHeight: 140,
+    },
+    cardHeader: {
+        marginBottom: 10,
     },
     statusText: {
-        position: 'absolute',
-        left: 20,
-        top: 10,
         fontSize: 14,
-        fontStyle: 'italic',
-        fontFamily: 'RobotoCondensed-Bold',
-        zIndex: 1,
-        backgroundColor: '#fff',
-        paddingHorizontal: 10,
-        
-    },
-    pendingText: {
-        color: '#DB7B2B',
-    },
-    approvedText: {
-        color: '#00A651',
+        fontWeight: 'bold',
+        textAlign: 'left',
+        marginLeft: 10,
     },
     cardContent: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        
-        marginHorizontal:20,
-        
-    },
-    infoContainer: {
         flex: 1,
     },
-    infoTitle: {
+    cardTitle: {
         fontSize: 12,
-        fontFamily: 'RobotoCondensed-Regular',
-        color: '#121212',
-        marginTop:25,
-    },
-    infoTo: {
-        fontSize: 12,
-        fontFamily: 'RobotoCondensed-Regular',
-                color: '#121212',
-       
-    },
-    infoText: {
-        fontSize: 14,
         fontFamily: 'RobotoCondensed-Bold',
-                color: '#121212',
     },
-    detailsContainer: {
-        alignItems: 'flex-end',
-    },
-    detailsText: {
+    cardText: {
         fontSize: 12,
+        color: '#333',
         fontFamily: 'RobotoCondensed-Regular',
-        color: '#121212',
     },
     backButton: {
         marginLeft: 10,

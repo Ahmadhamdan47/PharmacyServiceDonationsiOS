@@ -23,7 +23,6 @@ import * as FileSystem from "expo-file-system"
 import * as Sharing from "expo-sharing"
 import XLSX from "xlsx"
 import BottomNavBar from "./BottomNavBar" // Import BottomNavBar
-import HeaderProfile from "./HeaderProfile" // Import HeaderProfile component
 import * as Font from "expo-font"
 
 const createEmptyBatchLot = () => ({
@@ -194,13 +193,13 @@ const BatchLotForm = React.forwardRef(
             paddingLeft: 10,
             minHeight: 50, // Set height to 50px
             marginBottom: 10,
-            backgroundColor: "#FFFCFC",
+            backgroundColor: "#f9f9f9CFC",
             marginLeft: 35,
             marginRight: 35,
             width: 325,
           }}
           dropDownContainerStyle={{
-            backgroundColor: "#FFFCFC",
+            backgroundColor: "#f9f9f9CFC",
             borderWidth: 1,
             borderColor: "#00a651",
             borderRadius: 10,
@@ -375,10 +374,14 @@ const Donate = ({ route }) => {
   useEffect(() => {
     const createFirstBox = async () => {
       try {
+        // Get the authentication token
+        const token = await AsyncStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        
         const response = await axios.post("https://apiv2.medleb.org/boxes/add", {
           DonationId: donationId,
           BoxLabel: `Box 1`,
-        })
+        }, { headers })
 
         if (response.status === 201) {
           setCurrentBox(response.data.BoxId)
@@ -388,6 +391,26 @@ const Donate = ({ route }) => {
         }
       } catch (error) {
         console.error("Error creating the first box:", error)
+        
+        // Handle authentication errors specifically
+        if (error.response?.status === 401) {
+          Alert.alert(
+            "Authentication Error", 
+            "Your session has expired. Please sign in again.",
+            [
+              { 
+                text: "Sign In", 
+                onPress: () => {
+                  AsyncStorage.clear()
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'SignIn' }],
+                  })
+                }
+              }
+            ]
+          )
+        }
       }
     }
 
@@ -469,13 +492,17 @@ const Donate = ({ route }) => {
       // Close the camera immediately after scanning
       setIsCameraOpen(false)
 
+      // Get the authentication token for API calls
+      const token = await AsyncStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
       // Call the checkDonationStatus API
       const donationStatusResponse = await axios.post("https://apiv2.medleb.org/batchserial/checkDonationStatus", {
         GTIN: response.gtin,
         BatchNumber: response.lot,
         SerialNumber: response.sn,
         ExpiryDate: response.exp ? response.exp.toISOString().split("T")[0] : "",
-      })
+      }, { headers })
 
       const { isValid, isDonated, messageEN } = donationStatusResponse.data
 
@@ -515,7 +542,28 @@ const Donate = ({ route }) => {
       }, 100)
     } catch (error) {
       console.error("Error checking donation status or parsing scanned data:", error)
-      Alert.alert("Error", "Failed to check donation status. Please try again.")
+      
+      // Handle authentication errors specifically
+      if (error.response?.status === 401) {
+        Alert.alert(
+          "Authentication Error", 
+          "Your session has expired. Please sign in again.",
+          [
+            { 
+              text: "Sign In", 
+              onPress: () => {
+                AsyncStorage.clear()
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'SignIn' }],
+                })
+              }
+            }
+          ]
+        )
+      } else {
+        Alert.alert("Error", "Failed to check donation status. Please try again.")
+      }
     }
   }
 
@@ -809,6 +857,11 @@ const Donate = ({ route }) => {
 
     try {
       console.log("Submitting batch lots...")
+      
+      // Get the authentication token
+      const token = await AsyncStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
       const responses = await Promise.all(
         batchLots.map((batchLot) =>
           axios.post("https://apiv2.medleb.org/donation/batchlot", {
@@ -825,7 +878,7 @@ const Donate = ({ route }) => {
             SerialNumber: batchLot.serialNumber,
             DonationDate: batchLot.donationDate,
             BoxId: currentBox,
-          }),
+          }, { headers }),
         ),
       )
 
@@ -834,7 +887,7 @@ const Donate = ({ route }) => {
         const newPackCount = packCount + batchLots.length
         setPackCount(newPackCount)
 
-        await axios.put(`https://apiv2.medleb.org/boxes/${currentBox}`, { NumberOfPacks: newPackCount })
+        await axios.put(`https://apiv2.medleb.org/boxes/${currentBox}`, { NumberOfPacks: newPackCount }, { headers })
         console.log("Box updated with new pack count.")
 
         setNewPackCount(newPackCount) // Store new pack count in state
@@ -845,7 +898,28 @@ const Donate = ({ route }) => {
       }
     } catch (error) {
       console.error("Error creating batch lot or recipient agreement:", error)
-      Alert.alert("Warning", "Make sure you scanned the barcode and entered all of the fields correctly")
+      
+      // Handle authentication errors specifically
+      if (error.response?.status === 401) {
+        Alert.alert(
+          "Authentication Error", 
+          "Your session has expired. Please sign in again.",
+          [
+            { 
+              text: "Sign In", 
+              onPress: () => {
+                AsyncStorage.clear()
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'SignIn' }],
+                })
+              }
+            }
+          ]
+        )
+      } else {
+        Alert.alert("Warning", "Make sure you scanned the barcode and entered all of the fields correctly")
+      }
     }
   }
 
@@ -853,10 +927,14 @@ const Donate = ({ route }) => {
 
   const handleAddAnotherBox = async () => {
     try {
+      // Get the authentication token
+      const token = await AsyncStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
       const response = await axios.post("https://apiv2.medleb.org/boxes/add", {
         DonationId: donationId,
         BoxLabel: `Box ${boxLabelCounter}`,
-      })
+      }, { headers })
 
       if (response.status === 201) {
         setCurrentBox(response.data.BoxId)
@@ -867,7 +945,28 @@ const Donate = ({ route }) => {
       }
     } catch (error) {
       console.error("Error adding new box:", error)
-      Alert.alert("Error", "An error occurred while adding a new box.")
+      
+      // Handle authentication errors specifically
+      if (error.response?.status === 401) {
+        Alert.alert(
+          "Authentication Error", 
+          "Your session has expired. Please sign in again.",
+          [
+            { 
+              text: "Sign In", 
+              onPress: () => {
+                AsyncStorage.clear()
+                navigation.reset({
+                  index: 0,
+                  routes: [{ name: 'SignIn' }],
+                })
+              }
+            }
+          ]
+        )
+      } else {
+        Alert.alert("Error", "An error occurred while adding a new box.")
+      }
     }
   }
 
@@ -1029,13 +1128,13 @@ const Donate = ({ route }) => {
                   paddingLeft: 10,
                   minHeight: 50, // Set height to 50px
                   marginBottom: 10,
-                  backgroundColor: "#FFFCFC",
+                  backgroundColor: "#f9f9f9CFC",
                   marginLeft: 35,
                   marginRight: 35,
                   width: 325,
                 }}
                 dropDownContainerStyle={{
-                  backgroundColor: "#FFFCFC",
+                  backgroundColor: "#f9f9f9CFC",
                   borderWidth: 1,
                   borderColor: "#00a651",
                   borderRadius: 10,
@@ -1267,7 +1366,7 @@ const styles = StyleSheet.create({
     paddingLeft: 10,
     height: 50, // Set height to 50px
     marginBottom: 5,
-    backgroundColor: "#FFFCFC",
+    backgroundColor: "#f9f9f9CFC",
     marginLeft: 35,
     marginRight: 35,
     fontFamily: "RobotoCondensed-Medium",
@@ -1319,7 +1418,7 @@ const styles = StyleSheet.create({
     fontSize: 16, // Reduced font size
   },
   addMoreButton: {
-    backgroundColor: "#fff", // White background
+    backgroundColor: "#f9f9f9", // White background
     borderColor: "#00a651", // Green border
     borderWidth: 2, // Border width of 2px
     borderRadius: 20, // Same border radius as the original button
@@ -1413,7 +1512,7 @@ const styles = StyleSheet.create({
     marginLeft: 45,
   },
   disabledAddMoreButton: {
-    backgroundColor: "#fff", // White background
+    backgroundColor: "#f9f9f9", // White background
     borderColor: "grey", // Grey border when form is invalid
     borderWidth: 2,
   },
@@ -1435,7 +1534,7 @@ const styles = StyleSheet.create({
     height: 300,
   },
   modalTitle: {
-    color: "#fff",
+    color: "#f9f9f9",
     fontSize: 24,
     fontFamily: "RobotoCondensed-Bold",
     textAlign: "center",
@@ -1443,7 +1542,7 @@ const styles = StyleSheet.create({
     marginTop: 50,
   },
   modalSubtitle: {
-    color: "#fff",
+    color: "#f9f9f9",
     fontSize: 18,
     fontFamily: "RobotoCondensed-Bold",
     textAlign: "center",
@@ -1463,12 +1562,12 @@ const styles = StyleSheet.create({
   addBoxButton: {
     backgroundColor: "#00a651",
     borderWidth: 2,
-    borderColor: "#fff",
+    borderColor: "#f9f9f9",
     marginRight: 5,
     marginLeft: 10,
   },
   finishButton: {
-    backgroundColor: "#fff",
+    backgroundColor: "#f9f9f9",
     marginRight: 10,
     marginLeft: 5,
   },
@@ -1477,7 +1576,7 @@ const styles = StyleSheet.create({
     fontFamily: "RobotoCondensed-Bold",
   },
   AddBoxButtonText: {
-    color: "#ffff",
+    color: "#f9f9f9f",
   },
   smallinput: {
     borderWidth: 1,
@@ -1487,7 +1586,7 @@ const styles = StyleSheet.create({
     paddingLeft: 10,
     height: 50, // Keep height as 50px
     marginBottom: 10,
-    backgroundColor: "#FFFCFC",
+    backgroundColor: "#f9f9f9CFC",
     marginLeft: 35,
     marginRight: 35,
     // Smaller font size for short fields
