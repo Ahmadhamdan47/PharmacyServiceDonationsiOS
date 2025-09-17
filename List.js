@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, StatusBar } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import SortToggle from './SortToggle';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -311,19 +312,12 @@ const List = () => {
                 </View>
 
 
-                {/* Separator with inline sort arrows */}
+                {/* Separator with inline sort toggle (shared) */}
                 <View style={styles.separatorRow}>
                     <Image source={require('./assets/separator-green.png')} style={styles.separatorFlex} />
-                    <View style={styles.sortInline}>
-                        <TouchableOpacity onPress={() => setSortAsc(true)} style={styles.sortIconButton}>
-                            <MaterialCommunityIcons name={'arrow-up'} size={16} color={sortAsc ? '#00A651' : '#A9A9A9'} />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setSortAsc(false)} style={styles.sortIconButton}>
-                            <MaterialCommunityIcons name={'arrow-down'} size={16} color={!sortAsc ? '#FF8C00' : '#A9A9A9'} />
-                        </TouchableOpacity>
-                    </View>
+                    <SortToggle sortAsc={sortAsc} onToggle={() => setSortAsc(!sortAsc)} />
                 </View>
-                <Text style={styles.resultCount}>number of result(s): {selectedType === 'Donations' ? donations.length : importations.length}</Text>
+                <Text style={styles.resultCount}>Number of result(s): {selectedType === 'Donations' ? donations.length : importations.length}</Text>
 
                 {/* Data List */}
                 <ScrollView>
@@ -458,9 +452,8 @@ const styles = StyleSheet.create({
     
     filterText: {
         fontSize: 14,
-        fontFamily: 'RobotoCondensed-Bold',
-        color: '#000',
-        textAlign: 'center',
+        fontFamily: 'RobotoCondensed-Regular',
+        color: '#121212',
     },
     dropdown: {
         position: 'absolute',
@@ -585,10 +578,10 @@ const styles = StyleSheet.create({
     },
     filterLabel: {
         fontSize: 14,
-        fontWeight: 'bold',
-        color: 'grey',
+        fontFamily: 'RobotoCondensed-Bold',
+        color: '#A9A9A9',
+        marginLeft: 10,
         marginBottom: 5,
-        textAlign: 'center',
     },
     filterButton: {
         borderWidth: 1,

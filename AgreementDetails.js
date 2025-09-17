@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react"
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from "react-native"
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, BackHandler } from "react-native"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { useNavigation, useFocusEffect } from "@react-navigation/native"
 import axios from "axios"
@@ -69,13 +69,13 @@ const AgreementDetails = ({ route }) => {
                 "Are you sure you want to quit without signing?",
                 [
                   { text: "Stay", style: "cancel" },
-                  { text: "Quit", style: "destructive", onPress: () => navigation.navigate('DonorAgreements') },
+                  { text: "Quit", style: "destructive", onPress: navigateToAgreements },
                 ],
                 { cancelable: true },
               )
               return
             }
-            navigation.navigate('DonorAgreements')
+            navigateToAgreements()
           }}
           style={styles.backButtonContainer}
         >
@@ -90,7 +90,7 @@ const AgreementDetails = ({ route }) => {
         borderBottomWidth: 0,
       },
     })
-  }, [navigation, username, requireDonorSign, donorSigned])
+  }, [navigation, username, requireDonorSign, donorSigned, userRole])
 
   // Block accidental leave if donor must sign and status still pending
   useFocusEffect(
@@ -103,14 +103,41 @@ const AgreementDetails = ({ route }) => {
           "Are you sure you want to quit without signing?",
           [
             { text: "Stay", style: "cancel" },
-            { text: "Quit", style: "destructive", onPress: () => navigation.navigate('DonorAgreements') },
+            { text: "Quit", style: "destructive", onPress: navigateToAgreements },
           ],
         )
       })
       return () => {
         if (typeof unsubscribe === 'function') unsubscribe()
       }
-    }, [navigation, requireDonorSign, donorSigned])
+    }, [navigation, requireDonorSign, donorSigned, userRole])
+  )
+
+  // Handle Android hardware back button
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (requireDonorSign && !donorSigned) {
+          Alert.alert(
+            "Leave without signing?",
+            "Are you sure you want to quit without signing?",
+            [
+              { text: "Stay", style: "cancel" },
+              { text: "Quit", style: "destructive", onPress: navigateToAgreements },
+            ],
+            { cancelable: true },
+          )
+          return true // Prevent default back behavior
+        } else {
+          navigateToAgreements()
+          return true // Prevent default back behavior
+        }
+      }
+
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress)
+
+      return () => backHandler.remove()
+    }, [navigation, requireDonorSign, donorSigned, userRole])
   )
 
   const getUsername = async () => {
@@ -125,6 +152,14 @@ const AgreementDetails = ({ route }) => {
       }
     } catch (error) {
       console.error("Failed to load username or user role:", error)
+    }
+  }
+
+  const navigateToAgreements = () => {
+    if (userRole === 'Recipient') {
+      navigation.navigate('RecipientAgreements')
+    } else {
+      navigation.navigate('DonorAgreements')
     }
   }
 

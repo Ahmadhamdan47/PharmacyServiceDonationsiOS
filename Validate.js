@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet,Image,BackHandler } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, BackHandler, TextInput, Modal } from 'react-native';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as Font from 'expo-font';
 
 const Validate = () => {
@@ -13,16 +14,51 @@ const Validate = () => {
     const [toDate, setToDate] = useState(null);
     const [status, setStatus] = useState('All');
     const [selectedDonor, setSelectedDonor] = useState('All');
+    const [donorSearch, setDonorSearch] = useState('');
     const [showFromDatePicker, setShowFromDatePicker] = useState(false);
     const [showToDatePicker, setShowToDatePicker] = useState(false);
     const [showStatusPicker, setShowStatusPicker] = useState(false);
     const [showDonorPicker, setShowDonorPicker] = useState(false);
     const [username, setUsername] = useState('');
+    const [sortAsc, setSortAsc] = useState(false); // false = newest first
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
     const scrollViewRef = useRef(null);
     const navigation = useNavigation();
     const [isFontLoaded, setIsFontLoaded] = useState(false);
+        // Helper: get a precise timestamp for a donor (prefer created_at if present, then CreatedDate)
+        const getTime = (obj) => {
+            const tCreatedAt = obj?.created_at ? Date.parse(obj.created_at) : NaN;
+            const tCreatedDate = obj?.CreatedDate ? Date.parse(obj.CreatedDate) : NaN;
+            return Number.isFinite(tCreatedAt)
+                ? tCreatedAt
+                : Number.isFinite(tCreatedDate)
+                ? tCreatedDate
+                : 0;
+        };
+
+        // Helper: get a numeric id for tie-breaking (higher id assumed newer)
+        const getId = (obj) => {
+            const idCandidate = obj?.DonorId ?? obj?.id ?? obj?.ID;
+            if (typeof idCandidate === 'number') return idCandidate;
+            const parsed = parseInt(idCandidate, 10);
+            return Number.isFinite(parsed) ? parsed : 0;
+        };
+
+        // Comparator with tie-breakers: by time, then id, then name (stable)
+        const compareByTime = (a, b, asc = false) => {
+            const ta = getTime(a);
+            const tb = getTime(b);
+            if (ta !== tb) return asc ? ta - tb : tb - ta;
+            const ia = getId(a);
+            const ib = getId(b);
+            if (ia !== ib) return asc ? ia - ib : ib - ia;
+            const na = (a?.DonorName || '').toLowerCase();
+            const nb = (b?.DonorName || '').toLowerCase();
+            if (na < nb) return -1;
+            if (na > nb) return 1;
+            return 0;
+        };
     const fetchFonts = async () => {
       await Font.loadAsync({
         'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
@@ -41,18 +77,36 @@ const Validate = () => {
         getUsername();
     }, []);
 
+    // Auto-apply filters whenever inputs change
+    useEffect(() => {
+        filterDonors();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [status, selectedDonor, fromDate, toDate, donors]);
+
+    // Refresh donor list when screen comes into focus (e.g., returning from DonorDetails)
+    useFocusEffect(
+        React.useCallback(() => {
+            fetchDonors();
+        }, [])
+    );
+
     useEffect(() => {
         const backAction = () => {
+            // Close donor modal first if open
+            if (showDonorPicker) {
+                setShowDonorPicker(false);
+                return true;
+            }
             navigation.navigate('Landing'); // Navigate to "Landing" when back button is pressed
             return true; // Prevent default back button behavior
         };
-    
+
         const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
-    
+
         return () => {
             backHandler.remove(); // Clean up the listener when the component is unmounted
         };
-    }, [navigation]);
+    }, [navigation, showDonorPicker]);
 
     useEffect(() => {
         navigation.setOptions({
@@ -88,8 +142,10 @@ const Validate = () => {
     const fetchDonors = async () => {
         try {
             const response = await axios.get('https://apiv2.medleb.org/donor/all');
-            setDonors(response.data);
-            setFilteredDonors(response.data); // Initialize with all donors
+            // Sort newest -> oldest using precise timestamp with tie-breakers
+            const sorted = [...(response.data || [])].sort((a, b) => compareByTime(a, b, false));
+            setDonors(sorted);
+            setFilteredDonors(sorted); // Initialize with all donors (newest first)
         } catch (error) {
             console.error('Error fetching donors:', error);
         }
@@ -99,7 +155,17 @@ const Validate = () => {
         let filtered = donors;
 
         if (status !== 'All') {
-            filtered = filtered.filter(donor => (status === 'Active' ? donor.IsActive : !donor.IsActive));
+            // Map UI labels to IsActive values: Validated -> true, Not validated -> false, Pending -> null/undefined
+            filtered = filtered.filter(donor => {
+                if (status === 'Validated') {
+                    return donor.IsActive === true;
+                } else if (status === 'Not validated') {
+                    return donor.IsActive === false;
+                } else if (status === 'Pending') {
+                    return donor.IsActive === null || donor.IsActive === undefined;
+                }
+                return true;
+            });
         }
 
         if (selectedDonor !== 'All') {
@@ -107,12 +173,17 @@ const Validate = () => {
         }
 
         if (fromDate) {
-            filtered = filtered.filter(donor => new Date(donor.CreatedDate) >= fromDate);
+            const fromMs = fromDate.getTime();
+            filtered = filtered.filter(donor => getTime(donor) >= fromMs);
         }
 
         if (toDate) {
-            filtered = filtered.filter(donor => new Date(donor.CreatedDate) <= toDate);
+            const toMs = toDate.getTime();
+            filtered = filtered.filter(donor => getTime(donor) <= toMs);
         }
+
+        // Always keep newest -> oldest after filtering (stable with tie-breakers)
+        filtered = [...filtered].sort((a, b) => compareByTime(a, b, false));
 
         setFilteredDonors(filtered);
         setCurrentPage(1);
@@ -121,7 +192,8 @@ const Validate = () => {
     const getPaginatedDonors = () => {
         const startIndex = (currentPage - 1) * itemsPerPage;
         const endIndex = startIndex + itemsPerPage;
-        return filteredDonors.slice(startIndex, endIndex);
+        const sorted = [...filteredDonors].sort((a, b) => compareByTime(a, b, sortAsc));
+        return sorted.slice(startIndex, endIndex);
     };
 
     const renderDatePicker = (type) => {
@@ -148,7 +220,7 @@ const Validate = () => {
         if (isActive === true) {
             return 'Validated';
         } else if (isActive === false) {
-            return 'Rejected';
+            return 'Not validated';
         } else {
             return 'Pending';
         }
@@ -181,47 +253,112 @@ const Validate = () => {
                 {showToDatePicker && renderDatePicker('to')}    
 
 
-                <View style={styles.filterRow}>
-                    {/* Donor Dropdown */}
-                    <TouchableOpacity onPress={() => setShowDonorPicker(!showDonorPicker)} style={styles.filterButton}>
-                        <Text style={styles.filterText}>{selectedDonor}</Text>
-                    </TouchableOpacity>
-                    {showDonorPicker && (
-                        <View style={styles.dropdown}>
-                            <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
-                                {['All', ...donors.map(donor => donor.DonorName)].map(donorName => (
-                                    <TouchableOpacity key={donorName} onPress={() => { setSelectedDonor(donorName); setShowDonorPicker(false); filterDonors(); }}>
-                                        <Text style={styles.dropdownText}>{donorName}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-                        </View>
-                    )}
+                {/* Auto filtering enabled; manual search button removed */}
 
-                    {/* Status Dropdown */}
-                    <TouchableOpacity onPress={() => setShowStatusPicker(!showStatusPicker)} style={styles.filterButton}>
-                        <Text style={styles.filterText}>{status}</Text>
-                    </TouchableOpacity>
-                    {showStatusPicker && (
-                        <View style={styles.dropdown}>
-                            <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
-                                {['All', 'Active', 'Inactive'].map(s => (
-                                    <TouchableOpacity key={s} onPress={() => { setStatus(s); setShowStatusPicker(false); filterDonors(); }}>
-                                        <Text style={styles.dropdownText}>{s}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-                        </View>
-                    )}
+
+                <View style={styles.filterRow}>
+                    {/* Account Picker Column */}
+                    <View style={styles.filterColumn}>
+                        <Text style={styles.filterLabel}>Account</Text>
+                        <TouchableOpacity onPress={() => setShowDonorPicker(true)} style={styles.filterButton}>
+                            <View style={styles.pickerContent}>
+                                <Text
+                                    style={[
+                                        styles.filterText,
+                                        selectedDonor === 'All' && styles.placeholderBoldGreen,
+                                    ]}
+                                    numberOfLines={1}
+                                    ellipsizeMode="tail"
+                                >
+                                    {selectedDonor === 'All' ? 'Search for account' : selectedDonor}
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Status Dropdown Column */}
+                    <View style={styles.filterColumn}>
+                        <Text style={styles.filterLabel}>Status</Text>
+                        <TouchableOpacity onPress={() => setShowStatusPicker(!showStatusPicker)} style={styles.filterButton}>
+                            <View style={styles.pickerContent}>
+                                <Text style={[styles.filterText, styles.filterTextBoldGreen]}>{status}</Text>
+                                <MaterialCommunityIcons name={showStatusPicker ? 'chevron-up' : 'chevron-down'} size={20} color="#000000ff" />
+                            </View>
+                        </TouchableOpacity>
+                        {showStatusPicker && (
+                            <View style={styles.dropdown}>
+                                <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
+                                    {['All', 'Validated', 'Not validated', 'Pending'].map(s => (
+                                        <TouchableOpacity key={s} onPress={() => { setStatus(s); setShowStatusPicker(false); }}>
+                                            <Text style={styles.dropdownText}>{s}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        )}
+                    </View>
                 </View>
 
-                {/* Filter Button */}
-                <TouchableOpacity style={styles.searchButton} onPress={filterDonors}>
-    <Image source={require('./assets/search.png')} style={styles.searchIcon} />
-</TouchableOpacity>
+                {/* Separator with inline sort toggle */}
+                <View style={styles.separatorRow}>
+                    <Image source={require('./assets/separator-green.png')} style={styles.separatorFlex} />
+                    <TouchableOpacity 
+                        onPress={() => setSortAsc(!sortAsc)} 
+                        style={styles.sortToggleButton}
+                    >
+                        <MaterialCommunityIcons
+                            name={sortAsc ? 'sort-calendar-descending' : 'sort-calendar-ascending'}
+                            size={18}
+                            color={sortAsc ? '#FF8C00' : '#00A651'}
+                        />
+                        <Text style={[styles.sortToggleText, { color: sortAsc ? '#FF8C00' : '#00A651' }]}>
+                            {sortAsc ? 'Oldest' : 'Newest'}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Donor Modal Picker */}
+                <Modal
+                    animationType="slide"
+                    transparent={true}
+                    visible={showDonorPicker}
+                    onRequestClose={() => setShowDonorPicker(false)}
+                >
+                    <View style={styles.modalOverlay}>
+                        <View style={styles.modalContainer}>
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>Select Account</Text>
+                                <TouchableOpacity onPress={() => setShowDonorPicker(false)} style={styles.closeButton}>
+                                    <MaterialCommunityIcons name="close" size={22} color="#121212" />
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.searchInputWrapper}>
+                                <TextInput
+                                    style={styles.searchInput}
+                                    placeholder="Search for account"
+                                    placeholderTextColor="#A9A9A9"
+                                    value={donorSearch}
+                                    onChangeText={setDonorSearch}
+                                    autoFocus
+                                />
+                            </View>
+                            <ScrollView style={styles.modalList}>
+                                {['All', ...Array.from(new Set((donors || []).map(d => d.DonorName)))]
+                                    .filter(name => !donorSearch || name.toLowerCase().includes(donorSearch.toLowerCase()))
+                                    .map((donorName, idx) => (
+                                        <TouchableOpacity key={`${donorName}-${idx}`} style={styles.modalItem} onPress={() => { setSelectedDonor(donorName); setShowDonorPicker(false); setDonorSearch(''); }}>
+                                            <Text style={styles.modalItemText}>{donorName}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                            </ScrollView>
+                        </View>
+                    </View>
+                </Modal>
+
+                {/* Filter Button moved above under calendar */}
 
                 {/* Results Count */}
-                <Text style={styles.resultCount}>number of result(s): {filteredDonors.length}</Text>
+                <Text style={styles.resultCount}>Number of result(s): {filteredDonors.length}</Text>
 
                 {/* Display Donors */}
                 <ScrollView>
@@ -235,7 +372,7 @@ const Validate = () => {
             <Text 
                 style={[styles.statusText, { 
                     color: getStatusText(donor.IsActive) === 'Validated' ? 'green' : 
-                            getStatusText(donor.IsActive) === 'Rejected' ? 'red' : 'orange' 
+                            getStatusText(donor.IsActive) === 'Not validated' ? 'red' : 'orange' 
                 }]}
             >
                 {getStatusText(donor.IsActive)}
@@ -342,11 +479,22 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         marginBottom: 10,
     },
+        filterColumn: {
+            flex: 1,
+            marginHorizontal: 5,
+        },
+        filterLabel: {
+            fontSize: 14,
+            fontFamily: 'RobotoCondensed-Bold',
+            color: '#A9A9A9',
+            marginLeft: 10,
+            marginBottom: 5,
+        },
     filterButton: {
         borderColor: '#00A651',
         borderWidth: 1,
         borderRadius: 20,
-        paddingVertical: 8,
+            paddingVertical: 10,
         paddingHorizontal: 10,
         flex: 1,
         marginHorizontal: 5,
@@ -356,34 +504,143 @@ const styles = StyleSheet.create({
     },
     filterText: {
         fontSize: 14,
+        color: '#121212',
+        fontFamily: 'RobotoCondensed-Regular',
+    },
+    placeholderBoldGreen: {
+        color: '#00A651',
+        fontFamily: 'RobotoCondensed-Bold',
+    },
+    filterTextBoldGreen: {
         color: '#00A651',
         fontFamily: 'RobotoCondensed-Bold',
     },
     dropdown: {
-        backgroundColor: '#f9f9f9',
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 5,
-        marginTop: 5,
         position: 'absolute',
-        width: '100%',
-        maxHeight: 120,
-        zIndex: 10,
+        top: 75,
+        left: 0,
+        right: 0,
+        backgroundColor: '#f9f9f9',
+        borderRadius: 15,
+        minWidth: 160,
+        paddingVertical: 8,
+        elevation: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        borderWidth: 1,
+        borderColor: '#e8e8e8',
+        zIndex: 1000,
+        maxHeight: 260,
     },
     dropdownScroll: {
-        maxHeight: 120,
+        maxHeight: 200,
+        paddingHorizontal: 10,
     },
     dropdownText: {
+        paddingVertical: 12,
+        textAlign: 'center',
         fontSize: 14,
-        padding: 10,
+        fontFamily: 'RobotoCondensed-Regular',
+        color: '#121212',
+    },
+    separatorRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    separatorFlex: {
+        flex: 1,
+        resizeMode: 'contain',
+    },
+    sortToggleButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 15,
+        backgroundColor: '#f0f0f0',
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        marginLeft: 8,
+    },
+    sortToggleText: {
+        fontSize: 12,
+        fontFamily: 'RobotoCondensed-Medium',
+        marginLeft: 4,
+    },
+    searchInputWrapper: {
+        paddingHorizontal: 10,
+        paddingBottom: 6,
+    },
+    searchInput: {
+        height: 36,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        backgroundColor: '#fff',
+        fontFamily: 'RobotoCondensed-Regular',
+        color: '#121212',
+    },
+    pickerContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+        paddingHorizontal: 2,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        justifyContent: 'flex-end',
+    },
+    modalContainer: {
+        backgroundColor: '#f9f9f9',
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+        maxHeight: '80%',
+        paddingBottom: 20,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 6,
+    },
+    modalTitle: {
+        fontSize: 16,
         fontFamily: 'RobotoCondensed-Bold',
+        color: '#121212',
+    },
+    closeButton: {
+        padding: 6,
+        borderRadius: 16,
+    },
+    modalList: {
+        maxHeight: 400,
+        paddingHorizontal: 10,
+    },
+    modalItem: {
+        paddingVertical: 12,
+        borderBottomColor: '#e8e8e8',
+        borderBottomWidth: 1,
+    },
+    modalItemText: {
+        fontSize: 14,
+        fontFamily: 'RobotoCondensed-Regular',
+        color: '#121212',
+        textAlign: 'center',
     },
     resultCount: {
         textAlign: 'center',
         marginVertical: 10,
-        fontSize: 12,
-        fontFamily: 'RobotoCondensed-Regular',     
-           color: "#121212"
+        fontSize: 10,
+        color: '#121212',
+        fontFamily: 'RobotoCondensed-Regular',
     },
     card: {
         backgroundColor: '#f9f9f9',
@@ -395,8 +652,8 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 1.41,
-        borderColor:'green',
-        borderWidth:1,
+        borderColor: 'green',
+        borderWidth: 1,
     },
     statusText: {
         fontSize: 14,
@@ -474,20 +731,20 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     calendarIcon: {
-        width: 35,
-        height: 34,
+        width: 45,
+        height: 44,
         tintColor: '#00A651',
+        resizeMode: 'contain',
     },
     searchButton: {
         justifyContent: 'center',
         alignItems: 'center',
-        borderRadius: 100, // Optional: for round button
+        borderRadius: 50,
     },
     searchIcon: {
-        width: 280,  // Set the width of the search icon
-        height: 35, // Set the height of the search icon
-        borderRadius: 100, // Optional: for round button
-
+        width: 320,
+        height: 39,
+        borderRadius: 50,
     },  
 });
 

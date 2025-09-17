@@ -3,6 +3,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
 
 import SignIn from './SignIn';
 import SignUp from './SignUp';
@@ -25,20 +27,37 @@ import RecipientAgreement from './RecipientAgreements';
 import Settings from './Settings';
 const Stack = createStackNavigator();
 
+// Keep the native splash screen visible until we manually hide it
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
 const App = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState('');
+  const [appIsReady, setAppIsReady] = useState(false);
   const navigationRef = React.useRef();  // To navigate from anywhere
+
+  // Preload custom fonts (optional but prevents font swap flicker)
+  const [fontsLoaded] = useFonts({
+    'RobotoCondensed-Regular': require('./assets/fonts/RobotoCondensed-Regular.ttf'),
+    'RobotoCondensed-Medium': require('./assets/fonts/RobotoCondensed-Medium.ttf'),
+    'RobotoCondensed-SemiBold': require('./assets/fonts/RobotoCondensed-SemiBold.ttf'),
+    'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
+    'RobotoCondensed-ExtraBold': require('./assets/fonts/RobotoCondensed-ExtraBold.ttf'),
+  });
 
   // Set up Axios interceptor to handle 404 errors
    // Load custom fonts
 
-  // Set up Axios interceptor to handle 404 errors
+  // Set up Axios interceptor to handle authentication errors
   useEffect(() => {
     const interceptor = axios.interceptors.response.use(
       response => response,  // Return the response if it's successful
       async (error) => {
-        if (error.response && error.response.status === 404) {
+        console.log('🔍 App.js Interceptor: Caught error:', error.response?.status, error.config?.url);
+        
+        // Only logout on 401 (Unauthorized) or specific 404 errors that indicate invalid user/token
+        if (error.response && error.response.status === 401) {
+          console.log('🔐 App.js Interceptor: 401 Unauthorized - logging out user');
           await AsyncStorage.clear();  // Clear the AsyncStorage session
           setIsLoggedIn(false);  // Set the login state to false
 
@@ -49,9 +68,31 @@ const App = () => {
             });
           }
 
-          return Promise.reject(error);  // Return the error to handle it locally if needed
+          return Promise.reject(error);
         }
-        return Promise.reject(error);
+        
+        // Only logout on 404 for critical endpoints (user/donor validation)
+        if (error.response && error.response.status === 404) {
+          const url = error.config?.url || '';
+          const isCriticalEndpoint = url.includes('/Donor/') && !url.includes('/RecipientAgreements/');
+          
+          if (isCriticalEndpoint) {
+            console.log('🔐 App.js Interceptor: 404 on critical endpoint - logging out user');
+            await AsyncStorage.clear();
+            setIsLoggedIn(false);
+
+            if (navigationRef.current) {
+              navigationRef.current.reset({
+                index: 0,
+                routes: [{ name: 'SignIn' }],
+              });
+            }
+          } else {
+            console.log('📱 App.js Interceptor: 404 on non-critical endpoint - allowing local handling');
+          }
+        }
+        
+        return Promise.reject(error);  // Always return the error for local handling
       }
     );
 
@@ -90,34 +131,53 @@ const App = () => {
     }
   };
 
-  // Check login status on app load or refresh
-  useEffect(() => {
-    const checkLoginStatus = async () => {
-      try {
-        const token = await AsyncStorage.getItem('token');
-        const role = await AsyncStorage.getItem('userRole');
+  // Check login status helper
+  const checkLoginStatus = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const role = await AsyncStorage.getItem('userRole');
 
-        if (token && role) {
-          setUserRole(role);
+      if (token && role) {
+        setUserRole(role);
 
-          if (role === 'Donor') {
-            await fetchDonorData();  // For donors, fetch their data
-          } else {
-            setIsLoggedIn(true);  // Admin or other roles, assume logged in
-          }
+        if (role === 'Donor') {
+          await fetchDonorData();  // For donors, fetch their data
         } else {
-          setIsLoggedIn(false);  // If no token is found, set to not logged in
+          setIsLoggedIn(true);  // Admin or other roles, assume logged in
         }
-      } catch (error) {
-        console.error('Error checking login state:', error);
-        setIsLoggedIn(false);
+      } else {
+        setIsLoggedIn(false);  // If no token is found, set to not logged in
+      }
+    } catch (error) {
+      console.error('Error checking login state:', error);
+      setIsLoggedIn(false);
+    }
+  };
+
+  // Prepare app: wait for auth check (and fonts) before hiding splash
+  useEffect(() => {
+    const prepare = async () => {
+      try {
+        await checkLoginStatus();
+      } finally {
+        setAppIsReady(true);
       }
     };
-
-    checkLoginStatus();  // Always check login status on app load or refresh
+    prepare();
   }, []);
 
+  // Hide splash when everything is ready
+  useEffect(() => {
+    if (appIsReady && fontsLoaded) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [appIsReady, fontsLoaded]);
+
   // Only return after the fonts are loaded
+  if (!appIsReady || !fontsLoaded) {
+    // Keep native splash visible
+    return null;
+  }
 
   return (
     <NavigationContainer ref={navigationRef}>

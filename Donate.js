@@ -85,7 +85,6 @@ const BatchLotForm = React.forwardRef(
           <TextInput
             ref={inputRefs.gtin}
             style={[styles.input, validationErrors[index]?.gtin ? styles.inputError : null]}
-            placeholder="GTIN"
             value={form.gtin}
             onChangeText={(text) => handleFieldChange(index, "gtin", text)}
             onFocus={() => setIsInputFocused(true)}
@@ -101,7 +100,6 @@ const BatchLotForm = React.forwardRef(
         <TextInput
           ref={inputRefs.lotNumber}
           style={[styles.input, validationErrors[index]?.lotNumber ? styles.inputError : null]}
-          placeholder="Batch Lot Number"
           value={form.lotNumber}
           onChangeText={(text) => handleFieldChange(index, "lotNumber", text)}
           onFocus={() => setIsInputFocused(true)}
@@ -115,7 +113,6 @@ const BatchLotForm = React.forwardRef(
         <TextInput
           ref={inputRefs.expiryDate}
           style={[styles.input, validationErrors[index]?.expiryDate ? styles.inputError : null]}
-          placeholder="Expiry Date"
           value={form.expiryDate}
           onChangeText={(text) => handleFieldChange(index, "expiryDate", text)}
           onFocus={() => setIsInputFocused(true)}
@@ -129,7 +126,6 @@ const BatchLotForm = React.forwardRef(
         <TextInput
           ref={inputRefs.serialNumber}
           style={[styles.input, validationErrors[index]?.serialNumber ? styles.inputError : null]}
-          placeholder="Serial Number"
           value={form.serialNumber}
           onChangeText={(text) => handleFieldChange(index, "serialNumber", text)}
           onFocus={() => setIsInputFocused(true)}
@@ -193,19 +189,24 @@ const BatchLotForm = React.forwardRef(
             paddingLeft: 10,
             minHeight: 50, // Set height to 50px
             marginBottom: 10,
-            backgroundColor: "#f9f9f9CFC",
+            backgroundColor: "#f9f9f9",
+            color: "#000000",
             marginLeft: 35,
             marginRight: 35,
             width: 325,
           }}
           dropDownContainerStyle={{
-            backgroundColor: "#f9f9f9CFC",
+            backgroundColor: "#f9f9f9",
             borderWidth: 1,
             borderColor: "#00a651",
             borderRadius: 10,
             width: "90%", // Matches the GTIN input width
             alignSelf: "center",
             zIndex: 1000, // Ensures dropdown appears above other elements
+          }}
+          textStyle={{
+            color: "#000000",
+            fontFamily: "RobotoCondensed-Medium",
           }}
         />
         {validationErrors[index]?.drugName && (
@@ -222,7 +223,6 @@ const BatchLotForm = React.forwardRef(
                 styles.input,
                 { fontSize: 12 }, // Override the font size here directly
               ]}
-              placeholder="Presentation"
               value={form.presentation}
               onChangeText={(text) => handleFieldChange(index, "presentation", text)}
               onFocus={() => setIsInputFocused(true)}
@@ -236,7 +236,6 @@ const BatchLotForm = React.forwardRef(
                 styles.input,
                 { fontSize: 12 }, // Override the font size here directly
               ]}
-              placeholder="Form"
               value={form.form}
               onChangeText={(text) => handleFieldChange(index, "form", text)}
               onFocus={() => setIsInputFocused(true)}
@@ -252,7 +251,6 @@ const BatchLotForm = React.forwardRef(
                 styles.input,
                 { fontSize: 12 }, // Override the font size here directly
               ]}
-              placeholder="Laboratory"
               value={form.owner}
               onChangeText={(text) => handleFieldChange(index, "owner", text)}
               onFocus={() => setIsInputFocused(true)}
@@ -266,7 +264,6 @@ const BatchLotForm = React.forwardRef(
                 styles.input,
                 { fontSize: 12 }, // Override the font size here directly
               ]}
-              placeholder="Country"
               value={form.country}
               onChangeText={(text) => handleFieldChange(index, "country", text)}
               onFocus={() => setIsInputFocused(true)}
@@ -1025,7 +1022,6 @@ const Donate = ({ route }) => {
               <FieldLabel label="GTIN*" />
               <TextInput
                 style={[styles.input, validationErrors[0] && validationErrors[0].gtin ? styles.inputError : null]}
-                placeholder="GTIN"
                 value={batchLots[0].gtin}
                 onChangeText={(text) => handleFieldChange(0, "gtin", text)}
                 onFocus={() => setIsInputFocused(true)}
@@ -1041,7 +1037,6 @@ const Donate = ({ route }) => {
               <FieldLabel label="Batch Lot Number*" />
               <TextInput
                 style={[styles.input, validationErrors[0]?.lotNumber ? styles.inputError : null]}
-                placeholder="Batch Lot number"
                 value={batchLots[0].lotNumber}
                 onChangeText={(text) => handleFieldChange(0, "lotNumber", text)}
                 onFocus={() => setIsInputFocused(true)}
@@ -1053,7 +1048,6 @@ const Donate = ({ route }) => {
               <FieldLabel label="Expiry Date*" />
               <TextInput
                 style={[styles.input, validationErrors[0]?.expiryDate ? styles.inputError : null]}
-                placeholder="Expiry Date"
                 value={batchLots[0].expiryDate}
                 onChangeText={(text) => handleFieldChange(0, "expiryDate", text)}
                 onFocus={() => setIsInputFocused(true)}
@@ -1065,7 +1059,6 @@ const Donate = ({ route }) => {
               <FieldLabel label="Serial Number*" />
               <TextInput
                 style={[styles.input, validationErrors[0]?.serialNumber ? styles.inputError : null]}
-                placeholder="Serial Number"
                 value={batchLots[0].serialNumber}
                 onChangeText={(text) => handleFieldChange(0, "serialNumber", text)}
                 onFocus={() => setIsInputFocused(true)}
@@ -1128,19 +1121,24 @@ const Donate = ({ route }) => {
                   paddingLeft: 10,
                   minHeight: 50, // Set height to 50px
                   marginBottom: 10,
-                  backgroundColor: "#f9f9f9CFC",
+                  backgroundColor: "#f9f9f9",
+                  color: "#000000",
                   marginLeft: 35,
                   marginRight: 35,
                   width: 325,
                 }}
                 dropDownContainerStyle={{
-                  backgroundColor: "#f9f9f9CFC",
+                  backgroundColor: "#f9f9f9",
                   borderWidth: 1,
                   borderColor: "#00a651",
                   borderRadius: 10,
                   width: "90%", // Matches the GTIN input width
                   alignSelf: "center",
                   zIndex: 1000, // Ensures dropdown appears above other elements
+                }}
+                textStyle={{
+                  color: "#000000",
+                  fontFamily: "RobotoCondensed-Medium",
                 }}
               />
 
@@ -1156,7 +1154,6 @@ const Donate = ({ route }) => {
                     <FieldLabel label="Presentation *" />
                     <TextInput
                       style={styles.input}
-                      placeholder="Presentation"
                       value={batchLots[0].presentation}
                       onChangeText={(text) => handleFieldChange(0, "presentation", text)}
                       onFocus={() => setIsInputFocused(true)}
@@ -1167,7 +1164,6 @@ const Donate = ({ route }) => {
                     <FieldLabel label="Form *" />
                     <TextInput
                       style={styles.input}
-                      placeholder="Form"
                       value={batchLots[0].form}
                       onChangeText={(text) => handleFieldChange(0, "form", text)}
                       onFocus={() => setIsInputFocused(true)}
@@ -1182,7 +1178,6 @@ const Donate = ({ route }) => {
                     <FieldLabel label="Laboratory *" />
                     <TextInput
                       style={styles.input}
-                      placeholder="Laboratory"
                       value={batchLots[0].owner}
                       onChangeText={(text) => handleFieldChange(0, "owner", text)}
                       onFocus={() => setIsInputFocused(true)}
@@ -1193,7 +1188,6 @@ const Donate = ({ route }) => {
                     <FieldLabel label="Country *" />
                     <TextInput
                       style={styles.input}
-                      placeholder="Country"
                       value={batchLots[0].country}
                       onChangeText={(text) => handleFieldChange(0, "country", text)}
                       onFocus={() => setIsInputFocused(true)}
@@ -1366,7 +1360,8 @@ const styles = StyleSheet.create({
     paddingLeft: 10,
     height: 50, // Set height to 50px
     marginBottom: 5,
-    backgroundColor: "#f9f9f9CFC",
+    backgroundColor: "#F9f9f9",
+    color: "#000000",
     marginLeft: 35,
     marginRight: 35,
     fontFamily: "RobotoCondensed-Medium",
@@ -1576,7 +1571,7 @@ const styles = StyleSheet.create({
     fontFamily: "RobotoCondensed-Bold",
   },
   AddBoxButtonText: {
-    color: "#f9f9f9f",
+    color: "#f9f9f9",
   },
   smallinput: {
     borderWidth: 1,
@@ -1586,9 +1581,11 @@ const styles = StyleSheet.create({
     paddingLeft: 10,
     height: 50, // Keep height as 50px
     marginBottom: 10,
-    backgroundColor: "#f9f9f9CFC",
+    backgroundColor: "#ffffff",
+    color: "#000000",
     marginLeft: 35,
     marginRight: 35,
+    fontFamily: "RobotoCondensed-Medium",
     // Smaller font size for short fields
   },
   medicationDetailsContainer: {

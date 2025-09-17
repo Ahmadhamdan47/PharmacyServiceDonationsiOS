@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, StatusBar, Alert } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import SortToggle from './SortToggle';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -22,6 +23,38 @@ const RecipientList = () => {
     const [status, setStatus] = useState('All');
     const [showStatusPicker, setShowStatusPicker] = useState(false);
     const [sortAsc, setSortAsc] = useState(true);
+
+    // Debug function to check auth state
+    const debugAuthState = async () => {
+        try {
+            const authData = await AsyncStorage.multiGet([
+                'token', 'username', 'userRole', 'recipientData', 'recipientId',
+                'tempToken', 'tempUsername', 'tempUserRole', 'tempRecipientData'
+            ]);
+            
+            const authState = {};
+            authData.forEach(([key, value]) => {
+                authState[key] = value;
+            });
+            
+            console.log('=== AUTH STATE DEBUG ===');
+            console.log('Token:', !!authState.token ? 'EXISTS' : 'MISSING');
+            console.log('Username:', authState.username);
+            console.log('User Role:', authState.userRole);
+            console.log('Recipient ID:', authState.recipientId);
+            console.log('Recipient Data:', !!authState.recipientData ? 'EXISTS' : 'MISSING');
+            console.log('Temp Token:', !!authState.tempToken ? 'EXISTS' : 'MISSING');
+            console.log('Temp Username:', authState.tempUsername);
+            console.log('Temp User Role:', authState.tempUserRole);
+            console.log('Temp Recipient Data:', !!authState.tempRecipientData ? 'EXISTS' : 'MISSING');
+            console.log('========================');
+            
+            return authState;
+        } catch (error) {
+            console.error('Error debugging auth state:', error);
+            return null;
+        }
+    };
 
     const fetchFonts = async () => {
         await Font.loadAsync({
@@ -59,13 +92,17 @@ const RecipientList = () => {
     }, []);
 
     useEffect(() => {
+        debugAuthState(); // Debug auth state on mount
         getUsername();
         getRecipientId();
     }, []);
 
     useEffect(() => {
         if (recipientId) {
+            console.log('RecipientId is set, fetching donations for recipientId:', recipientId);
             fetchDonations();
+        } else {
+            console.log('RecipientId not set yet, waiting...');
         }
     }, [recipientId]);
     
@@ -83,37 +120,264 @@ const RecipientList = () => {
 
     const getRecipientId = async () => {
         try {
+            // First, try to get from AsyncStorage
             const storedRecipientId = await AsyncStorage.getItem('recipientId');
+            
             if (storedRecipientId) {
+                console.log('Found stored recipientId:', storedRecipientId);
                 setRecipientId(storedRecipientId);
+                return;
+            }
+
+            // If not in storage, fetch from API using username (same as RecipientAgreements.js)
+            const storedUsername = await AsyncStorage.getItem('username');
+            const token = await AsyncStorage.getItem('token');
+            
+            if (!token) {
+                console.error('No authentication token found');
+                Alert.alert(
+                    "Authentication Required", 
+                    "Please sign in again.",
+                    [
+                        { 
+                            text: "Sign In", 
+                            onPress: () => {
+                                AsyncStorage.clear();
+                                navigation.reset({
+                                    index: 0,
+                                    routes: [{ name: 'SignIn' }],
+                                });
+                            }
+                        }
+                    ]
+                );
+                return;
+            }
+            
+            if (storedUsername) {
+                console.log(`Fetching recipient details for username: ${storedUsername}`);
+                const headers = { Authorization: `Bearer ${token}` };
+                const response = await axios.get(`https://apiv2.medleb.org/users/Recipient/username/${storedUsername}`, { headers });
+                console.log('Recipient details response:', response.data);
+                
+                if (response.data && response.data.RecipientId) {
+                    console.log('Recipient ID found:', response.data.RecipientId);
+                    const recipientIdStr = response.data.RecipientId.toString();
+                    setRecipientId(recipientIdStr);
+                    // Store it for future use
+                    await AsyncStorage.setItem('recipientId', recipientIdStr);
+                    // Also store recipient data if available
+                    if (response.data) {
+                        await AsyncStorage.setItem('recipientData', JSON.stringify(response.data));
+                    }
+                } else {
+                    console.log('No recipient ID found in response.');
+                    Alert.alert(
+                        "Account Issue", 
+                        "Could not find recipient account details. Please contact support.",
+                        [{ text: "OK" }]
+                    );
+                }
+            } else {
+                console.error('No username found in storage');
+                Alert.alert(
+                    "Authentication Required", 
+                    "Please sign in again.",
+                    [
+                        { 
+                            text: "Sign In", 
+                            onPress: () => {
+                                AsyncStorage.clear();
+                                navigation.reset({
+                                    index: 0,
+                                    routes: [{ name: 'SignIn' }],
+                                });
+                            }
+                        }
+                    ]
+                );
             }
         } catch (error) {
             console.error('Failed to load recipient ID:', error);
+            
+            // Handle authentication errors
+            if (error.response?.status === 401) {
+                Alert.alert(
+                    "Authentication Error", 
+                    "Your session has expired. Please sign in again.",
+                    [
+                        { 
+                            text: "Sign In", 
+                            onPress: () => {
+                                AsyncStorage.clear();
+                                navigation.reset({
+                                    index: 0,
+                                    routes: [{ name: 'SignIn' }],
+                                });
+                            }
+                        }
+                    ]
+                );
+            } else if (error.response?.status === 404) {
+                Alert.alert(
+                    "Account Not Found", 
+                    "Recipient account not found. Please contact support.",
+                    [{ text: "OK" }]
+                );
+            } else {
+                Alert.alert(
+                    "Error", 
+                    `Failed to load recipient information. ${error.response?.status ? `(HTTP ${error.response.status})` : 'Please try again.'}`,
+                    [{ text: "OK" }]
+                );
+            }
         }
     };
 
     const fetchDonations = async () => {
         try {
-            const token = await AsyncStorage.getItem('token');
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
-            
-            const response = await axios.get('https://apiv2.medleb.org/donation/filtered', {
-                headers,
-                params: {
-                    recipientId,
-                    fromDate: fromDate ? fromDate.toISOString().split('T')[0] : '',
-                    toDate: toDate ? toDate.toISOString().split('T')[0] : '',
-                },
-            });
+            if (!recipientId) {
+                console.error('Cannot fetch donations: recipientId is not set');
+                Alert.alert("Error", "Recipient information not available. Please sign in again.");
+                return;
+            }
 
-            if (Array.isArray(response.data)) {
-                setDonations(response.data);
-            } else {
-                console.error('Unexpected response structure:', response.data);
-                setDonations([]);
+            const token = await AsyncStorage.getItem('token');
+            if (!token) {
+                console.error('No token found - user needs to login');
+                Alert.alert(
+                    "Authentication Required", 
+                    "Please sign in to view donations.",
+                    [
+                        { 
+                            text: "Sign In", 
+                            onPress: () => {
+                                AsyncStorage.clear();
+                                navigation.reset({
+                                    index: 0,
+                                    routes: [{ name: 'SignIn' }],
+                                });
+                            }
+                        }
+                    ]
+                );
+                return;
+            }
+
+            console.log('Fetching donations for recipientId:', recipientId);
+            
+            // Let's try without authentication headers first, like RecipientLanding does
+            try {
+                const response = await axios.get(`https://apiv2.medleb.org/donation/byRecipient/${recipientId}`);
+                
+                if (Array.isArray(response.data)) {
+                    // Apply date filters if set
+                    let filteredDonations = response.data;
+                    
+                    if (fromDate || toDate) {
+                        filteredDonations = response.data.filter(donation => {
+                            const donationDate = new Date(donation.DateDonated);
+                            let matchesDate = true;
+                            
+                            if (fromDate && donationDate < fromDate) {
+                                matchesDate = false;
+                            }
+                            if (toDate && donationDate > toDate) {
+                                matchesDate = false;
+                            }
+                            
+                            return matchesDate;
+                        });
+                    }
+                    
+                    setDonations(filteredDonations);
+                    console.log(`Successfully fetched ${filteredDonations.length} donations (${response.data.length} total before filtering)`);
+                } else {
+                    console.error('Unexpected response structure:', response.data);
+                    setDonations([]);
+                }
+            } catch (apiError) {
+                console.log('First attempt failed, trying with auth headers...');
+                // If the first attempt fails, try with authentication headers
+                const headers = { Authorization: `Bearer ${token}` };
+                const response = await axios.get(`https://apiv2.medleb.org/donation/byRecipient/${recipientId}`, {
+                    headers,
+                });
+                
+                if (Array.isArray(response.data)) {
+                    // Apply date filters if set
+                    let filteredDonations = response.data;
+                    
+                    if (fromDate || toDate) {
+                        filteredDonations = response.data.filter(donation => {
+                            const donationDate = new Date(donation.DateDonated);
+                            let matchesDate = true;
+                            
+                            if (fromDate && donationDate < fromDate) {
+                                matchesDate = false;
+                            }
+                            if (toDate && donationDate > toDate) {
+                                matchesDate = false;
+                            }
+                            
+                            return matchesDate;
+                        });
+                    }
+                    
+                    setDonations(filteredDonations);
+                    console.log(`Successfully fetched ${filteredDonations.length} donations (${response.data.length} total before filtering)`);
+                } else {
+                    console.error('Unexpected response structure:', response.data);
+                    setDonations([]);
+                }
             }
         } catch (error) {
-            console.error('Error fetching donations:', error);
+            console.error('Error fetching donations:', {
+                message: error.message,
+                status: error.response?.status,
+                statusText: error.response?.statusText,
+                data: error.response?.data,
+                url: error.config?.url,
+                params: error.config?.params
+            });
+            
+            // Handle specific error cases
+            if (error.response?.status === 401) {
+                Alert.alert(
+                    "Authentication Error", 
+                    "Your session has expired. Please sign in again.",
+                    [
+                        { 
+                            text: "Sign In", 
+                            onPress: () => {
+                                AsyncStorage.clear();
+                                navigation.reset({
+                                    index: 0,
+                                    routes: [{ name: 'SignIn' }],
+                                });
+                            }
+                        }
+                    ]
+                );
+            } else if (error.response?.status === 403) {
+                Alert.alert(
+                    "Access Denied", 
+                    "You don't have permission to view these donations. Please contact support.",
+                    [{ text: "OK" }]
+                );
+            } else if (error.response?.status === 404) {
+                Alert.alert(
+                    "Not Found", 
+                    "No donations found for the specified criteria.",
+                    [{ text: "OK" }]
+                );
+            } else {
+                Alert.alert(
+                    "Error", 
+                    `Failed to load donations. ${error.response?.status ? `(HTTP ${error.response.status})` : 'Please check your connection and try again.'}`,
+                    [{ text: "OK" }]
+                );
+            }
             setDonations([]);
         }
     };
@@ -205,17 +469,10 @@ const RecipientList = () => {
                     </View>
                 </View>
 
-                {/* Separator with inline sort arrows */}
+                {/* Separator with inline sort toggle (shared) */}
                 <View style={styles.separatorRow}>
                     <Image source={require('./assets/separator-green.png')} style={styles.separatorFlex} />
-                    <View style={styles.sortInline}>
-                        <TouchableOpacity onPress={() => setSortAsc(true)} style={styles.sortIconButton}>
-                            <MaterialCommunityIcons name={'arrow-up'} size={16} color={sortAsc ? '#00A651' : '#A9A9A9'} />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setSortAsc(false)} style={styles.sortIconButton}>
-                            <MaterialCommunityIcons name={'arrow-down'} size={16} color={!sortAsc ? '#FF8C00' : '#A9A9A9'} />
-                        </TouchableOpacity>
-                    </View>
+                    <SortToggle sortAsc={sortAsc} onToggle={() => setSortAsc(!sortAsc)} />
                 </View>
                 <Text style={styles.resultCount}>Number of result(s): {donations.length}</Text>
 
@@ -334,9 +591,8 @@ const styles = StyleSheet.create({
     
     filterText: {
         fontSize: 14,
-        fontFamily: 'RobotoCondensed-Bold',
-        color: '#000',
-        textAlign: 'center',
+        fontFamily: 'RobotoCondensed-Regular',
+        color: '#121212',
     },
     dropdown: {
         position: 'absolute',
@@ -461,18 +717,19 @@ const styles = StyleSheet.create({
     },
     filterLabel: {
         fontSize: 14,
-        fontWeight: 'bold',
-        color: 'grey',
+        fontFamily: 'RobotoCondensed-Bold',
+        color: '#A9A9A9',
+        marginLeft: 10,
         marginBottom: 5,
-        textAlign: 'center',
     },
     filterButton: {
         borderWidth: 1,
         borderColor: '#00A651',
         borderRadius: 20,
-        paddingVertical: 8,
-        paddingHorizontal: 15,
-        minWidth:100,
+        paddingVertical: 10,
+        alignItems: 'center',
+        height: 45,
+        backgroundColor: '#f9f9f9',
     },
     searchButton: {
         justifyContent: 'center',

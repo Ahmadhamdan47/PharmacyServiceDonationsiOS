@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, StatusBar, BackHandler } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import BottomNavBar from './BottomNavBar'; // Import the BottomNavBar for Donor
 import * as Font from 'expo-font';
 
@@ -18,8 +18,8 @@ const DonorAgreement = () => {
     const [isFontLoaded, setIsFontLoaded] = useState(false);
     const [statusFilter, setStatusFilter] = useState('Pending');
     const [showStatusPicker, setShowStatusPicker] = useState(false);
-    // Sort: true = oldest→newest, false = newest→oldest
-    const [sortAsc, setSortAsc] = useState(true);
+    // Sort: true = oldest→newest, false = newest→oldest (default: newest first)
+    const [sortAsc, setSortAsc] = useState(false);
     // Map of DonationId -> DonationTitle fetched directly from the donation
     const [donationTitles, setDonationTitles] = useState({});
 
@@ -71,6 +71,20 @@ const DonorAgreement = () => {
         }
     }, [donorId]);
 
+    // Handle Android hardware back button
+    useFocusEffect(
+        React.useCallback(() => {
+            const onBackPress = () => {
+                navigation.navigate('DonorLanding');
+                return true; // Prevent default back behavior
+            };
+
+            const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+            return () => backHandler.remove();
+        }, [navigation])
+    );
+
     const getUsername = async () => {
         try {
             console.log('Fetching username from AsyncStorage...');
@@ -112,16 +126,16 @@ const DonorAgreement = () => {
             console.log('Agreements response:', response);
             if (response.data && Array.isArray(response.data.data)) {
                 const items = response.data.data;
-                // Default: sort oldest -> newest by Donation.DonationDate (fallbacks applied)
+                // Default: sort newest -> oldest by Donation.DonationDate (fallbacks applied)
                 const parse = (d) => (d ? Date.parse(d) : 0);
-                const sortedAsc = [...items].sort((a, b) => {
+                const sortedDesc = [...items].sort((a, b) => {
                     const aDate = parse(a?.Donation?.DonationDate) || parse(a?.CreatedDate) || parse(a?.created_at);
                     const bDate = parse(b?.Donation?.DonationDate) || parse(b?.CreatedDate) || parse(b?.created_at);
-                    return (aDate || 0) - (bDate || 0);
+                    return (bDate || 0) - (aDate || 0);
                 });
-                setAgreements(sortedAsc);
+                setAgreements(sortedDesc);
                 // Fetch authoritative donation titles for these agreements
-                fetchDonationTitles(sortedAsc).catch((e) => console.warn('Failed fetching donation titles:', e?.message));
+                fetchDonationTitles(sortedDesc).catch((e) => console.warn('Failed fetching donation titles:', e?.message));
             } else {
                 console.error('Unexpected response structure:', response.data);
                 setAgreements([]);
@@ -241,25 +255,22 @@ const DonorAgreement = () => {
                     </View>
                 </View>
 
-                {/* Separator with inline sort arrows */}
+                {/* Separator with inline sort toggle */}
                 <View style={styles.separatorRow}>
                     <Image source={require('./assets/separator-green.png')} style={styles.separatorFlex} />
-                    <View style={styles.sortInline}>
-                        <TouchableOpacity onPress={() => setSortAsc(true)} style={styles.sortIconButton}>
-                            <MaterialCommunityIcons
-                                name={'arrow-up'}
-                                size={16}
-                                color={sortAsc ? '#00A651' : '#A9A9A9'}
-                            />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setSortAsc(false)} style={styles.sortIconButton}>
-                            <MaterialCommunityIcons
-                                name={'arrow-down'}
-                                size={16}
-                                color={!sortAsc ? '#FF8C00' : '#A9A9A9'}
-                            />
-                        </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity 
+                        onPress={() => setSortAsc(!sortAsc)} 
+                        style={styles.sortToggleButton}
+                    >
+                        <MaterialCommunityIcons
+                            name={sortAsc ? 'sort-calendar-descending': 'sort-calendar-ascending'  }
+                            size={18}
+                            color={sortAsc ? '#FF8C00' : '#00A651'}
+                        />
+                        <Text style={[styles.sortToggleText, { color: sortAsc ? '#FF8C00' : '#00A651' }]}>
+                            {sortAsc ? 'Oldest' : 'Newest'}
+                        </Text>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Results Count */}
@@ -396,10 +407,21 @@ const styles = StyleSheet.create({
         flex: 1,
         resizeMode: 'contain',
     },
-    sortInline: {
+    sortToggleButton: {
         flexDirection: 'row',
         alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 15,
+        backgroundColor: '#f0f0f0',
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
         marginLeft: 8,
+    },
+    sortToggleText: {
+        fontSize: 12,
+        fontFamily: 'RobotoCondensed-Medium',
+        marginLeft: 4,
     },
     resultCount: {
         textAlign: 'center',
@@ -443,10 +465,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         flexDirection: 'row',
-    },
-    sortIconButton: {
-        paddingHorizontal: 4,
-        paddingVertical: 6,
     },
     filterText: {
         fontSize: 14,

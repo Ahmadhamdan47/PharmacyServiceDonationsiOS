@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image, ScrollView } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
@@ -48,9 +48,13 @@ const DonorDetails = ({ route, navigation }) => {
     const handleApproval = async (isActive) => {
         setIsLoading(true);
         try {
+            const token = await AsyncStorage.getItem('token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            
             await axios.put(`https://apiv2.medleb.org/Donor/${donor.DonorId}`, {
                 IsActive: isActive,
-            });
+            }, { headers });
+            
             Alert.alert('Success', isActive ? 'Donor Approved' : 'Donor Rejected');
             navigation.goBack();
         } catch (error) {
@@ -63,34 +67,35 @@ const DonorDetails = ({ route, navigation }) => {
 
     return (
         <View style={styles.container}>
-            <Text style={styles.label}>Donor Name</Text>
-            <TextInput style={styles.input} value={donor.DonorName} editable={false} />
+            <ScrollView contentContainerStyle={styles.scrollContent}>
+                <Text style={styles.label}>Donor Name</Text>
+                <TextInput style={styles.input} value={donor.DonorName} editable={false} />
 
-            <Text style={styles.label}>Donor Type</Text>
-            <TextInput style={styles.input} value={donor.DonorType} editable={false} />
+                <Text style={styles.label}>Donor Type</Text>
+                <TextInput style={styles.input} value={donor.DonorType} editable={false} />
 
-            <Text style={styles.label}>Address</Text>
-            <TextInput style={styles.input} value={donor.Address} editable={false} />
+                <Text style={styles.label}>Address</Text>
+                <TextInput style={styles.input} value={donor.Address} editable={false} />
 
-            <Text style={styles.label}>Phone Number</Text>
-            <TextInput style={styles.input} value={donor.PhoneNumber} editable={false} />
+                <Text style={styles.label}>Phone Number</Text>
+                <TextInput style={styles.input} value={donor.PhoneNumber} editable={false} />
 
-            <Text style={styles.label}>Email</Text>
-            <TextInput style={styles.input} value={donor.Email} editable={false} />
+                <Text style={styles.label}>Email</Text>
+                <TextInput style={styles.input} value={donor.Email} editable={false} />
 
-            <Text style={styles.label}>Country</Text>
-            <TextInput style={styles.input} value={donor.DonorCountry} editable={false} />
+                <Text style={styles.label}>Country</Text>
+                <TextInput style={styles.input} value={donor.DonorCountry} editable={false} />
 
-            <View style={styles.buttonContainer}>
-                <TouchableOpacity style={[styles.button, styles.rejectButton]} onPress={() => handleApproval(false)} disabled={isLoading}>
-                    <Text style={styles.rejectbuttonText}>Reject</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.button, styles.approveButton]} onPress={() => handleApproval(true)} disabled={isLoading}>
-                    <Text style={styles.buttonText}>Approve</Text>
-                </TouchableOpacity>
-            </View>
+                <View style={styles.buttonContainer}>
+                    <TouchableOpacity style={[styles.button, styles.rejectButton]} onPress={() => handleApproval(false)} disabled={isLoading}>
+                        <Text style={styles.rejectbuttonText}>Reject</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.button, styles.approveButton]} onPress={() => handleApproval(true)} disabled={isLoading}>
+                        <Text style={styles.buttonText}>Approve</Text>
+                    </TouchableOpacity>
+                </View>
+            </ScrollView>
             <BottomNavBarInspection currentScreen="" />
-
         </View>
     );
 };
@@ -101,6 +106,9 @@ const styles = StyleSheet.create({
         padding: 20,
         backgroundColor: '#f9f9f9',
         
+    },
+    scrollContent: {
+        paddingBottom: 80,
     },
     label: {
         fontSize: 16,

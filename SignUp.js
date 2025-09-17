@@ -13,6 +13,7 @@ const SignUp = () => {
     const [donorName, setDonorName] = useState('');
     const [name, setName] = useState('');
     const [lastName, setLastName] = useState('');
+    const [username, setUsername] = useState('');
     const [organizationName, setOrganizationName] = useState('');
     const [decreeNumber, setDecreeNumber] = useState('');
     const [registrationDate, setRegistrationDate] = useState('');
@@ -300,28 +301,6 @@ const SignUp = () => {
         }
     };
 
-    const validatePassword = () => {
-        const errors = [];
-        
-        if (password.length < 8) {
-            Alert.alert('Invalid Password', 'Password must be at least 8 characters long', [
-                { text: 'OK', style: 'default' }
-            ]);
-            errors.push('password');
-            setValidationErrors(['password']);
-            return false;
-        }
-        if (password !== confirmPassword) {
-            Alert.alert('Password Mismatch', 'Passwords do not match', [
-                { text: 'OK', style: 'default' }
-            ]);
-            errors.push('password', 'confirmPassword');
-            setValidationErrors(['password', 'confirmPassword']);
-            return false;
-        }
-        return true;
-    };
-
     const validateEmail = (email) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return emailRegex.test(email);
@@ -339,6 +318,7 @@ const SignUp = () => {
         // Clear all form fields
         setName('');
         setLastName('');
+        setUsername('');
         setOrganizationName('');
         setDecreeNumber('');
         setRegistrationDate('');
@@ -448,7 +428,7 @@ const SignUp = () => {
             
             formData.append('metadata', JSON.stringify(metadata));
 
-            const response = await axios.post('https://apiv2.medleb.org/files/upload', formData, {
+            const response = await axios.post('https://apiv2.medleb.org/files/registration/upload', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },
@@ -464,6 +444,8 @@ const SignUp = () => {
             if (error.response) {
                 if (error.response.status === 400) {
                     errorMessage = 'Invalid file format or file too large';
+                } else if (error.response.status === 401) {
+                    errorMessage = 'Authentication error - please try again';
                 } else if (error.response.status === 403) {
                     errorMessage = 'Access denied for file upload';
                 } else if (error.response.data?.message) {
@@ -479,26 +461,32 @@ const SignUp = () => {
     const validateRequiredFields = () => {
         const missingFields = [];
         const errors = [];
+        const invalidFields = [];
 
         // Common validations for all user types
         if (!organizationType) {
             missingFields.push(`${userType} Type`);
             errors.push('organizationType');
         }
-        if (!country) {
-            missingFields.push('Country');
-            errors.push('country');
+        
+        // Only validate country for Donor (Recipients are always Lebanon)
+        if (userType === 'Donor') {
+            if (!country) {
+                missingFields.push('Country');
+                errors.push('country');
+            }
+        } else {
+            // For recipients, set country to Lebanon
+            setCountry('Lebanon');
+            setCountryCode('LB');
         }
+        
         if (!email) {
             missingFields.push('Email');
             errors.push('email');
         } else if (!validateEmail(email)) {
-            Alert.alert('Invalid Email', 'Please enter a valid email address', [
-                { text: 'OK', style: 'default' }
-            ]);
+            invalidFields.push('Email format is invalid');
             errors.push('email');
-            setValidationErrors(['email']);
-            return false;
         }
         if (!phoneNumber) {
             missingFields.push('Phone Number');
@@ -511,10 +499,16 @@ const SignUp = () => {
         if (!password) {
             missingFields.push('Password');
             errors.push('password');
+        } else if (password.length < 8) {
+            invalidFields.push('Password must be at least 8 characters long');
+            errors.push('password');
         }
         if (!confirmPassword) {
             missingFields.push('Confirm Password');
             errors.push('confirmPassword');
+        } else if (password !== confirmPassword) {
+            invalidFields.push('Passwords do not match');
+            errors.push('password', 'confirmPassword');
         }
 
         // Individual specific validations
@@ -526,6 +520,10 @@ const SignUp = () => {
             if (!lastName) {
                 missingFields.push('Last Name');
                 errors.push('lastName');
+            }
+            if (!username) {
+                missingFields.push('Username');
+                errors.push('username');
             }
             
             // Recipient Individual specific validation
@@ -591,12 +589,21 @@ const SignUp = () => {
             }
         }
 
-        if (missingFields.length > 0) {
+        if (missingFields.length > 0 || invalidFields.length > 0) {
             setValidationErrors(errors);
-            const fieldsList = missingFields.join(', ');
+            
+            let errorMessage = '';
+            if (missingFields.length > 0) {
+                errorMessage += `Missing required fields:\n• ${missingFields.join('\n• ')}`;
+            }
+            if (invalidFields.length > 0) {
+                if (errorMessage) errorMessage += '\n\n';
+                errorMessage += `Validation errors:\n• ${invalidFields.join('\n• ')}`;
+            }
+            
             Alert.alert(
-                'Missing Required Fields', 
-                `Please fill in the following required fields:\n\n${fieldsList}`,
+                'Validation Errors', 
+                errorMessage,
                 [{ text: 'OK', style: 'default' }]
             );
             return false;
@@ -608,9 +615,15 @@ const SignUp = () => {
     
 
     const handleSignUp = () => {
-        if (!validateRequiredFields()) return;
-        if (!validatePassword()) return;
+        console.log('🚀 DEBUG - Starting signup process...');
+        console.log('Current form validation state before submission');
         
+        if (!validateRequiredFields()) {
+            console.log('❌ DEBUG - Validation failed, stopping signup process');
+            return;
+        }
+        
+        console.log('✅ DEBUG - Validation passed, proceeding to CAPTCHA');
         generateCaptcha(); // Generate a CAPTCHA question
         setIsCaptchaVisible(true); // Show the CAPTCHA modal
     };
@@ -619,6 +632,19 @@ const SignUp = () => {
         if (!handleVerifyCaptcha()) return;
 
         setIsCaptchaVisible(false); // Hide the CAPTCHA modal
+
+        // Debug logs for initial form data validation
+        console.log('🔍 DEBUG - Form data at signup submission:');
+        console.log('userType:', userType);
+        console.log('organizationType:', organizationType);
+        console.log('name:', name, '| isEmpty:', !name || name.trim() === '');
+        console.log('lastName:', lastName, '| isEmpty:', !lastName || lastName.trim() === '');
+        console.log('organizationName:', organizationName, '| isEmpty:', !organizationName || organizationName.trim() === '');
+        console.log('email:', email, '| isEmpty:', !email || email.trim() === '');
+        console.log('password length:', password ? password.length : 0);
+        console.log('address:', address, '| isEmpty:', !address || address.trim() === '');
+        console.log('phoneNumber:', phoneNumber, '| isEmpty:', !phoneNumber || phoneNumber.trim() === '');
+        console.log('country:', country, '| isEmpty:', !country || country.trim() === '');
 
         try {
             let uploadedDocumentData = null;
@@ -650,20 +676,71 @@ const SignUp = () => {
                     }),
                 };
 
+                // Debug logs for donorData validation
+                console.log('🔍 DEBUG - Donor Data validation:');
+                console.log('donorData:', JSON.stringify(donorData, null, 2));
+                console.log('donorData is null/undefined:', donorData === null || donorData === undefined);
+                console.log('donorData is empty object:', Object.keys(donorData).length === 0);
+                
+                // Check for empty/null critical fields
+                const criticalFields = ['DonorName', 'DonorType', 'Email'];
+                criticalFields.forEach(field => {
+                    const value = donorData[field];
+                    console.log(`${field}:`, value, '| isEmpty:', !value || value.trim() === '');
+                });
+
+                const accountUsername = organizationType === 'Individual' ? username : organizationName;
+                console.log('🔍 DEBUG - Account credentials validation:');
+                console.log('accountUsername:', accountUsername, '| isEmpty:', !accountUsername || accountUsername.trim() === '');
+                console.log('password:', password ? '***HIDDEN***' : 'EMPTY/NULL', '| isEmpty:', !password || password.trim() === '');
+
+                // Validate data before sending
+                if (!donorData || Object.keys(donorData).length === 0) {
+                    console.error('❌ ERROR: donorData is null, undefined, or empty');
+                    Alert.alert('Error', 'Donor data is missing. Please try again.');
+                    return;
+                }
+
+                if (!accountUsername || accountUsername.trim() === '') {
+                    console.error('❌ ERROR: username is empty or null');
+                    Alert.alert('Error', 'Username cannot be empty. Please check your username field.');
+                    return;
+                }
+
+                if (!password || password.trim() === '') {
+                    console.error('❌ ERROR: password is empty or null');
+                    Alert.alert('Error', 'Password cannot be empty.');
+                    return;
+                }
+
                 const endpoint = 'users/Donor/register';
 
-                await axios.post(`https://apiv2.medleb.org/${endpoint}`, {
+                const requestPayload = {
                     donorData,
-                    username: organizationType === 'Individual' ? `${name} ${lastName}` : organizationName,
+                    username: accountUsername,
                     password,
-                });
+                };
+
+                // Debug log the exact payload being sent
+                console.log('🔍 DEBUG - Complete request payload for donor registration:');
+                console.log('endpoint:', endpoint);
+                console.log('requestPayload:', JSON.stringify(requestPayload, null, 2));
+                console.log('donorData.Email vs accountUsername comparison:');
+                console.log('donorData.Email:', donorData.Email);
+                console.log('accountUsername:', accountUsername);
+                console.log('Are they the same?:', donorData.Email === accountUsername);
+
+                await axios.post(`https://apiv2.medleb.org/${endpoint}`, requestPayload);
+
+                console.log('✅ DEBUG - Donor registration successful');
             } else if (userType === 'Recipient') {
                 const recipientData = {
                     RecipientName: organizationType === 'Individual' ? `${name} ${lastName}` : organizationName,
                     RecipientType: organizationType,
                     Address: address,
                     City: city,
-                    Country: country,
+                    Country: 'Lebanon', // Always Lebanon for recipients
+                    Email: email,
                     ContactPerson: organizationType === 'organization' ? `${contactPersonFirstName} ${contactPersonLastName}` : '',
                     ContactNumber: `${phoneCountryCode} ${phoneNumber}`,
                     IsActive: null,
@@ -673,15 +750,66 @@ const SignUp = () => {
                     }),
                 };
 
+                // Debug logs for recipientData validation
+                console.log('🔍 DEBUG - Recipient Data validation:');
+                console.log('recipientData:', JSON.stringify(recipientData, null, 2));
+                console.log('recipientData is null/undefined:', recipientData === null || recipientData === undefined);
+                console.log('recipientData is empty object:', Object.keys(recipientData).length === 0);
+                
+                // Check for empty/null critical fields
+                const criticalFields = ['RecipientName', 'RecipientType', 'Email'];
+                criticalFields.forEach(field => {
+                    const value = recipientData[field];
+                    console.log(`${field}:`, value, '| isEmpty:', !value || value.trim() === '');
+                });
+
+                const accountUsername = organizationType === 'Individual' ? username : organizationName;
+                console.log('🔍 DEBUG - Account credentials validation:');
+                console.log('accountUsername:', accountUsername, '| isEmpty:', !accountUsername || accountUsername.trim() === '');
+                console.log('password:', password ? '***HIDDEN***' : 'EMPTY/NULL', '| isEmpty:', !password || password.trim() === '');
+
+                // Validate data before sending
+                if (!recipientData || Object.keys(recipientData).length === 0) {
+                    console.error('❌ ERROR: recipientData is null, undefined, or empty');
+                    Alert.alert('Error', 'Recipient data is missing. Please try again.');
+                    return;
+                }
+
+                if (!accountUsername || accountUsername.trim() === '') {
+                    console.error('❌ ERROR: username is empty or null');
+                    Alert.alert('Error', 'Username cannot be empty. Please check your username field.');
+                    return;
+                }
+
+                if (!password || password.trim() === '') {
+                    console.error('❌ ERROR: password is empty or null');
+                    Alert.alert('Error', 'Password cannot be empty.');
+                    return;
+                }
+
                 const endpoint = 'users/Recipient/register';
 
-                await axios.post(`https://apiv2.medleb.org/${endpoint}`, {
+                const requestPayload = {
                     recipientData,
-                    username: organizationType === 'Individual' ? `${name} ${lastName}` : organizationName,
+                    username: accountUsername,
                     password,
-                });
+                };
+
+                // Debug log the exact payload being sent
+                console.log('🔍 DEBUG - Complete request payload for recipient registration:');
+                console.log('endpoint:', endpoint);
+                console.log('requestPayload:', JSON.stringify(requestPayload, null, 2));
+                console.log('recipientData.Email vs accountUsername comparison:');
+                console.log('recipientData.Email:', recipientData.Email);
+                console.log('accountUsername:', accountUsername);
+                console.log('Are they the same?:', recipientData.Email === accountUsername);
+
+                await axios.post(`https://apiv2.medleb.org/${endpoint}`, requestPayload);
+
+                console.log('✅ DEBUG - Recipient registration successful');
             }
 
+            console.log('🎉 DEBUG - Registration process completed successfully');
             Alert.alert('Success', 'Your Account has been sent for validation', [
                 { text: 'OK', onPress: () => navigation.navigate('SignIn') },
             ]);
@@ -697,13 +825,23 @@ const SignUp = () => {
                 } else if (error.response.status === 400) {
                     errorMessage = error.response.data?.error || error.response.data?.message || "Invalid data provided. Please check all fields."
                 } else if (error.response.status === 409) {
-                    errorMessage = "User already exists. Please try a different username or email."
+                    // Duplicate/Conflict (likely email already used)
+                    errorMessage = "This email is already used somewhere else. Please use another email."
+                    // Mark email field as invalid to highlight it
+                    setValidationErrors(prev => prev.includes('email') ? prev : [...prev, 'email']);
                 } else if (error.response.data?.message) {
                     errorMessage = error.response.data.message
                 } else if (error.response.data?.error) {
                     errorMessage = error.response.data.error
                 } else {
                     errorMessage = `Server error: ${error.response.status}`
+                }
+
+                // Also catch server-provided messages that indicate duplicate email even if status != 409
+                const serverMsg = `${error.response.data?.message || error.response.data?.error || ''}`.toLowerCase();
+                if (serverMsg.includes('email') && (serverMsg.includes('already') || serverMsg.includes('exists') || serverMsg.includes('taken') || serverMsg.includes('duplicate'))) {
+                    errorMessage = "This email is already used somewhere else. Please use another email.";
+                    setValidationErrors(prev => prev.includes('email') ? prev : [...prev, 'email']);
                 }
             } else if (error.request) {
                 // Network error
@@ -822,6 +960,18 @@ const SignUp = () => {
                     if (text.trim()) clearFieldError('lastName');
                 }}
                 placeholder="Last Name"
+                placeholderTextColor="#A9A9A9"
+            />
+
+            <Text style={styles.label}>Username*</Text>
+            <TextInput
+                style={hasFieldError('username') ? styles.inputError : styles.input}
+                value={username}
+                onChangeText={(text) => {
+                    setUsername(text);
+                    if (text.trim()) clearFieldError('username');
+                }}
+                placeholder="Username"
                 placeholderTextColor="#A9A9A9"
             />
 
@@ -1198,107 +1348,57 @@ const SignUp = () => {
 
     const renderRecipientIndividualFields = () => (
         <>
-            <Text style={styles.label}>Country*</Text>
-            <TouchableOpacity 
-                style={styles.countryPickerButton} 
-                onPress={() => setCountryVisible(true)}
-            >
-                <View style={styles.pickerContent}>
-                    <Text style={[styles.countryPickerText, !country && styles.placeholder]}>
-                        {country || 'Select Country'}
-                    </Text>
-                    <View style={styles.pickerIconsContainer}>
-                        {country && (
-                            <TouchableOpacity 
-                                onPress={() => {
-                                    setCountry('');
-                                    setCountryCode('');
-                                }}
-                                style={styles.clearButton}
-                            >
-                                <MaterialCommunityIcons name="close" size={16} color="#000000ff" />
-                            </TouchableOpacity>
-                        )}
-                        <MaterialCommunityIcons name="chevron-down" size={22} color="#000000ff" />
-                    </View>
-                </View>
-            </TouchableOpacity>
-            
-            {countryVisible && (
-                <>
-                    <CountryPicker
-                        show={countryVisible}
-                        onBackdropPress={() => setCountryVisible(false)}
-                        inputPlaceholder="Search countries..."
-                        searchMessage="Search countries..."
-                        enableModalAvoiding={true}
-                        androidWindowSoftInputMode="adjustResize"
-                        excludedCountries={['IL']}
-                        style={{
-                            modal: {
-                                height: '85%',
-                                marginTop: '15%',
-                            },
-                            textInput: { 
-                                height: 48, 
-                                borderRadius: 12, 
-                                paddingHorizontal: 12,
-                                marginHorizontal: 10,
-                                marginTop: 10,
-                                marginBottom: 10,
-                                borderWidth: 1,
-                                borderColor: '#e0e0e0',
-                            },
-                            itemsList: { 
-                                maxHeight: '90%',
-                                paddingHorizontal: 0,
-                            },
-                            countryButtonStyles: {
-                                height: 50,
-                                marginHorizontal: 10,
-                            },
-                        }}
-                        pickerButtonOnPress={(item) => {
-                            onSelectCountry({ name: item.name.en, cca2: item.code });
-                            setCountryVisible(false);
-                        }}
-                    />
-
-                    {/* Overlay close button above the library's modal */}
-                    <Modal visible={countryVisible} transparent animationType="none">
-                        <View style={{ flex: 1 }} pointerEvents="box-none">
-                            <TouchableOpacity
-                                onPress={() => setCountryVisible(false)}
-                                style={styles.countryCloseFab}
-                                activeOpacity={0.8}
-                            >
-                                <MaterialCommunityIcons name="close" size={22} color="#f9f9f9" />
-                            </TouchableOpacity>
-                        </View>
-                    </Modal>
-                </>
-            )}
-
             <Text style={styles.label}>Name*</Text>
             <TextInput
-                style={styles.input}
+                style={hasFieldError('name') ? styles.inputError : styles.input}
                 value={name}
-                onChangeText={setName}
+                onChangeText={(text) => {
+                    setName(text);
+                    if (text.trim()) clearFieldError('name');
+                }}
                 placeholder="First Name"
                 placeholderTextColor="#A9A9A9"
             />
 
             <Text style={styles.label}>Last Name*</Text>
             <TextInput
-                style={styles.input}
+                style={hasFieldError('lastName') ? styles.inputError : styles.input}
                 value={lastName}
-                onChangeText={setLastName}
+                onChangeText={(text) => {
+                    setLastName(text);
+                    if (text.trim()) clearFieldError('lastName');
+                }}
                 placeholder="Last Name"
                 placeholderTextColor="#A9A9A9"
             />
 
+            <Text style={styles.label}>Username*</Text>
+            <TextInput
+                style={hasFieldError('username') ? styles.inputError : styles.input}
+                value={username}
+                onChangeText={(text) => {
+                    setUsername(text);
+                    if (text.trim()) clearFieldError('username');
+                }}
+                placeholder="Username"
+                placeholderTextColor="#A9A9A9"
+            />
+
+            <Text style={styles.label}>Email*</Text>
+            <TextInput
+                style={hasFieldError('email') ? styles.inputError : styles.input}
+                value={email}
+                onChangeText={(text) => {
+                    setEmail(text);
+                    if (text.trim()) clearFieldError('email');
+                }}
+                placeholder="Email"
+                placeholderTextColor="#A9A9A9"
+                keyboardType="email-address"
+            />
+
             <Text style={styles.label}>Phone Number*</Text>
-            <View style={styles.phoneInputContainer}>
+            <View style={hasFieldError('phoneNumber') ? styles.phoneInputContainerError : styles.phoneInputContainer}>
                 <TouchableOpacity 
                     style={styles.countryCodeButton}
                     onPress={() => setPhoneCountryVisible(true)}
@@ -1309,7 +1409,10 @@ const SignUp = () => {
                 <TextInput
                     style={styles.phoneInput}
                     value={phoneNumber}
-                    onChangeText={setPhoneNumber}
+                    onChangeText={(text) => {
+                        setPhoneNumber(text);
+                        if (text.trim()) clearFieldError('phoneNumber');
+                    }}
                     placeholder="Phone Number"
                     placeholderTextColor="#A9A9A9"
                     keyboardType="phone-pad"
@@ -1318,18 +1421,24 @@ const SignUp = () => {
 
             <Text style={styles.label}>Address*</Text>
             <TextInput
-                style={styles.input}
+                style={hasFieldError('address') ? styles.inputError : styles.input}
                 value={address}
-                onChangeText={setAddress}
+                onChangeText={(text) => {
+                    setAddress(text);
+                    if (text.trim()) clearFieldError('address');
+                }}
                 placeholder="Address"
                 placeholderTextColor="#A9A9A9"
             />
 
             <Text style={styles.label}>City*</Text>
             <TextInput
-                style={styles.input}
+                style={hasFieldError('city') ? styles.inputError : styles.input}
                 value={city}
-                onChangeText={setCity}
+                onChangeText={(text) => {
+                    setCity(text);
+                    if (text.trim()) clearFieldError('city');
+                }}
                 placeholder="City"
                 placeholderTextColor="#A9A9A9"
             />
@@ -1338,90 +1447,9 @@ const SignUp = () => {
 
     const renderRecipientOrganizationFields = () => (
         <>
-            <Text style={styles.label}>Country*</Text>
-            <TouchableOpacity 
-                style={styles.countryPickerButton} 
-                onPress={() => setCountryVisible(true)}
-            >
-                <View style={styles.pickerContent}>
-                    <Text style={[styles.countryPickerText, !country && styles.placeholder]}>
-                        {country || 'Select Country'}
-                    </Text>
-                    <View style={styles.pickerIconsContainer}>
-                        {country && (
-                            <TouchableOpacity 
-                                onPress={() => {
-                                    setCountry('');
-                                    setCountryCode('');
-                                }}
-                                style={styles.clearButton}
-                            >
-                                <MaterialCommunityIcons name="close" size={16} color="#000000ff" />
-                            </TouchableOpacity>
-                        )}
-                        <MaterialCommunityIcons name="chevron-down" size={22} color="#000000ff" />
-                    </View>
-                </View>
-            </TouchableOpacity>
-            
-            {countryVisible && (
-                <>
-                    <CountryPicker
-                        show={countryVisible}
-                        onBackdropPress={() => setCountryVisible(false)}
-                        inputPlaceholder="Search countries..."
-                        searchMessage="Search countries..."
-                        enableModalAvoiding={true}
-                        androidWindowSoftInputMode="adjustResize"
-                        excludedCountries={['IL']}
-                        style={{
-                            modal: {
-                                height: '85%',
-                                marginTop: '15%',
-                            },
-                            textInput: { 
-                                height: 48, 
-                                borderRadius: 12, 
-                                paddingHorizontal: 12,
-                                marginHorizontal: 10,
-                                marginTop: 10,
-                                marginBottom: 10,
-                                borderWidth: 1,
-                                borderColor: '#e0e0e0',
-                            },
-                            itemsList: { 
-                                maxHeight: '90%',
-                                paddingHorizontal: 0,
-                            },
-                            countryButtonStyles: {
-                                height: 50,
-                                marginHorizontal: 10,
-                            },
-                        }}
-                        pickerButtonOnPress={(item) => {
-                            onSelectCountry({ name: item.name.en, cca2: item.code });
-                            setCountryVisible(false);
-                        }}
-                    />
-
-                    {/* Overlay close button above the library's modal */}
-                    <Modal visible={countryVisible} transparent animationType="none">
-                        <View style={{ flex: 1 }} pointerEvents="box-none">
-                            <TouchableOpacity
-                                onPress={() => setCountryVisible(false)}
-                                style={styles.countryCloseFab}
-                                activeOpacity={0.8}
-                            >
-                                <MaterialCommunityIcons name="close" size={22} color="#f9f9f9" />
-                            </TouchableOpacity>
-                        </View>
-                    </Modal>
-                </>
-            )}
-
             <Text style={styles.label}>Organization Category*</Text>
             <TouchableOpacity 
-                style={styles.pickerButton} 
+                style={hasFieldError('organizationCategory') ? styles.pickerButtonError : styles.pickerButton} 
                 onPress={() => setCategoryPickerVisible(true)}
             >
                 <View style={styles.pickerContent}>
@@ -1438,6 +1466,7 @@ const SignUp = () => {
                                 onPress={() => {
                                     setOrganizationCategory(null);
                                     setOrganizationSubType(null);
+                                    clearFieldError('organizationCategory');
                                 }}
                                 style={styles.clearButton}
                             >
@@ -1453,7 +1482,7 @@ const SignUp = () => {
                 <>
                     <Text style={styles.label}>Organization Type*</Text>
                     <TouchableOpacity 
-                        style={styles.pickerButton} 
+                        style={hasFieldError('organizationSubType') ? styles.pickerButtonError : styles.pickerButton} 
                         onPress={() => setSubTypePickerVisible(true)}
                     >
                         <View style={styles.pickerContent}>
@@ -1467,7 +1496,10 @@ const SignUp = () => {
                             <View style={styles.pickerIconsContainer}>
                                 {organizationSubType && (
                                     <TouchableOpacity 
-                                        onPress={() => setOrganizationSubType(null)}
+                                        onPress={() => {
+                                            setOrganizationSubType(null);
+                                            clearFieldError('organizationSubType');
+                                        }}
                                         style={styles.clearButton}
                                     >
                                         <MaterialCommunityIcons name="close" size={16} color="#000000ff" />
@@ -1482,9 +1514,12 @@ const SignUp = () => {
 
             <Text style={styles.label}>Organization Name*</Text>
             <TextInput
-                style={styles.input}
+                style={hasFieldError('organizationName') ? styles.inputError : styles.input}
                 value={organizationName}
-                onChangeText={setOrganizationName}
+                onChangeText={(text) => {
+                    setOrganizationName(text);
+                    if (text.trim()) clearFieldError('organizationName');
+                }}
                 placeholder="Organization Name"
                 placeholderTextColor="#A9A9A9"
             />
@@ -1513,8 +1548,21 @@ const SignUp = () => {
                 placeholderTextColor="#A9A9A9"
             />
 
+            <Text style={styles.label}>Email*</Text>
+            <TextInput
+                style={hasFieldError('email') ? styles.inputError : styles.input}
+                value={email}
+                onChangeText={(text) => {
+                    setEmail(text);
+                    if (text.trim()) clearFieldError('email');
+                }}
+                placeholder="Email"
+                placeholderTextColor="#A9A9A9"
+                keyboardType="email-address"
+            />
+
             <Text style={styles.label}>Phone Number*</Text>
-            <View style={styles.phoneInputContainer}>
+            <View style={hasFieldError('phoneNumber') ? styles.phoneInputContainerError : styles.phoneInputContainer}>
                 <TouchableOpacity 
                     style={styles.countryCodeButton}
                     onPress={() => setPhoneCountryVisible(true)}
@@ -1525,7 +1573,10 @@ const SignUp = () => {
                 <TextInput
                     style={styles.phoneInput}
                     value={phoneNumber}
-                    onChangeText={setPhoneNumber}
+                    onChangeText={(text) => {
+                        setPhoneNumber(text);
+                        if (text.trim()) clearFieldError('phoneNumber');
+                    }}
                     placeholder="Phone Number"
                     placeholderTextColor="#A9A9A9"
                     keyboardType="phone-pad"
@@ -1534,18 +1585,24 @@ const SignUp = () => {
 
             <Text style={styles.label}>Address*</Text>
             <TextInput
-                style={styles.input}
+                style={hasFieldError('address') ? styles.inputError : styles.input}
                 value={address}
-                onChangeText={setAddress}
+                onChangeText={(text) => {
+                    setAddress(text);
+                    if (text.trim()) clearFieldError('address');
+                }}
                 placeholder="Address"
                 placeholderTextColor="#A9A9A9"
             />
 
             <Text style={styles.label}>City*</Text>
             <TextInput
-                style={styles.input}
+                style={hasFieldError('city') ? styles.inputError : styles.input}
                 value={city}
-                onChangeText={setCity}
+                onChangeText={(text) => {
+                    setCity(text);
+                    if (text.trim()) clearFieldError('city');
+                }}
                 placeholder="City"
                 placeholderTextColor="#A9A9A9"
             />

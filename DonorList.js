@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, BackHandler, Image,StatusBar } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import SortToggle from './SortToggle';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
@@ -160,8 +161,28 @@ const DonorList = ({ navigation }) => {
                     }
                 }
             } catch (agreementError) {
+                // Handle authentication errors specifically
+                if (agreementError.response?.status === 401) {
+                    Alert.alert(
+                        "Authentication Error", 
+                        "Your session has expired. Please sign in again.",
+                        [
+                            { 
+                                text: "Sign In", 
+                                onPress: () => {
+                                    AsyncStorage.clear()
+                                    navigation.reset({
+                                        index: 0,
+                                        routes: [{ name: 'SignIn' }],
+                                    })
+                                }
+                            }
+                        ]
+                    )
+                    return
+                }
                 // Handle 404 error (no agreements found) as normal case
-                if (agreementError.response && agreementError.response.status === 404) {
+                else if (agreementError.response && agreementError.response.status === 404) {
                     console.log('[DonorList] No agreements found for this donor - showing no donations');
                 } else {
                     console.error('[DonorList] Error checking agreements:', {
@@ -188,6 +209,28 @@ const DonorList = ({ navigation }) => {
                 data: error.response?.data,
             };
             console.error('[DonorList] Error fetching donations:', errInfo);
+            
+            // Handle authentication errors specifically
+            if (error.response?.status === 401) {
+                Alert.alert(
+                    "Authentication Error", 
+                    "Your session has expired. Please sign in again.",
+                    [
+                        { 
+                            text: "Sign In", 
+                            onPress: () => {
+                                AsyncStorage.clear()
+                                navigation.reset({
+                                    index: 0,
+                                    routes: [{ name: 'SignIn' }],
+                                })
+                            }
+                        }
+                    ]
+                )
+                return
+            }
+            
             setError(`Failed to load donations${errInfo.status ? ` (HTTP ${errInfo.status})` : ''}.`);
             Alert.alert("Error", "Failed to load donations.");
         }
@@ -361,17 +404,10 @@ const DonorList = ({ navigation }) => {
                         </View>
                     </View>
 
-                    {/* Separator with inline sort arrows */}
+                    {/* Separator with inline sort toggle (shared) */}
                     <View style={styles.separatorRow}>
                         <Image source={require('./assets/separator-green.png')} style={styles.separatorFlex} />
-                        <View style={styles.sortInline}>
-                            <TouchableOpacity onPress={() => setSortAsc(true)} style={styles.sortIconButton}>
-                                <MaterialCommunityIcons name={'arrow-up'} size={16} color={sortAsc ? '#00A651' : '#A9A9A9'} />
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={() => setSortAsc(false)} style={styles.sortIconButton}>
-                                <MaterialCommunityIcons name={'arrow-down'} size={16} color={!sortAsc ? '#FF8C00' : '#A9A9A9'} />
-                            </TouchableOpacity>
-                        </View>
+                        <SortToggle sortAsc={sortAsc} onToggle={() => setSortAsc(!sortAsc)} />
                     </View>
                     <Text style={styles.resultCount}>number of result(s): {donations.length}</Text>
 
@@ -594,6 +630,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 20,
     height: 39,
+    width: '110%',
     borderWidth: 1,
     borderColor: '#00A651',
     backgroundColor: '#f9f9f9',

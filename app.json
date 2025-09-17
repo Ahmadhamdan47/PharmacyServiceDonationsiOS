@@ -8,14 +8,21 @@
       "backgroundColor": "#f9f9f9"
     },
     "ios": {
-      "bundleIdentifier": "com.anonymous.PharmacyServiceDonations",
+      "bundleIdentifier": "org.name.PharmacyServiceDonations",
       "icon": "./assets/icon/ios-icon.png",
-      "buildNumber": "3.0.0"
+      "buildNumber": "3.0.0",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
-    "version": "3.0.12",
+    "version": "3.0.14",
     "android": {
       "package": "com.anonymous.PharmacyServiceDonations",
-      "icon": "./assets/icon/android-icon.png"
+      "icon": "./assets/icon/android-icon.png",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "extra": {
       "eas": {

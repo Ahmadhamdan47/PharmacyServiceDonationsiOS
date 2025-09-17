@@ -139,9 +139,24 @@ const SignIn = () => {
   
     try {
       const response = await axios.post("https://apiv2.medleb.org/users/login", { username, password })
-      console.log(response.data)
+      console.log('🔍 DEBUG - Login response:', response.data)
+      
       if (response.data.token) {
         const { token, role, email, donorData, recipientData } = response.data
+        
+        // Debug logging for response data
+        console.log('🔍 DEBUG - Login response breakdown:')
+        console.log('token:', token ? '***TOKEN_EXISTS***' : 'NULL')
+        console.log('role:', role)
+        console.log('email:', email)
+        console.log('donorData:', donorData)
+        console.log('recipientData:', recipientData)
+        
+        // Check if email looks like an ID instead of email
+        if (email && !email.includes('@')) {
+          console.log('⚠️ WARNING: Email field appears to be an ID instead of email address!')
+          console.log('Expected email format but got:', email)
+        }
   
         // Store the token, username, and user role temporarily
         await AsyncStorage.setItem("tempToken", token)
@@ -157,13 +172,33 @@ const SignIn = () => {
         }
   
         if (email) {
-          // Store email for OTP verification
-          await AsyncStorage.setItem("tempEmail", email)
+          // Check if email looks like an ID instead of email address
+          let emailToUse = email;
+          if (!email.includes('@')) {
+            console.log('⚠️ WARNING: Email field appears to be an ID, attempting to use username as email')
+            // If username looks like an email, use it instead
+            if (username.includes('@')) {
+              emailToUse = username;
+              console.log('✅ Using username as email for OTP:', emailToUse)
+            } else {
+              console.log('❌ Username is not an email format, cannot proceed with OTP')
+              Alert.alert("Error", "Email information is corrupted in server response. Please contact support.")
+              return;
+            }
+          }
+          
+          // Store the corrected email for OTP verification
+          await AsyncStorage.setItem("tempEmail", emailToUse)
+          
+          console.log('🔍 DEBUG - About to send OTP:')
+          console.log('email being sent to OTP service:', emailToUse)
+          console.log('original username used for login:', username)
+          console.log('email from server response:', email)
   
           try {
             // Send OTP to the user's email
-            const otpResponse = await axios.post("https://apiv2.medleb.org/users/send-otp", { email })
-            console.log("OTP sent response:", otpResponse.data)
+            const otpResponse = await axios.post("https://apiv2.medleb.org/users/send-otp", { email: emailToUse })
+            console.log("✅ OTP sent response:", otpResponse.data)
             setShowOtpInput(true)
           } catch (otpError) {
             console.error("OTP sending error:", otpError)
@@ -256,6 +291,14 @@ const SignIn = () => {
         const tempUserRole = await AsyncStorage.getItem("tempUserRole")
         const tempDonorData = await AsyncStorage.getItem("tempDonorData")
         const tempRecipientData = await AsyncStorage.getItem("tempRecipientData")
+        
+        // Debug logging for stored data
+        console.log('🔍 DEBUG - Data retrieved from temp storage:')
+        console.log('tempToken:', tempToken ? '***TOKEN_EXISTS***' : 'NULL')
+        console.log('tempUsername:', tempUsername)
+        console.log('tempUserRole:', tempUserRole)
+        console.log('tempDonorData:', tempDonorData)
+        console.log('tempRecipientData:', tempRecipientData)
   
         // Move from temp storage to actual storage
         await AsyncStorage.setItem("token", tempToken)
@@ -264,19 +307,28 @@ const SignIn = () => {
         await AsyncStorage.setItem("pinSet", "true")
 
         // Store donor or recipient data permanently
-        if (tempDonorData) {
+        if (tempDonorData && tempDonorData !== 'null') {
+          console.log('✅ DEBUG - Storing donor data permanently')
           await AsyncStorage.setItem("donorData", tempDonorData)
           const parsedDonorData = JSON.parse(tempDonorData)
           if (parsedDonorData.DonorId) {
             await AsyncStorage.setItem("donorId", parsedDonorData.DonorId.toString())
+            console.log('✅ DEBUG - Stored donorId:', parsedDonorData.DonorId)
           }
+        } else {
+          console.log('⚠️ WARNING - No donor data to store (tempDonorData is null or empty)')
         }
-        if (tempRecipientData) {
+        
+        if (tempRecipientData && tempRecipientData !== 'null') {
+          console.log('✅ DEBUG - Storing recipient data permanently')
           await AsyncStorage.setItem("recipientData", tempRecipientData)
           const parsedRecipientData = JSON.parse(tempRecipientData)
           if (parsedRecipientData.RecipientId) {
             await AsyncStorage.setItem("recipientId", parsedRecipientData.RecipientId.toString())
+            console.log('✅ DEBUG - Stored recipientId:', parsedRecipientData.RecipientId)
           }
+        } else {
+          console.log('⚠️ WARNING - No recipient data to store (tempRecipientData is null or empty)')
         }
   
         // Clear temp and OTP-related data

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, StatusBar, BackHandler } from 'react-native';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import BottomNavBarRecipient from './BottomNavBarRecipient'; // Import the BottomNavBar for Recipient
 import * as Font from 'expo-font';
 
@@ -17,6 +18,8 @@ const RecipientAgreements = () => {
     const [isFontLoaded, setIsFontLoaded] = useState(false);
     const [statusFilter, setStatusFilter] = useState('All');
     const [showStatusPicker, setShowStatusPicker] = useState(false);
+    // Sort: true = oldest→newest, false = newest→oldest (default: newest first)
+    const [sortAsc, setSortAsc] = useState(false);
     const [donationTitles, setDonationTitles] = useState({});
 
     const fetchFonts = async () => {
@@ -66,6 +69,20 @@ const RecipientAgreements = () => {
             fetchAgreements();
         }
     }, [recipientId]);
+
+    // Handle Android hardware back button
+    useFocusEffect(
+        React.useCallback(() => {
+            const onBackPress = () => {
+                navigation.navigate('RecipientLanding');
+                return true; // Prevent default back behavior
+            };
+
+            const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+            return () => backHandler.remove();
+        }, [navigation])
+    );
 
     const getUsername = async () => {
         try {
@@ -157,17 +174,29 @@ const RecipientAgreements = () => {
         return (a?.Agreed_Upon || '').toLowerCase() === statusFilter.toLowerCase();
     });
 
+    // Apply sorting based on selected sort option
+    const parseDate = (d) => (d ? Date.parse(d) : 0);
+    const getDate = (obj) => parseDate(obj?.Donation?.DonationDate) || parseDate(obj?.CreatedDate) || parseDate(obj?.created_at) || 0;
+    const sortedAgreements = [...filteredAgreements].sort((a, b) => {
+        const aDate = getDate(a);
+        const bDate = getDate(b);
+        return sortAsc ? (aDate || 0) - (bDate || 0) : (bDate || 0) - (aDate || 0);
+    });
+
     return (
         <View style={styles.container}>
             <StatusBar backgroundColor="#f9f9f9" barStyle="dark-content" />
 
             <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-                {/* Filters Row: Status */}
+                {/* Filters Row: Status + Search */}
                 <View style={styles.filterRow}>
                     <View style={styles.filterColumn}>
                         <Text style={styles.filterLabel}>Status</Text>
                         <TouchableOpacity onPress={() => setShowStatusPicker(!showStatusPicker)} style={styles.filterButton}>
-                            <Text style={styles.filterText}>{statusFilter}</Text>
+                            <View style={styles.pickerContent}>
+                                <Text style={styles.filterText} numberOfLines={1} ellipsizeMode="tail">{statusFilter}</Text>
+                                <MaterialCommunityIcons name={showStatusPicker ? 'chevron-up' : 'chevron-down'} size={20} color="#000000ff" />
+                            </View>
                         </TouchableOpacity>
                         {showStatusPicker && (
                             <View style={styles.dropdown}>
@@ -181,20 +210,39 @@ const RecipientAgreements = () => {
                             </View>
                         )}
                     </View>
+
+                    <View style={styles.filterColumn}>
+                        <Text style={styles.filterLabel}>Search</Text>
+                        <TouchableOpacity style={styles.searchButton} onPress={fetchAgreements}>
+                            <Image source={require('./assets/search.png')} style={[styles.searchIcon, styles.searchIconInline]} />
+                        </TouchableOpacity>
+                    </View>
                 </View>
-    
-                {/* Search Button */}
-                <TouchableOpacity style={styles.searchButton} onPress={fetchAgreements}>
-                    <Image source={require('./assets/search.png')} style={styles.searchIcon} />
-                </TouchableOpacity>
+
+                {/* Separator with inline sort toggle */}
+                <View style={styles.separatorRow}>
+                    <Image source={require('./assets/separator-green.png')} style={styles.separatorFlex} />
+                    <TouchableOpacity 
+                        onPress={() => setSortAsc(!sortAsc)} 
+                        style={styles.sortToggleButton}
+                    >
+                        <MaterialCommunityIcons
+                            name={sortAsc ? 'sort-calendar-descending': 'sort-calendar-ascending'  }
+                            size={18}
+                            color={sortAsc ? '#FF8C00' : '#00A651'}
+                        />
+                        <Text style={[styles.sortToggleText, { color: sortAsc ? '#FF8C00' : '#00A651' }]}>
+                            {sortAsc ? 'Oldest' : 'Newest'}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
 
                 {/* Results Count */}
-                <Image source={require('./assets/separator-green.png')} style={styles.separator} />
-                <Text style={styles.resultCount}>Number of result(s): {filteredAgreements.length}</Text>
+                <Text style={styles.resultCount}>Number of result(s): {sortedAgreements.length}</Text>
 
                 {/* Agreements List */}
                 <ScrollView>
-                    {filteredAgreements.map((agreement, index) => (
+                    {sortedAgreements.map((agreement, index) => (
                         <TouchableOpacity
                             key={index}
                             style={styles.card}
@@ -282,6 +330,41 @@ const styles = StyleSheet.create({
     },
     separator: {
         marginTop: 10,
+    },
+    separatorRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    separatorFlex: {
+        flex: 1,
+        resizeMode: 'contain',
+    },
+    sortToggleButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 15,
+        backgroundColor: '#f0f0f0',
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        marginLeft: 8,
+    },
+    sortToggleText: {
+        fontSize: 12,
+        fontFamily: 'RobotoCondensed-Medium',
+        marginLeft: 4,
+    },
+    searchIconInline: {
+        width: '100%',
+    },
+    pickerContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        width: '100%',
+        paddingHorizontal: 10,
     },
     resultCount: {
         textAlign: 'center',
