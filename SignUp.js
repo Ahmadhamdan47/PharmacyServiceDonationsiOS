@@ -1,5 +1,20 @@
 import React, { useState, useLayoutEffect } from 'react';
-import { View, TextInput, Text, StyleSheet, Alert, Image, TouchableOpacity, ScrollView, Modal, FlatList, Platform } from 'react-native';
+import { 
+    View, 
+    TextInput, 
+    Text, 
+    StyleSheet, 
+    Alert, 
+    Image, 
+    TouchableOpacity, 
+    ScrollView, 
+    Modal, 
+    FlatList, 
+    Platform,
+    TouchableWithoutFeedback,
+    KeyboardAvoidingView,
+    Keyboard,
+} from 'react-native';
 import axios from 'axios';
 import { useNavigation } from '@react-navigation/native';
 import DropDownPicker from 'react-native-dropdown-picker';
@@ -1610,7 +1625,13 @@ const SignUp = () => {
     );
 
     return (
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <KeyboardAvoidingView 
+            style={{ flex: 1 }} 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        >
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                <ScrollView contentContainerStyle={styles.scrollContainer}>
             <View style={styles.container}>
                 <Text style={styles.label}>Sign Up as</Text>
                 <View style={styles.toggleContainer}>
@@ -1825,7 +1846,9 @@ const SignUp = () => {
                     </>
                 )}
             </View>
-        </ScrollView>
+                </ScrollView>
+            </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
     );
 };
 

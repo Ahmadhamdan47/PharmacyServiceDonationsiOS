@@ -4,6 +4,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBar from './BottomNavBar'; // Import BottomNavBar for Donor
 import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomNavBarInspection for Admin
+import BottomNavBarRecipient from './BottomNavBarRecipient'; // Import Recipient BottomNav
 import * as Font from 'expo-font';
 
 const DonationDetails = ({ route, navigation }) => {
@@ -29,33 +30,31 @@ const DonationDetails = ({ route, navigation }) => {
     useEffect(() => {
         fetchUserRole();
         fetchUsername();  // Fetch the username from AsyncStorage
-        // Fetch the user role from AsyncStorage
         fetchBoxes();     // Fetch the boxes data
     }, []);
-    navigation.setOptions({
-        headerTitle: 'List',
-        headerLeft: () => (
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
-               
-                <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
-            </TouchableOpacity>
-        ),
-        headerRight: () => null,
-        headerTitleAlign: 'center',
-        headerTitleStyle: {
-          marginTop: 30, // Add margin top of 42px to the header title
-          position: 'relative', // Ensure the profile container is the reference for positioning the dropdown
-            backgroundColor: '#f9f9f9',
-            fontFamily: 'RobotoCondensed-Bold',
 
-            
-        },
-        headerStyle: {
-          height: 100, // Increase the header height to accommodate the margin
-          backgroundColor: '#f9f9f9',
-      },
-        
-    });
+    React.useLayoutEffect(() => {
+        navigation.setOptions({
+            headerTitle: 'List',
+            headerLeft: () => (
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
+                    <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
+                </TouchableOpacity>
+            ),
+            headerRight: () => null,
+            headerTitleAlign: 'center',
+            headerTitleStyle: {
+                marginTop: 30,
+                position: 'relative',
+                backgroundColor: '#f9f9f9',
+                fontFamily: 'RobotoCondensed-Bold',
+            },
+            headerStyle: {
+                height: 100,
+                backgroundColor: '#f9f9f9',
+            },
+        });
+    }, [navigation]);
     const fetchUserRole = async () => {
         try {
             const role = await AsyncStorage.getItem('userRole');
@@ -165,6 +164,8 @@ const DonationDetails = ({ route, navigation }) => {
             {/* Conditional Bottom Navigation Bar based on user role */}
             {userRole === 'Admin' ? (
                 <BottomNavBarInspection currentScreen="DonationDetails" />
+            ) : userRole === 'Recipient' ? (
+                <BottomNavBarRecipient />
             ) : (
                 <BottomNavBar />
             )}

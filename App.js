@@ -57,6 +57,13 @@ const App = () => {
         
         // Only logout on 401 (Unauthorized) or specific 404 errors that indicate invalid user/token
         if (error.response && error.response.status === 401) {
+          // If the original request didn't include an Authorization header, don't treat it as a session failure
+          const hadAuthHeader = !!error.config?.headers?.Authorization;
+          if (!hadAuthHeader) {
+            console.log('🔐 App.js Interceptor: 401 on unauthenticated request - skipping global logout');
+            return Promise.reject(error);
+          }
+
           console.log('🔐 App.js Interceptor: 401 Unauthorized - logging out user');
           await AsyncStorage.clear();  // Clear the AsyncStorage session
           setIsLoggedIn(false);  // Set the login state to false

@@ -265,71 +265,36 @@ const RecipientList = () => {
             }
 
             console.log('Fetching donations for recipientId:', recipientId);
-            
-            // Let's try without authentication headers first, like RecipientLanding does
-            try {
-                const response = await axios.get(`https://apiv2.medleb.org/donation/byRecipient/${recipientId}`);
-                
-                if (Array.isArray(response.data)) {
-                    // Apply date filters if set
-                    let filteredDonations = response.data;
-                    
-                    if (fromDate || toDate) {
-                        filteredDonations = response.data.filter(donation => {
-                            const donationDate = new Date(donation.DateDonated);
-                            let matchesDate = true;
-                            
-                            if (fromDate && donationDate < fromDate) {
-                                matchesDate = false;
-                            }
-                            if (toDate && donationDate > toDate) {
-                                matchesDate = false;
-                            }
-                            
-                            return matchesDate;
-                        });
-                    }
-                    
-                    setDonations(filteredDonations);
-                    console.log(`Successfully fetched ${filteredDonations.length} donations (${response.data.length} total before filtering)`);
-                } else {
-                    console.error('Unexpected response structure:', response.data);
-                    setDonations([]);
+
+            // Always include auth headers to avoid 401 from protected endpoints
+            const headers = { Authorization: `Bearer ${token}` };
+            const response = await axios.get(`https://apiv2.medleb.org/donation/byRecipient/${recipientId}` , { headers });
+
+            if (Array.isArray(response.data)) {
+                // Apply optional date and status filters if set
+                let filteredDonations = response.data;
+
+                if (fromDate || toDate) {
+                    filteredDonations = filteredDonations.filter(donation => {
+                        const donationDate = new Date(donation.DonationDate || donation.CreatedDate || donation.DateDonated);
+                        let matchesDate = true;
+                        if (fromDate && donationDate < fromDate) matchesDate = false;
+                        if (toDate && donationDate > toDate) matchesDate = false;
+                        return matchesDate;
+                    });
                 }
-            } catch (apiError) {
-                console.log('First attempt failed, trying with auth headers...');
-                // If the first attempt fails, try with authentication headers
-                const headers = { Authorization: `Bearer ${token}` };
-                const response = await axios.get(`https://apiv2.medleb.org/donation/byRecipient/${recipientId}`, {
-                    headers,
-                });
-                
-                if (Array.isArray(response.data)) {
-                    // Apply date filters if set
-                    let filteredDonations = response.data;
-                    
-                    if (fromDate || toDate) {
-                        filteredDonations = response.data.filter(donation => {
-                            const donationDate = new Date(donation.DateDonated);
-                            let matchesDate = true;
-                            
-                            if (fromDate && donationDate < fromDate) {
-                                matchesDate = false;
-                            }
-                            if (toDate && donationDate > toDate) {
-                                matchesDate = false;
-                            }
-                            
-                            return matchesDate;
-                        });
-                    }
-                    
-                    setDonations(filteredDonations);
-                    console.log(`Successfully fetched ${filteredDonations.length} donations (${response.data.length} total before filtering)`);
-                } else {
-                    console.error('Unexpected response structure:', response.data);
-                    setDonations([]);
+
+                if (status && status !== 'All') {
+                    filteredDonations = filteredDonations.filter(donation =>
+                        (donation.status || '').toLowerCase() === status.toLowerCase()
+                    );
                 }
+
+                setDonations(filteredDonations);
+                console.log(`Successfully fetched ${filteredDonations.length} donations (${response.data.length} total before filtering)`);
+            } else {
+                console.error('Unexpected response structure:', response.data);
+                setDonations([]);
             }
         } catch (error) {
             console.error('Error fetching donations:', {

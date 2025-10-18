@@ -10,6 +10,10 @@ import {
     ActivityIndicator,
     Modal,
     FlatList,
+    TouchableWithoutFeedback,
+    KeyboardAvoidingView,
+    Platform,
+    Keyboard,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -345,7 +349,18 @@ const Settings = () => {
                     'Authorization': `Bearer ${token}`
                 }
             });
-            setSubAccounts(response.data.data || []);
+            
+            console.log('Sub-accounts API response:', response.data);
+            const subAccountsData = response.data.data || response.data || [];
+            console.log('Sub-accounts data:', subAccountsData);
+            
+            // Ensure each sub-account has a Permissions array
+            const processedSubAccounts = subAccountsData.map(account => ({
+                ...account,
+                Permissions: Array.isArray(account.Permissions) ? account.Permissions : []
+            }));
+            
+            setSubAccounts(processedSubAccounts);
         } catch (error) {
             console.log('Error loading sub-accounts:', error.response?.status || error.message);
             // Don't show error for 401/403 - just means no sub-accounts or feature not available
@@ -606,12 +621,13 @@ const Settings = () => {
                                 <Text style={styles.loadingText}>Loading sub-accounts...</Text>
                             </View>
                         ) : subAccounts.length > 0 ? (
-                            <FlatList
-                                data={subAccounts}
-                                keyExtractor={(item) => item.UserId.toString()}
-                                renderItem={renderSubAccountItem}
-                                style={styles.subAccountList}
-                            />
+                            <View style={styles.subAccountList}>
+                                {subAccounts.map((item) => (
+                                    <View key={item.UserId.toString()}>
+                                        {renderSubAccountItem({ item })}
+                                    </View>
+                                ))}
+                            </View>
                         ) : (
                             <Text style={styles.noSubAccountsText}>
                                 No sub-accounts created yet. Create sub-accounts to allow other users to access your donor account with limited permissions.
@@ -623,49 +639,61 @@ const Settings = () => {
         );
     };
 
-    const renderSubAccountItem = ({ item }) => (
-        <View style={styles.subAccountItem}>
-            <View style={styles.subAccountInfo}>
-                <Text style={styles.subAccountUsername}>{item.Username}</Text>
-                <Text style={styles.subAccountEmail}>{item.Email}</Text>
-                <View style={styles.permissionsContainer}>
-                    {item.Permissions?.map((permission) => (
-                        <View key={permission} style={styles.permissionChip}>
-                            <Text style={styles.permissionText}>
-                                {permission.replace('_', ' ').toUpperCase()}
-                            </Text>
-                        </View>
-                    ))}
+    const renderSubAccountItem = ({ item }) => {
+        console.log('Rendering sub-account item:', item);
+        
+        // Ensure permissions is an array
+        const permissions = Array.isArray(item.Permissions) ? item.Permissions : [];
+        
+        return (
+            <View style={styles.subAccountItem}>
+                <View style={styles.subAccountInfo}>
+                    <Text style={styles.subAccountUsername}>{item.Username || 'Unknown User'}</Text>
+                    <Text style={styles.subAccountEmail}>{item.Email || 'No Email'}</Text>
+                    <View style={styles.permissionsContainer}>
+                        {permissions.map((permission, index) => (
+                            <View key={`${permission}-${index}`} style={styles.permissionChip}>
+                                <Text style={styles.permissionText}>
+                                    {typeof permission === 'string' ? permission.replace('_', ' ').toUpperCase() : 'UNKNOWN'}
+                                </Text>
+                            </View>
+                        ))}
+                        {permissions.length === 0 && (
+                            <View style={styles.permissionChip}>
+                                <Text style={styles.permissionText}>NO PERMISSIONS</Text>
+                            </View>
+                        )}
+                    </View>
+                </View>
+                <View style={styles.subAccountActions}>
+                    <TouchableOpacity
+                        style={styles.editPermissionsButton}
+                        onPress={() => showPermissionsModal(item)}
+                    >
+                        <Text style={styles.editPermissionsText}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.deactivateButton}
+                        onPress={() => deactivateSubAccount(item.UserId, item.Username)}
+                    >
+                        <Text style={styles.deactivateText}>Deactivate</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
-            <View style={styles.subAccountActions}>
-                <TouchableOpacity
-                    style={styles.editPermissionsButton}
-                    onPress={() => showPermissionsModal(item)}
-                >
-                    <Text style={styles.editPermissionsText}>Edit</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={styles.deactivateButton}
-                    onPress={() => deactivateSubAccount(item.UserId, item.Username)}
-                >
-                    <Text style={styles.deactivateText}>Deactivate</Text>
-                </TouchableOpacity>
-            </View>
-        </View>
-    );
+        );
+    };
 
     const showPermissionsModal = (subAccount) => {
         const availablePermissions = ['view_donations', 'add_donations', 'edit_donations'];
+        const currentPermissions = subAccount.Permissions || [];
         
         Alert.alert(
             'Edit Permissions',
             `Update permissions for ${subAccount.Username}`,
             [
                 ...availablePermissions.map(permission => ({
-                    text: `${subAccount.Permissions?.includes(permission) ? '✓' : '○'} ${permission.replace('_', ' ').toUpperCase()}`,
+                    text: `${currentPermissions.includes(permission) ? '✓' : '○'} ${permission.replace('_', ' ').toUpperCase()}`,
                     onPress: () => {
-                        const currentPermissions = subAccount.Permissions || [];
                         let newPermissions;
                         
                         if (currentPermissions.includes(permission)) {
@@ -691,6 +719,12 @@ const Settings = () => {
         >
             <View style={styles.modalOverlay}>
                 <View style={styles.modalContent}>
+                    <TouchableOpacity 
+                        style={styles.modalCloseButton} 
+                        onPress={() => setShowSubAccountModal(false)}
+                    >
+                        <Text style={styles.modalCloseText}>✕</Text>
+                    </TouchableOpacity>
                     <Text style={styles.modalTitle}>Create Sub-Account</Text>
                     
                     <Text style={styles.label}>Username*</Text>
@@ -959,8 +993,14 @@ const Settings = () => {
     }
 
     return (
-        <>
-            <ScrollView style={styles.container} contentContainerStyle={styles.scrollContainer}>
+        <KeyboardAvoidingView 
+            style={{ flex: 1 }} 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        >
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                <View style={{ flex: 1 }}>
+                    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContainer}>
                 <View style={styles.header}>
                     <Text style={styles.title}>Settings</Text>
                     <Text style={styles.subtitle}>Update your {userRole.toLowerCase()} information</Text>
@@ -986,7 +1026,9 @@ const Settings = () => {
                 </View>
             </ScrollView>
             {renderSubAccountModal()}
-        </>
+                </View>
+            </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
     );
 };
 
@@ -1283,6 +1325,24 @@ const styles = StyleSheet.create({
         padding: 20,
         width: '90%',
         maxHeight: '80%',
+        position: 'relative',
+    },
+    modalCloseButton: {
+        position: 'absolute',
+        top: 10,
+        right: 15,
+        zIndex: 1,
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: 'rgba(0, 0, 0, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalCloseText: {
+        color: '#666',
+        fontSize: 18,
+        fontWeight: 'bold',
     },
     modalTitle: {
         fontSize: 20,

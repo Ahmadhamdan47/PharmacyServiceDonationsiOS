@@ -1,5 +1,19 @@
 import { useState, useEffect } from "react"
-import { View, TextInput, Text, StyleSheet, Alert, Image, TouchableOpacity, StatusBar, KeyboardAvoidingView, ScrollView, Platform, Keyboard } from "react-native"
+import { 
+    View, 
+    TextInput, 
+    Text, 
+    StyleSheet, 
+    Alert, 
+    Image, 
+    TouchableOpacity, 
+    StatusBar, 
+    KeyboardAvoidingView, 
+    ScrollView, 
+    Platform, 
+    Keyboard,
+    TouchableWithoutFeedback,
+} from "react-native"
 import axios from "axios"
 import { useNavigation } from "@react-navigation/native"
 import AsyncStorage from "@react-native-async-storage/async-storage"
@@ -447,7 +461,8 @@ const SignIn = () => {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={KEYBOARD_VERTICAL_OFFSET}
     >
-      <ScrollView 
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView 
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -555,7 +570,8 @@ const SignIn = () => {
           </View>
         )}
       </View>
-    </ScrollView>
+        </ScrollView>
+      </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   )
 }

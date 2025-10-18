@@ -2,7 +2,7 @@ import React, { useEffect, useState, useLayoutEffect } from 'react';
 import { StyleSheet, View, Image, TouchableOpacity, Text, BackHandler, ToastAndroid, ScrollView, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import BottomNavBar from './BottomNavBar'; // Import BottomNavBar
+import BottomNavBarRecipient from './BottomNavBarRecipient'; // Recipient bottom nav
 import HeaderProfile from './HeaderProfile'; // Unified header profile with badge
 import axios from 'axios';
 
@@ -28,7 +28,9 @@ const RecipientLanding = () => {
         const fetchDonations = async () => {
             try {
                 const recipientId = await AsyncStorage.getItem('recipientId');
-                const response = await axios.get(`https://apiv2.medleb.org/donation/byRecipient/${recipientId}`);
+                const token = await AsyncStorage.getItem('token');
+                const headers = token ? { Authorization: `Bearer ${token}` } : {};
+                const response = await axios.get(`https://apiv2.medleb.org/donation/byRecipient/${recipientId}`, { headers });
                 setDonations(response.data);
             } catch (error) {
                 console.error('Failed to fetch donations:', error);
@@ -111,7 +113,7 @@ const RecipientLanding = () => {
 
             <View style={styles.content}>
                 <View style={styles.buttonsContainer}>
-                    <TouchableOpacity onPress={() => navigation.navigate('DonationAgreement')} style={styles.buttonWrapper}>
+                    <TouchableOpacity onPress={() => navigation.navigate('RecipientAgreements')} style={styles.buttonWrapper}>
                         <Image source={require("./assets/donate.png")} style={styles.buttonImage} />
                     </TouchableOpacity>
                 </View>
@@ -127,8 +129,8 @@ const RecipientLanding = () => {
                 </ScrollView>
             </View>
 
-            {/* Bottom navigation bar should always be at the bottom */}
-            <BottomNavBar />
+            {/* Bottom navigation bar for recipient */}
+            <BottomNavBarRecipient />
         </View>
     );
 };

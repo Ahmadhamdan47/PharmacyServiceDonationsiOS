@@ -6,7 +6,9 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
-import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomNavBarInspection
+import BottomNavBarInspection from './BottomNavBarInspection'; // Admin/Inspector nav
+import BottomNavBarRecipient from './BottomNavBarRecipient'; // Recipient nav
+import BottomNavBar from './BottomNavBar'; // Donor nav
 import * as Font from 'expo-font';
 
 const List = () => {
@@ -18,15 +20,14 @@ const List = () => {
     const [donorId, setDonorId] = useState('');
     const [recipientId, setRecipientId] = useState('');
     const [status, setStatus] = useState('All');
-    const [fromDate, setFromDate] = useState(null);
-    const [toDate, setToDate] = useState(null);
-    const [showFromDatePicker, setShowFromDatePicker] = useState(false);
-    const [showToDatePicker, setShowToDatePicker] = useState(false);
+    // Removed date filtering per requirement
     const [showDonorPicker, setShowDonorPicker] = useState(false);
     const [showRecipientPicker, setShowRecipientPicker] = useState(false);
     const [showStatusPicker, setShowStatusPicker] = useState(false);
     const [username, setUsername] = useState('');
-    const [sortAsc, setSortAsc] = useState(true);
+    // Default to newest first (descending)
+    const [sortAsc, setSortAsc] = useState(false);
+    const [userRole, setUserRole] = useState('');
     const scrollViewRef = useRef(null);
     const navigation = useNavigation();
     const [isFontLoaded, setIsFontLoaded] = useState(false);
@@ -47,7 +48,18 @@ const List = () => {
         fetchDonors();
         fetchRecipients();
         getUsername();
+        (async () => {
+            try { const role = await AsyncStorage.getItem('userRole'); if (role) setUserRole(role); } catch {}
+        })();
     }, []);
+
+    // If a recipient lands on this screen, send them to RecipientList which uses the proper endpoint and UI
+    useEffect(() => {
+        if (userRole === 'Recipient') {
+            // Navigate after mount to avoid updating during render
+            try { navigation.replace('RecipientList'); } catch (_) { /* noop */ }
+        }
+    }, [userRole]);
 
     useEffect(() => {
         
@@ -71,6 +83,15 @@ const List = () => {
           },
         });
     }, [navigation, username]);
+
+    // Auto-fetch on mount and whenever filters change (for non-recipient roles)
+    useEffect(() => {
+        if (!userRole || userRole === 'Recipient') return;
+        const id = setTimeout(() => {
+            fetchData();
+        }, 150);
+        return () => clearTimeout(id);
+    }, [userRole, selectedType, donorId, recipientId, status]);
 
 
     const getUsername = async () => {
@@ -97,8 +118,7 @@ const List = () => {
                         donorId,
                         recipientId,
                         status: status === 'All' ? '' : status,
-                        fromDate: fromDate ? fromDate.toISOString().split('T')[0] : '',
-                        toDate: toDate ? toDate.toISOString().split('T')[0] : '',
+                        // Date filters removed
                     },
                 });
 
@@ -110,6 +130,15 @@ const List = () => {
                 }
             } catch (error) {
                 console.error('Error fetching donations:', error);
+                if (error.response?.status === 403) {
+                    // If the user is a Recipient, they don't have access to this endpoint
+                    if (userRole === 'Recipient') {
+                        try {
+                            alert("You don't have permission to view this list. Redirecting to your donations.");
+                        } catch {}
+                        try { navigation.replace('RecipientList'); } catch {}
+                    }
+                }
                 setDonations([]);
             }
         } else {
@@ -119,8 +148,7 @@ const List = () => {
                     headers,
                     params: {
                         status: status === 'All' ? '' : status,
-                        fromDate: fromDate ? fromDate.toISOString().split('T')[0] : '',
-                        toDate: toDate ? toDate.toISOString().split('T')[0] : '',
+                        // Date filters removed
                     },
                 });
 
@@ -161,25 +189,7 @@ const List = () => {
         }
     };
 
-    const renderDatePicker = (type) => {
-        return (
-            <DateTimePicker
-                value={type === 'from' ? (fromDate || new Date()) : (toDate || new Date())}
-                mode="date"
-                display="default"
-                onChange={(event, selectedDate) => {
-                    const currentDate = selectedDate || (type === 'from' ? fromDate : toDate);
-                    if (type === 'from') {
-                        setShowFromDatePicker(false);
-                        setFromDate(currentDate);
-                    } else {
-                        setShowToDatePicker(false);
-                        setToDate(currentDate);
-                    }
-                }}
-            />
-        );
-    };
+    // Date pickers removed
 
     // Add this function to determine the color based on status
     const getStatusColor = (status) => {
@@ -204,25 +214,7 @@ const List = () => {
                 <TouchableOpacity style={styles.typeButton} onPress={() => setSelectedType(selectedType === 'Donations' ? 'Importations' : 'Donations')}>
                     <Text style={styles.typeButtonText}>{selectedType}</Text>
                 </TouchableOpacity>
-
-                {/* First Row: Date Filters */}
-                <View style={styles.dateRangeContainer}>
-                    <TouchableOpacity style={styles.dateContainer} onPress={() => setShowFromDatePicker(true)}>
-                        <Text style={styles.dateText}>From</Text>
-                        <Text style={styles.dateValue}>{fromDate ? fromDate.toISOString().split('T')[0] : '01/01/24'}</Text>
-                    </TouchableOpacity>
-
-                    <View style={styles.dateIcon}>
-                        <Image source={require("./assets/calendar.png")} style={styles.calendarIcon} />
-                    </View>
-
-                    <TouchableOpacity style={styles.dateContainer} onPress={() => setShowToDatePicker(true)}>
-                        <Text style={styles.dateText}>To</Text>
-                        <Text style={styles.dateValue}>{toDate ? toDate.toISOString().split('T')[0] : '01/08/24'}</Text>
-                    </TouchableOpacity>
-                </View>
-                {showFromDatePicker && renderDatePicker('from')}
-                {showToDatePicker && renderDatePicker('to')}    
+                {/* Date filters removed */}
            
 
                 {/* Second Row: Donor & Recipient (for Donations) */}
@@ -304,7 +296,7 @@ const List = () => {
                         )}
                     </View>
                     <View style={styles.filterColumnInline}>
-                        <Text style={styles.filterLabel}>Search</Text>
+                        <Text style={styles.filterLabel}>Refresh</Text>
                         <TouchableOpacity style={styles.searchButton} onPress={fetchData}>
                             <Image source={require('./assets/search.png')} style={[styles.searchIcon, styles.searchIconInline]} />
                         </TouchableOpacity>
@@ -317,12 +309,22 @@ const List = () => {
                     <Image source={require('./assets/separator-green.png')} style={styles.separatorFlex} />
                     <SortToggle sortAsc={sortAsc} onToggle={() => setSortAsc(!sortAsc)} />
                 </View>
-                <Text style={styles.resultCount}>Number of result(s): {selectedType === 'Donations' ? donations.length : importations.length}</Text>
+                {selectedType === 'Donations' ? (
+                    <Text style={styles.resultCount}>
+                        Number of result(s): {donations.filter(d => (d?.NumberOfBoxes || 0) > 0).length}
+                    </Text>
+                ) : (
+                    <Text style={styles.resultCount}>
+                        Number of result(s): {importations.filter(i => (i?.NumberOfBoxes || 0) > 0).length}
+                    </Text>
+                )}
 
                 {/* Data List */}
                 <ScrollView>
                     {selectedType === 'Donations' ? (
-                        [...donations].sort((a,b)=>{
+                        [...donations]
+                        .filter(d => (d?.NumberOfBoxes || 0) > 0)
+                        .sort((a,b)=>{
                             const parse=(d)=> (d? Date.parse(d):0);
                             const ad=parse(a?.DonationDate)||parse(a?.CreatedDate)||0;
                             const bd=parse(b?.DonationDate)||parse(b?.CreatedDate)||0;
@@ -363,7 +365,9 @@ const List = () => {
                             </TouchableOpacity>
                         ))
                     ) : (
-                        [...importations].sort((a,b)=>{
+                        [...importations]
+                        .filter(i => (i?.NumberOfBoxes || 0) > 0)
+                        .sort((a,b)=>{
                             const parse=(d)=> (d? Date.parse(d):0);
                             const ad=parse(a?.ImportationDate)||parse(a?.CreatedDate)||0;
                             const bd=parse(b?.ImportationDate)||parse(b?.CreatedDate)||0;
@@ -407,8 +411,14 @@ const List = () => {
                 </ScrollView>
             </ScrollView>
 
-            {/* Bottom Navigation Bar */}
-            <BottomNavBarInspection currentScreen="List" />
+            {/* Bottom Navigation Bar by role */}
+            {userRole === 'Donor' ? (
+                <BottomNavBar />
+            ) : userRole === 'Recipient' ? (
+                <BottomNavBarRecipient />
+            ) : (
+                <BottomNavBarInspection currentScreen="List" />
+            )}
         </View>
     );
 };
@@ -535,42 +545,7 @@ const styles = StyleSheet.create({
         marginLeft: 10,
      
       },
-      dateRangeContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-       
-        borderWidth: 1,
-        borderColor: '#00A651',
-        borderRadius: 20,
-        paddingVertical: 10,
-        paddingHorizontal: 10,
-        height:45,
-        
-    },
-    dateContainer: {
-        flex: 1,
-        alignItems: 'center',
-    },
-    dateText: {
-        fontSize: 13,
-        fontFamily: 'RobotoCondensed-Bold',        color: '#707070',
-    },
-    dateValue: {
-        fontSize: 13,
-        fontFamily: 'RobotoCondensed-Bold',        color: '#000',
-    },
-    dateIcon: {
-        width: 30,
-        height: 30,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    calendarIcon: {
-        width: 45,
-        height: 44,
-        tintColor: '#00A651',
-        resizeMode:'contain'
-    },
+    // Date UI removed
     filterContainer: {
         marginVertical: 20,
         paddingHorizontal: 10,

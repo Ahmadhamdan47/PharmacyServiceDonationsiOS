@@ -9,8 +9,8 @@ const BottomNavBarRecipient = () => {
 
     // Determine the active route to set icon colors
     const isHomeActive = route.name === 'Landing';
-    const isListActive = route.name === 'List';
-    const isAgreementsActive = route.name === 'Agreements';
+    const isListActive = route.name === 'RecipientList';
+    const isAgreementsActive = route.name === 'RecipientAgreements';
 
     return (
         <View style={styles.container}>
@@ -20,13 +20,13 @@ const BottomNavBarRecipient = () => {
                     style={styles.icon} 
                 />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('List')}>
+            <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('RecipientList')}>
                 <Image 
                     source={isListActive ? require('./assets/list-green.png') : require('./assets/list-grey.png')} 
                     style={styles.icon} 
                 />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Agreements')}>
+            <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('RecipientAgreements')}>
                 <Image 
                     source={isAgreementsActive ? require('./assets/agreements-green.png') : require('./assets/agreements-grey.png')} 
                     style={styles.icon} 

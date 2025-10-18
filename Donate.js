@@ -12,11 +12,14 @@ import {
   BackHandler,
   Modal,
   StatusBar,
+  Linking,
+  TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { CameraView, useCameraPermissions } from "expo-camera"
 import axios from "axios"
-import DropDownPicker from "react-native-dropdown-picker"
 import Icon from "react-native-vector-icons/FontAwesome"
 import { useNavigation } from "@react-navigation/native"
 import * as FileSystem from "expo-file-system"
@@ -53,6 +56,7 @@ const BatchLotForm = React.forwardRef(
       checkDrugNameInAPI,
       openCamera,
       fetchDrugNames,
+      searchDrugByNameInstamed,
       setIsInputFocused,
       setIsDropDownOpen,
       validationErrors,
@@ -143,77 +147,23 @@ const BatchLotForm = React.forwardRef(
         </View>
 
         <FieldLabel label="Drug Name" />
-        <DropDownPicker
+        <TextInput
           ref={inputRefs.drugName}
-          open={form.open}
+          style={[styles.input, validationErrors[index]?.drugName ? styles.inputError : null]}
           value={form.drugName}
-          items={drugItems}
-          setOpen={(open) => {
-            handleFieldChange(index, "open", open)
-            setIsDropDownOpen(open)
-          }}
-          setValue={(callback) => {
-            const originalValue = callback(form.drugName)
-            handleFieldChange(index, "drugName", originalValue)
-            handleFieldChange(index, "drugValid", null)
-
-            const selectedDrug = drugItems.find((item) => item.value === originalValue)
-            if (selectedDrug) {
-              handleFieldChange(index, "form", selectedDrug.drug.pharmaceuticalForm)
-              handleFieldChange(index, "presentation", selectedDrug.drug.presentationLabel)
-
-              const owner = selectedDrug.drug.owner
-              const countryMatch = owner.match(/$$([^)]+)$$/)
-              if (countryMatch) {
-                handleFieldChange(index, "owner", owner.replace(countryMatch[0], "").trim())
-                handleFieldChange(index, "country", countryMatch[1])
-              } else {
-                handleFieldChange(index, "owner", owner.trim())
-                handleFieldChange(index, "country", "France")
-              }
-            }
-          }}
-          onChangeSearchText={(text) => {
-            fetchDrugNames(text)
-          }}
-          setItems={() => {}}
-          searchable={true}
-          placeholder="Select a drug"
-          searchPlaceholder="Search..."
-          arrowIconStyle={{ display: "none" }}
-          style={{
-            borderWidth: 1,
-            borderColor: "#00a651",
-            borderRadius: 20,
-            padding: 5,
-            paddingLeft: 10,
-            minHeight: 50, // Set height to 50px
-            marginBottom: 10,
-            backgroundColor: "#f9f9f9",
-            color: "#000000",
-            marginLeft: 35,
-            marginRight: 35,
-            width: 325,
-          }}
-          dropDownContainerStyle={{
-            backgroundColor: "#f9f9f9",
-            borderWidth: 1,
-            borderColor: "#00a651",
-            borderRadius: 10,
-            width: "90%", // Matches the GTIN input width
-            alignSelf: "center",
-            zIndex: 1000, // Ensures dropdown appears above other elements
-          }}
-          textStyle={{
-            color: "#000000",
-            fontFamily: "RobotoCondensed-Medium",
-          }}
+          onChangeText={(text) => handleFieldChange(index, "drugName", text)}
+          onBlur={() => searchDrugByNameInstamed(index, form.drugName)}
+          onFocus={() => setIsInputFocused(true)}
         />
         {validationErrors[index]?.drugName && (
           <Text style={styles.errorMessage}>{validationErrors[index].drugName}</Text>
         )}
         {form.drugValid && <Icon name="check" size={30} color="green" style={{ marginLeft: 270 }} />}
-        {form.drugValid === false && <Text style={{ color: "red" }}>{form.drugValidationMessage}</Text>}
+        {form.drugValid === false && (
+          <View style={styles.tevaWarning}>
+            <Text style={styles.tevaWarningText}>{form.drugValidationMessage}</Text>
+          </View>
+        )}
 
         <View style={styles.row}>
           <View style={styles.halfWidth}>
@@ -295,6 +245,19 @@ const Donate = ({ route }) => {
     fetchUsername()
   }, [])
 
+  // Proactively request camera permission on mount/open
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!permission || (!permission.granted && permission.canAskAgain !== false)) {
+          await requestPermission()
+        }
+      } catch (e) {
+        console.warn("Camera permission request failed:", e)
+      }
+    })()
+  }, [permission])
+
   useEffect(() => {
     navigation.setOptions({
       headerLeft: () => (
@@ -347,6 +310,114 @@ const Donate = ({ route }) => {
       "RobotoCondensed-Regular": require("./assets/fonts/RobotoCondensed-Regular.ttf"),
     })
     setIsFontLoaded(true)
+  }
+
+  // French BDPM GF API base (specialites)
+  const BDPM_BASE = "https://bdpmgf.vedielaute.fr/api/"
+
+  // Detect disallowed manufacturer (TEVA)
+  const isTeva = (owner) => typeof owner === "string" && /teva/i.test(owner)
+
+  // Extract country in parentheses from owner like: "LAB NAME (France)"
+  const parseOwnerCountry = (owner) => {
+    if (!owner) return { owner: "", country: "France" }
+    const match = String(owner).match(/\(([^)]+)\)/)
+    if (match) {
+      return { owner: String(owner).replace(match[0], "").trim(), country: match[1] }
+    }
+    return { owner: String(owner).trim(), country: "France" }
+  }
+
+  // Heuristic to convert GTIN to CIP13 used by French DB
+  const toCip13 = (gtin) => {
+    if (!gtin) return ""
+    const digits = String(gtin).replace(/\D/g, "")
+    if (digits.length === 14) return digits.slice(1) // drop packaging indicator
+    if (digits.length >= 13) return digits.slice(-13)
+    return digits
+  }
+
+  // Query BDPM GF API by GTIN (cip13) strictly via presentations -> CIS -> specialite
+  const fetchSpecialiteByCip13 = async (code) => {
+    if (!code) return null
+    try {
+      // 1) Search presentations with q=<gtin> to get CIS
+      console.log("BDPM: querying presentations with", code)
+      const presResp = await axios.get(`${BDPM_BASE}medicaments/presentations`, {
+        params: { q: code, limit: 1 },
+      })
+      const dataArr = presResp?.data?.data || presResp?.data || []
+      const first = Array.isArray(dataArr) ? dataArr[0] : null
+      const cis = first?.cis
+      console.log("BDPM: presentations returned cis:", cis)
+      // Fallback: some scans provide GTIN-14; retry with derived CIP13 if no CIS
+      let resolvedCis = cis
+      if (!resolvedCis) {
+        const alt = toCip13(code)
+        if (alt && alt !== code) {
+          console.log("BDPM: retrying presentations with normalized CIP13:", alt)
+          try {
+            const presResp2 = await axios.get(`${BDPM_BASE}medicaments/presentations`, {
+              params: { q: alt, limit: 1 },
+            })
+            const dataArr2 = presResp2?.data?.data || presResp2?.data || []
+            const first2 = Array.isArray(dataArr2) ? dataArr2[0] : null
+            resolvedCis = first2?.cis
+            console.log("BDPM: retry returned cis:", resolvedCis)
+          } catch (innerRetry) {
+            console.log("BDPM: retry with normalized CIP13 failed", innerRetry?.response?.status)
+          }
+        }
+      }
+      if (!resolvedCis) return null
+
+      // 2) Fetch the specialite details using CIS
+      const url = `${BDPM_BASE}medicaments/specialites/${encodeURIComponent(resolvedCis)}`
+      console.log("BDPM: fetching specialite URL:", url)
+      const byCis = await axios.get(url)
+      return byCis?.data || null
+    } catch (e) {
+      console.error("BDPM fetch (presentations -> CIS -> specialite) failed:", e)
+      return null
+    }
+  }
+
+  // Apply specialite fields to a batchLot row
+  const applySpecialiteToForm = (index, sp) => {
+    if (!sp) return
+    const denomination = sp.denomination || ""
+    const form = sp.forme_pharma || ""
+    const presentation = sp.libelle || sp?.presentations?.[0]?.libelle || ""
+    const titulaire = sp.titulaire || ""
+
+    if (isTeva(titulaire)) {
+      Alert.alert("Not Allowed", "This is not accepted to be entered on Lebanese territory.")
+      setBatchLots((prev) => {
+        const updated = [...prev]
+        if (!updated[index]) return prev
+        updated[index].drugValid = false
+        updated[index].drugValidationMessage = "Not accepted in Lebanese territory"
+        const parsed = parseOwnerCountry(titulaire)
+        updated[index].owner = parsed.owner
+        updated[index].country = parsed.country
+        return updated
+      })
+      return
+    }
+
+    const parsed = parseOwnerCountry(titulaire)
+    setBatchLots((prev) => {
+      const updated = [...prev]
+      if (!updated[index]) return prev
+      updated[index].drugName = denomination
+      updated[index].form = form
+      updated[index].presentation = presentation
+      updated[index].owner = parsed.owner
+      updated[index].country = parsed.country
+      updated[index].drugValid = true
+      updated[index].drugValidationMessage = ""
+      return updated
+    })
   }
 
   useEffect(() => {
@@ -456,29 +527,76 @@ const Donate = ({ route }) => {
     }
     return result
   }
-  const excludedOwners = [
-    "TEVA SANTE",
-    "TEVA (PAYS-BAS)",
-    "TEVA PHARMA (PAYS-BAS)",
-    "TEVA (ALLEMAGNE)",
-    "TEVA PHARMA (FRANCE)",
-    "TEVA PHARMA (ALLEMAGNE)",
-    "TEVA",
-  ]
+  const excludedOwners = []
 
   const fetchDrugNames = async (query = "") => {
     try {
-      const response = await axios.get(`https://data.instamed.fr/api/drugs?name=${query}`)
-      const drugsData = response.data["hydra:member"]
-      const filteredDrugsData = drugsData.filter((drug) => !excludedOwners.includes(drug.owner))
+      // Avoid hitting API with empty query (returns 404 on this API)
+      if (!query || query.trim().length < 2) {
+        setDrugItems([])
+        return
+      }
+      const resp = await axios.get(`${BDPM_BASE}specialites/?denomination=${encodeURIComponent(query)}`)
+      const drugsData = Array.isArray(resp.data)
+        ? resp.data
+        : resp.data?.items || resp.data?.results || resp.data?.["hydra:member"] || []
+      const filteredDrugsData = (drugsData || []).filter((drug) => !isTeva(drug?.titulaire))
       const dropdownItems = filteredDrugsData.map((drug, index) => ({
-        label: drug.name,
-        value: `${drug.name}-${index}`,
+        label: drug.denomination,
+        value: `${drug.denomination}-${index}`,
         drug,
       }))
       setDrugItems(dropdownItems)
     } catch (error) {
+      // Gracefully handle 404/no results
+      if (error?.response?.status === 404) {
+        setDrugItems([])
+        return
+      }
       console.error("Error fetching drug names:", error)
+    }
+  }
+
+  // Manual search by drug name using Instamed API when user types name
+  const searchDrugByNameInstamed = async (index, name) => {
+    if (!name || !name.trim()) return
+    try {
+      const resp = await axios.get(`https://data.instamed.fr/api/drugs?name=${encodeURIComponent(name.trim())}`)
+      const items = resp?.data?.["hydra:member"] || []
+      if (!items.length) return
+      // pick the first non-TEVA item
+      const found = items.find((d) => !isTeva(d?.owner)) || items[0]
+      if (!found) return
+      if (isTeva(found.owner)) {
+        // Show styled TEVA message; block auto-fill
+        setBatchLots((prev) => {
+          const updated = [...prev]
+          if (!updated[index]) return prev
+          updated[index].drugValid = false
+          updated[index].drugValidationMessage = "This product is not accepted in Lebanese territory (TEVA)."
+          return updated
+        })
+        Alert.alert(
+          "Not allowed",
+          "The selected manufacturer (TEVA) is not accepted in Lebanese territory. Please choose a different product.",
+        )
+        return
+      }
+      const parsed = parseOwnerCountry(found.owner)
+      setBatchLots((prev) => {
+        const updated = [...prev]
+        if (!updated[index]) return prev
+        updated[index].drugName = found.name || name
+        updated[index].form = found.pharmaceuticalForm || updated[index].form
+        updated[index].presentation = found.presentationLabel || updated[index].presentation
+        updated[index].owner = parsed.owner || updated[index].owner
+        updated[index].country = parsed.country || updated[index].country
+        updated[index].drugValid = true
+        updated[index].drugValidationMessage = ""
+        return updated
+      })
+    } catch (e) {
+      console.error("Instamed name search failed:", e)
     }
   }
 
@@ -537,6 +655,23 @@ const Donate = ({ route }) => {
           })
         }
       }, 100)
+
+      // Auto-fill from French DB using raw GTIN directly as cip13
+      const codeForLookup = response.gtin
+      if (codeForLookup) {
+        console.log("BDPM: starting lookup with GTIN:", codeForLookup)
+        const specialite = await fetchSpecialiteByCip13(codeForLookup)
+        if (specialite) {
+          console.log("BDPM: specialite found for GTIN:", codeForLookup)
+          applySpecialiteToForm(cameraIndex, specialite)
+        } else {
+          console.log("BDPM: no specialite found for GTIN:", codeForLookup)
+          Alert.alert(
+            "Not found",
+            "This GTIN was not found in the French database. You can fill the information manually or search by drug name.",
+          )
+        }
+      }
     } catch (error) {
       console.error("Error checking donation status or parsing scanned data:", error)
       
@@ -629,29 +764,8 @@ const Donate = ({ route }) => {
 
   const handleOpenCamera = async (index) => {
     try {
-      if (!permission) {
-        // Request permission if not granted
-        console.log("Requesting camera permission...")
-        const result = await requestPermission()
-        
-        if (result.granted) {
-          setIsCameraOpen(true)
-          setCameraIndex(index)
-        } else {
-          Alert.alert(
-            "Camera Permission Required", 
-            "Please allow camera access in your device settings to scan barcodes.",
-            [{ text: "OK" }]
-          )
-        }
-      } else if (!permission.granted) {
-        Alert.alert(
-          "Camera Permission Denied", 
-          "Camera permission is required to scan barcodes. Please enable it in your device settings.",
-          [{ text: "OK" }]
-        )
-      } else {
-        // Permission already granted
+      // If already granted, open camera directly
+      if (permission?.granted) {
         const currentRef = batchLotRefs.current[index]
         if (currentRef) {
           currentRef.measureLayout(scrollViewRef.current, (x, y) => {
@@ -660,6 +774,33 @@ const Donate = ({ route }) => {
         }
         setIsCameraOpen(true)
         setCameraIndex(index)
+        return
+      }
+
+      // Request permission when not granted yet
+      console.log("Requesting camera permission...")
+      const result = await requestPermission()
+
+      if (result?.granted) {
+        const currentRef = batchLotRefs.current[index]
+        if (currentRef) {
+          currentRef.measureLayout(scrollViewRef.current, (x, y) => {
+            setScrollPosition(y)
+          })
+        }
+        setIsCameraOpen(true)
+        setCameraIndex(index)
+      } else {
+        const actions = []
+        if (result && result.canAskAgain === false) {
+          actions.push({ text: "Open Settings", onPress: () => Linking.openSettings() })
+        }
+        actions.push({ text: "OK" })
+        Alert.alert(
+          "Camera Permission Required",
+          "Please allow camera access to scan barcodes.",
+          actions
+        )
       }
     } catch (error) {
       console.error("Error opening camera:", error)
@@ -737,80 +878,10 @@ const Donate = ({ route }) => {
     console.log(packCounter)
   }
 
-  const exportToExcel = async (donationData, donorName, recipientName, donationDate) => {
-    try {
-      const tableHead = [
-        "Drug Name",
-        "GTIN",
-        "LOT",
-        "Serial Number",
-        "Expiry Date",
-        "Form",
-        "Presentation",
-        "Owner",
-        "Country",
-        "Donation Date",
-      ]
-      const filteredData = donationData.map((batchLot) => [
-        batchLot.drugName,
-        batchLot.gtin,
-        batchLot.lotNumber,
-        batchLot.serialNumber,
-        batchLot.expiryDate,
-        batchLot.form,
-        batchLot.presentation,
-        batchLot.owner,
-        batchLot.country,
-        batchLot.donationDate,
-      ])
-
-      const ws = XLSX.utils.aoa_to_sheet([tableHead, ...filteredData])
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, "Donations")
-
-      const wscols = [
-        { wch: 20 },
-        { wch: 20 },
-        { wch: 15 },
-        { wch: 20 },
-        { wch: 15 },
-        { wch: 15 },
-        { wch: 20 },
-        { wch: 15 },
-        { wch: 15 },
-        { wch: 20 },
-      ]
-      ws["!cols"] = wscols
-
-      const wbout = XLSX.write(wb, { type: "base64", bookType: "xlsx" })
-
-      const fileName = `${donorName.replace(/[^a-zA-Z0-9]/g, "_")}_${recipientName.replace(/[^a-zA-Z0-9]/g, "_")}_${donationDate.replace(/[^a-zA-Z0-9]/g, "_")}.xlsx`
-      const uri = FileSystem.documentDirectory + fileName
-
-      await FileSystem.writeAsStringAsync(uri, wbout, {
-        encoding: FileSystem.EncodingType.Base64,
-      })
-
-      const shareOptions = {
-        mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        dialogTitle: "Share Donations Excel",
-        UTI: "com.microsoft.excel.xlsx",
-      }
-
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, shareOptions)
-      } else {
-        Alert.alert("Success", "Excel file has been saved to your device's storage.", [{ text: "OK" }])
-      }
-    } catch (error) {
-      console.error("Error exporting to Excel:", error)
-      Alert.alert("Error", `Failed to export to Excel. Please try again. ${error.message}`, [{ text: "OK" }])
-    }
-  }
-
+  // Validate required fields and set field-level errors
   const validateFields = () => {
     let isAllFieldsValid = true
-    const updatedValidationErrors = batchLots.map((batchLot, index) => {
+    const updatedValidationErrors = batchLots.map((batchLot) => {
       const errors = {}
       const requiredFields = [
         "gtin",
@@ -824,7 +895,8 @@ const Donate = ({ route }) => {
         "country",
       ]
       requiredFields.forEach((field) => {
-        if (!batchLot[field] || batchLot[field].trim() === "") {
+        const value = batchLot[field]
+        if (!value || (typeof value === "string" && value.trim() === "")) {
           errors[field] = "This field is required"
           isAllFieldsValid = false
         }
@@ -849,6 +921,13 @@ const Donate = ({ route }) => {
 
   const submitBatchLot = async () => {
     if (!validateFields()) {
+      return
+    }
+
+    // Block TEVA-owned products
+    const tevaFound = batchLots.some((b) => isTeva(b.owner))
+    if (tevaFound) {
+      Alert.alert("Not Allowed", "This is not accepted to be entered on Lebanese territory.")
       return
     }
 
@@ -990,7 +1069,13 @@ const Donate = ({ route }) => {
   }
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={{ flex: 1 }} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.container}>
       {isCameraOpen ? (
         <CameraView
           style={{ ...StyleSheet.absoluteFillObject, height: "100%" }}
@@ -1076,75 +1161,20 @@ const Donate = ({ route }) => {
                 <View style={styles.line} />
               </View>
 
-              <DropDownPicker
-                open={batchLots[0].open}
+              <FieldLabel label="Drug Name" />
+              <TextInput
+                style={[styles.input, validationErrors[0]?.drugName ? styles.inputError : null]}
                 value={batchLots[0].drugName}
-                items={drugItems}
-                setOpen={(open) => {
-                  handleFieldChange(0, "open", open)
-                  setIsDropDownOpen(open)
-                }}
-                setValue={(callback) => {
-                  const originalValue = callback(batchLots[0].drugName)
-                  handleFieldChange(0, "drugName", originalValue)
-                  handleFieldChange(0, "drugValid", null)
-
-                  const selectedDrug = drugItems.find((item) => item.value === originalValue)
-                  if (selectedDrug) {
-                    handleFieldChange(0, "form", selectedDrug.drug.pharmaceuticalForm)
-                    handleFieldChange(0, "presentation", selectedDrug.drug.presentationLabel)
-
-                    const owner = selectedDrug.drug.owner
-                    const countryMatch = owner.match(/$$([^)]+)$$/)
-                    if (countryMatch) {
-                      handleFieldChange(0, "owner", owner.replace(countryMatch[0], "").trim())
-                      handleFieldChange(0, "country", countryMatch[1])
-                    } else {
-                      handleFieldChange(0, "owner", owner.trim())
-                      handleFieldChange(0, "country", "France")
-                    }
-                  }
-                }}
-                onChangeSearchText={(text) => {
-                  fetchDrugNames(text)
-                }}
-                setItems={() => {}}
-                searchable={true}
-                placeholder="Select a drug"
-                searchPlaceholder="Search..."
-                arrowIconStyle={{ display: "none" }}
-                style={{
-                  borderWidth: 1,
-                  borderColor: "#00a651",
-                  borderRadius: 20,
-                  padding: 5,
-                  paddingLeft: 10,
-                  minHeight: 50, // Set height to 50px
-                  marginBottom: 10,
-                  backgroundColor: "#f9f9f9",
-                  color: "#000000",
-                  marginLeft: 35,
-                  marginRight: 35,
-                  width: 325,
-                }}
-                dropDownContainerStyle={{
-                  backgroundColor: "#f9f9f9",
-                  borderWidth: 1,
-                  borderColor: "#00a651",
-                  borderRadius: 10,
-                  width: "90%", // Matches the GTIN input width
-                  alignSelf: "center",
-                  zIndex: 1000, // Ensures dropdown appears above other elements
-                }}
-                textStyle={{
-                  color: "#000000",
-                  fontFamily: "RobotoCondensed-Medium",
-                }}
+                onChangeText={(text) => handleFieldChange(0, "drugName", text)}
+                onBlur={() => searchDrugByNameInstamed(0, batchLots[0].drugName)}
+                onFocus={() => setIsInputFocused(true)}
               />
 
               {batchLots[0].drugValid && <Icon name="check" size={30} color="green" style={{ marginLeft: 270 }} />}
               {batchLots[0].drugValid === false && (
-                <Text style={{ color: "red" }}>{batchLots[0].drugValidationMessage}</Text>
+                <View style={styles.tevaWarning}>
+                  <Text style={styles.tevaWarningText}>{batchLots[0].drugValidationMessage}</Text>
+                </View>
               )}
 
               <View style={styles.detailsContainer}>
@@ -1208,6 +1238,7 @@ const Donate = ({ route }) => {
               checkDrugNameInAPI={checkDrugNameInAPI}
               openCamera={handleOpenCamera}
               fetchDrugNames={fetchDrugNames}
+              searchDrugByNameInstamed={searchDrugByNameInstamed}
               setIsInputFocused={setIsInputFocused}
               setIsDropDownOpen={setIsDropDownOpen}
               validationErrors={validationErrors}
@@ -1244,6 +1275,12 @@ const Donate = ({ route }) => {
       >
         <View style={styles.modalBackground}>
           <View style={styles.modalContainer}>
+            <TouchableOpacity 
+              style={styles.modalCloseButton} 
+              onPress={() => setFinishModalVisible(false)}
+            >
+              <Text style={styles.modalCloseText}>✕</Text>
+            </TouchableOpacity>
             <Text style={styles.modalTitle}>{newPackCount} Packs in this box</Text>
             <Text style={styles.modalSubtitle}>{`"Box ${boxLabelCounter - 1}"`}</Text>
 
@@ -1280,6 +1317,12 @@ const Donate = ({ route }) => {
       >
         <View style={styles.modalBackground}>
           <View style={styles.modalContainer}>
+            <TouchableOpacity 
+              style={styles.modalCloseButton} 
+              onPress={() => setConfirmModalVisible(false)}
+            >
+              <Text style={styles.modalCloseText}>✕</Text>
+            </TouchableOpacity>
             <Text style={styles.modalTitle}>Confirm finish</Text>
             <Text style={styles.modalSubtitle}>Are you sure you want to finish the donation?</Text>
 
@@ -1306,7 +1349,9 @@ const Donate = ({ route }) => {
           </View>
         </View>
       </Modal>
-    </View>
+        </View>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   )
 }
 
@@ -1333,10 +1378,10 @@ const styles = StyleSheet.create({
   },
   barcodeIcon: {
     position: "absolute",
-    right: 0,
-    top: -5,
-    height: 40, // Reduced height
-    width: 40, // Reduced width
+    right: 3,
+    top: 10,
+    height: 35, // Reduced height
+    width: 30, // Reduced width
     justifyContent: "center",
     alignItems: "center",
   },
@@ -1527,6 +1572,24 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: "center",
     height: 300,
+    position: "relative",
+  },
+  modalCloseButton: {
+    position: "absolute",
+    top: 10,
+    right: 15,
+    zIndex: 1,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalCloseText: {
+    color: "#f9f9f9",
+    fontSize: 18,
+    fontWeight: "bold",
   },
   modalTitle: {
     color: "#f9f9f9",
@@ -1611,6 +1674,20 @@ const styles = StyleSheet.create({
     color: "00a651",
     marginLeft: 20,
     marginBottom: 5,
+  },
+  tevaWarning: {
+    backgroundColor: "#ffe6e6",
+    borderColor: "#e60000",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginHorizontal: 35,
+    marginTop: 4,
+  },
+  tevaWarningText: {
+    color: "#e60000",
+    fontFamily: "RobotoCondensed-Bold",
   },
 })
 

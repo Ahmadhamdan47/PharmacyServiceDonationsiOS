@@ -15,7 +15,7 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-    "version": "3.0.14",
+    "version": "3.0.15",
     "android": {
       "package": "com.anonymous.PharmacyServiceDonations",
       "icon": "./assets/icon/android-icon.png",
