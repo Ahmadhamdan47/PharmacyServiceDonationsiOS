@@ -82,7 +82,23 @@ const DonationDetails = ({ route, navigation }) => {
             const headers = token ? { Authorization: `Bearer ${token}` } : {};
             
             const response = await axios.get(`https://apiv2.medleb.org/boxes/byDonation/${donation.DonationId}`, { headers });
-            setBoxes(response.data);
+            const boxesData = response.data;
+            
+            // Fetch actual pack counts from batchserial table for each box
+            const boxesWithActualCounts = await Promise.all(
+                boxesData.map(async (box) => {
+                    try {
+                        const packsResponse = await axios.get(`https://apiv2.medleb.org/batchserial/byBox/${box.BoxId}`, { headers });
+                        const actualPackCount = Array.isArray(packsResponse.data?.data) ? packsResponse.data.data.length : 0;
+                        return { ...box, NumberOfPacks: actualPackCount };
+                    } catch (error) {
+                        console.warn(`Failed to fetch packs for box ${box.BoxId}:`, error);
+                        return box; // Keep original count if fetch fails
+                    }
+                })
+            );
+            
+            setBoxes(boxesWithActualCounts);
         } catch (error) {
             console.error('Error fetching boxes:', error);
             Alert.alert('Error', 'Failed to load boxes.');

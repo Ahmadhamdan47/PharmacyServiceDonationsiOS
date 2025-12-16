@@ -621,13 +621,14 @@ const Settings = () => {
                                 <Text style={styles.loadingText}>Loading sub-accounts...</Text>
                             </View>
                         ) : subAccounts.length > 0 ? (
-                            <View style={styles.subAccountList}>
-                                {subAccounts.map((item) => (
-                                    <View key={item.UserId.toString()}>
-                                        {renderSubAccountItem({ item })}
-                                    </View>
-                                ))}
-                            </View>
+                            <FlatList
+                                style={styles.subAccountList}
+                                data={subAccounts}
+                                keyExtractor={(item) => (item.UserId ? item.UserId.toString() : `${item.Username}-${item.Email}`)}
+                                renderItem={({ item }) => renderSubAccountItem({ item })}
+                                nestedScrollEnabled={true}
+                                showsVerticalScrollIndicator={true}
+                            />
                         ) : (
                             <Text style={styles.noSubAccountsText}>
                                 No sub-accounts created yet. Create sub-accounts to allow other users to access your donor account with limited permissions.

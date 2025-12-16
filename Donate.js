@@ -295,7 +295,7 @@ const Donate = ({ route }) => {
   const [scrollPosition, setScrollPosition] = useState(0)
   const [validationErrors, setValidationErrors] = useState([])
   const [isFormValid, setIsFormValid] = useState(false)
-  const [currentBox, setCurrentBox] = useState(1)
+  const [currentBox, setCurrentBox] = useState(null)
   const [packCount, setPackCount] = useState(0)
   const [boxLabelCounter, setBoxLabelCounter] = useState(1)
   const [packCounter, setPackCounter] = useState(1) // Initialize packCounter with 1
@@ -439,51 +439,8 @@ const Donate = ({ route }) => {
     fetchDrugNames()
   }, [])
 
-  useEffect(() => {
-    const createFirstBox = async () => {
-      try {
-        // Get the authentication token
-        const token = await AsyncStorage.getItem('token');
-        const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        
-        const response = await axios.post("https://apiv2.medleb.org/boxes/add", {
-          DonationId: donationId,
-          BoxLabel: `Box 1`,
-        }, { headers })
-
-        if (response.status === 201) {
-          setCurrentBox(response.data.BoxId)
-          setBoxLabelCounter(2)
-        } else {
-          console.error("Error creating the first box")
-        }
-      } catch (error) {
-        console.error("Error creating the first box:", error)
-        
-        // Handle authentication errors specifically
-        if (error.response?.status === 401) {
-          Alert.alert(
-            "Authentication Error", 
-            "Your session has expired. Please sign in again.",
-            [
-              { 
-                text: "Sign In", 
-                onPress: () => {
-                  AsyncStorage.clear()
-                  navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'SignIn' }],
-                  })
-                }
-              }
-            ]
-          )
-        }
-      }
-    }
-
-    createFirstBox()
-  }, [donationId])
+  // Do NOT auto-create a box on donation start. Boxes are created
+  // only when the user actually submits packs, or explicitly adds a box.
 
   useEffect(() => {
     const keyboardDidHideListener = Keyboard.addListener("keyboardDidHide", () => setIsInputFocused(false))
@@ -938,6 +895,35 @@ const Donate = ({ route }) => {
       const token = await AsyncStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       
+      // Ensure we have a box created for this donation before submitting packs
+      const ensureCurrentBox = async () => {
+        if (currentBox) return currentBox
+        // Compute next unique label from server state
+        const boxesResp = await axios.get(`https://apiv2.medleb.org/boxes/byDonation/${donationId}`, { headers })
+        const existing = Array.isArray(boxesResp.data) ? boxesResp.data : []
+        let nextNumber = 1
+        existing.forEach(b => {
+          const match = typeof b.BoxLabel === 'string' && b.BoxLabel.match(/Box\s+(\d+)/i)
+          if (match) {
+            const n = parseInt(match[1], 10)
+            if (!Number.isNaN(n)) nextNumber = Math.max(nextNumber, n + 1)
+          }
+        })
+        const label = `Box ${nextNumber}`
+        const createResp = await axios.post("https://apiv2.medleb.org/boxes/add", {
+          DonationId: donationId,
+          BoxLabel: label,
+        }, { headers })
+        if (createResp.status === 201) {
+          setCurrentBox(createResp.data.BoxId)
+          setBoxLabelCounter(nextNumber + 1)
+          return createResp.data.BoxId
+        }
+        throw new Error('Failed to create box')
+      }
+
+      const boxIdToUse = await ensureCurrentBox()
+
       const responses = await Promise.all(
         batchLots.map((batchLot) =>
           axios.post("https://apiv2.medleb.org/donation/batchlot", {
@@ -953,20 +939,24 @@ const Donate = ({ route }) => {
             LaboratoryCountry: batchLot.country,
             SerialNumber: batchLot.serialNumber,
             DonationDate: batchLot.donationDate,
-            BoxId: currentBox,
+            BoxId: boxIdToUse,
           }, { headers }),
         ),
       )
 
       if (responses.every((response) => response.status === 200)) {
         console.log("Batch lots submitted successfully.")
-        const newPackCount = packCount + batchLots.length
-        setPackCount(newPackCount)
+        
+        // Query the database to get the actual total count of packs in this box
+        const packsResponse = await axios.get(`https://apiv2.medleb.org/batchserial/byBox/${boxIdToUse}`, { headers });
+        const actualPackCount = Array.isArray(packsResponse.data?.data) ? packsResponse.data.data.length : 0;
+        
+        // Update the box with the actual count from the database
+        await axios.put(`https://apiv2.medleb.org/boxes/${boxIdToUse}`, { NumberOfPacks: actualPackCount }, { headers })
+        console.log(`Box updated with actual pack count: ${actualPackCount}`)
 
-        await axios.put(`https://apiv2.medleb.org/boxes/${currentBox}`, { NumberOfPacks: newPackCount }, { headers })
-        console.log("Box updated with new pack count.")
-
-        setNewPackCount(newPackCount) // Store new pack count in state
+        setPackCount(actualPackCount) // Update local state with actual count
+        setNewPackCount(actualPackCount) // Store actual pack count in state
         setFinishModalVisible(true) // Show the custom modal
       } else {
         console.warn("Some batch lots were not submitted successfully.")
@@ -1006,15 +996,27 @@ const Donate = ({ route }) => {
       // Get the authentication token
       const token = await AsyncStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      
+      // Compute next unique label from server state to avoid duplicates
+      const boxesResp = await axios.get(`https://apiv2.medleb.org/boxes/byDonation/${donationId}`, { headers })
+      const existing = Array.isArray(boxesResp.data) ? boxesResp.data : []
+      let nextNumber = 1
+      existing.forEach(b => {
+        const match = typeof b.BoxLabel === 'string' && b.BoxLabel.match(/Box\s+(\d+)/i)
+        if (match) {
+          const n = parseInt(match[1], 10)
+          if (!Number.isNaN(n)) nextNumber = Math.max(nextNumber, n + 1)
+        }
+      })
+      const label = `Box ${nextNumber}`
+
       const response = await axios.post("https://apiv2.medleb.org/boxes/add", {
         DonationId: donationId,
-        BoxLabel: `Box ${boxLabelCounter}`,
+        BoxLabel: label,
       }, { headers })
 
       if (response.status === 201) {
         setCurrentBox(response.data.BoxId)
-        setBoxLabelCounter((prevCounter) => prevCounter + 1)
+        setBoxLabelCounter(nextNumber + 1)
         setBatchLots([createEmptyBatchLot()])
       } else {
         Alert.alert("Error", "Failed to add a new box.")

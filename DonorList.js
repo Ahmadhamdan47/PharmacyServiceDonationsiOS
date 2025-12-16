@@ -29,6 +29,8 @@ const DonorList = ({ navigation }) => {
     const [sortAsc, setSortAsc] = useState(true); // true = oldest→newest
     // Keep unfiltered list separate
     const [allDonations, setAllDonations] = useState([]);
+    // Map DonationId -> non-empty box count (NumberOfPacks > 0)
+    const [nonEmptyBoxCounts, setNonEmptyBoxCounts] = useState({});
     const fetchFonts = async () => {
       await Font.loadAsync({
         'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
@@ -200,6 +202,13 @@ const DonorList = ({ navigation }) => {
             // Apply current filters immediately
             const filtered = applyFilters(donationsWithAgreements, { fromDate, toDate, status });
             setDonations(filtered);
+
+            // Prefetch non-empty box counts for these donations
+            try {
+                await prefetchNonEmptyBoxCounts(filtered);
+            } catch (e) {
+                console.warn('[DonorList] prefetchNonEmptyBoxCounts failed:', e?.message);
+            }
         } catch (error) {
             const errInfo = {
                 message: error.message,
@@ -235,6 +244,33 @@ const DonorList = ({ navigation }) => {
             Alert.alert("Error", "Failed to load donations.");
         }
         setLoading(false);
+    };
+
+    const prefetchNonEmptyBoxCounts = async (donationsList = []) => {
+        const token = await AsyncStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const ids = Array.from(new Set((donationsList || []).map(d => d?.DonationId).filter(Boolean)));
+        if (ids.length === 0) return;
+        const results = await Promise.allSettled(
+            ids.map(id => axios.get(`https://apiv2.medleb.org/boxes/byDonation/${id}`, { headers }))
+        );
+        const map = {};
+        results.forEach((res, idx) => {
+            const id = ids[idx];
+            if (res.status === 'fulfilled') {
+                const boxes = Array.isArray(res.value?.data) ? res.value.data : [];
+                map[id] = boxes.filter(b => (b?.NumberOfPacks || 0) > 0).length;
+            }
+        });
+        if (Object.keys(map).length) {
+            setNonEmptyBoxCounts(prev => ({ ...prev, ...map }));
+        }
+    };
+
+    const getComputedBoxCount = (donation) => {
+        const id = donation?.DonationId;
+        if (id && nonEmptyBoxCounts[id] != null) return nonEmptyBoxCounts[id];
+        return donation?.NumberOfBoxes ?? 0;
     };
 
     const parseDateSafe = (value) => {
@@ -418,7 +454,7 @@ const DonorList = ({ navigation }) => {
                         </View>
                     )}
                     {(() => {
-                        const filtered = donations.filter(d => (d?.NumberOfBoxes ?? 0) > 0 || ((d?.BatchLotTrackings ?? []).length > 0));
+                        const filtered = donations.filter(d => (getComputedBoxCount(d) ?? 0) > 0 || ((d?.BatchLotTrackings ?? []).length > 0));
                         const toRenderBase = filtered.length > 0 ? filtered : donations;
                         const parse = (d) => (d ? Date.parse(d) : 0);
                         const getDate = (obj) => parse(obj?.DonationDate) || parse(obj?.CreatedDate) || 0;
@@ -466,7 +502,7 @@ const DonorList = ({ navigation }) => {
                                                         <Text style={[styles.cardTitle]}>Date</Text>
                                                         <Text style={[styles.cardText]}>{donation.DonationDate || 'N/A'}</Text>
                                                         <Text style={[styles.cardTitle]}>Boxes/Packs</Text>
-                                                        <Text style={[styles.cardText]}>{donation.NumberOfBoxes ?? 0}/{(donation.BatchLotTrackings ?? []).length}</Text>
+                                                        <Text style={[styles.cardText]}>{getComputedBoxCount(donation)}/{(donation.BatchLotTrackings ?? []).length}</Text>
                                                     </View>
                                                 </View>
                                             </View>

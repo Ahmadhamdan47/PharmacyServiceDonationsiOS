@@ -11,6 +11,7 @@ import * as Font from 'expo-font';
 
 const RecipientList = () => {
     const [donations, setDonations] = useState([]);
+    const [nonEmptyBoxCounts, setNonEmptyBoxCounts] = useState({});
     const [fromDate, setFromDate] = useState(null);
     const [toDate, setToDate] = useState(null);
     const [showFromDatePicker, setShowFromDatePicker] = useState(false);
@@ -292,6 +293,13 @@ const RecipientList = () => {
 
                 setDonations(filteredDonations);
                 console.log(`Successfully fetched ${filteredDonations.length} donations (${response.data.length} total before filtering)`);
+
+                // Prefetch non-empty box counts for these donations
+                try {
+                    await prefetchNonEmptyBoxCounts(filteredDonations);
+                } catch (e) {
+                    console.warn('[RecipientList] prefetchNonEmptyBoxCounts failed:', e?.message);
+                }
             } else {
                 console.error('Unexpected response structure:', response.data);
                 setDonations([]);
@@ -345,6 +353,31 @@ const RecipientList = () => {
             }
             setDonations([]);
         }
+    };
+
+    const prefetchNonEmptyBoxCounts = async (donationsList = []) => {
+        const token = await AsyncStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const ids = Array.from(new Set((donationsList || []).map(d => d?.DonationId).filter(Boolean)));
+        if (ids.length === 0) return;
+        const results = await Promise.allSettled(
+            ids.map(id => axios.get(`https://apiv2.medleb.org/boxes/byDonation/${id}`, { headers }))
+        );
+        const map = {};
+        results.forEach((res, idx) => {
+            const id = ids[idx];
+            if (res.status === 'fulfilled') {
+                const boxes = Array.isArray(res.value?.data) ? res.value.data : [];
+                map[id] = boxes.filter(b => (b?.NumberOfPacks || 0) > 0).length;
+            }
+        });
+        if (Object.keys(map).length) setNonEmptyBoxCounts(prev => ({ ...prev, ...map }));
+    };
+
+    const getComputedBoxCount = (donation) => {
+        const id = donation?.DonationId;
+        if (id && nonEmptyBoxCounts[id] != null) return nonEmptyBoxCounts[id];
+        return donation?.NumberOfBoxes ?? 0;
     };
 
     const renderDatePicker = (type) => {
@@ -475,7 +508,7 @@ const RecipientList = () => {
                                         <Text style={[styles.cardTitle]}>To</Text>
                                         <Text style={[styles.cardText]}>{donation.RecipientName}</Text>
                                         <Text style={[styles.cardTitle]}>Number of Boxes</Text>
-                                        <Text style={styles.cardText}>{donation.NumberOfBoxes || 0}</Text>
+                                        <Text style={styles.cardText}>{getComputedBoxCount(donation)}</Text>
                                     </View>
                                 </View>
                             </View>
