@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, StatusBar, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, StatusBar, Alert, ActivityIndicator } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import SortToggle from './SortToggle';
 import axios from 'axios';
@@ -12,6 +12,7 @@ import * as Font from 'expo-font';
 const RecipientList = () => {
     const [donations, setDonations] = useState([]);
     const [nonEmptyBoxCounts, setNonEmptyBoxCounts] = useState({});
+    const [boxCountsReady, setBoxCountsReady] = useState(false);
     const [fromDate, setFromDate] = useState(null);
     const [toDate, setToDate] = useState(null);
     const [showFromDatePicker, setShowFromDatePicker] = useState(false);
@@ -296,9 +297,12 @@ const RecipientList = () => {
 
                 // Prefetch non-empty box counts for these donations
                 try {
+                    setBoxCountsReady(false);
                     await prefetchNonEmptyBoxCounts(filteredDonations);
                 } catch (e) {
                     console.warn('[RecipientList] prefetchNonEmptyBoxCounts failed:', e?.message);
+                } finally {
+                    setBoxCountsReady(true);
                 }
             } else {
                 console.error('Unexpected response structure:', response.data);
@@ -360,24 +364,51 @@ const RecipientList = () => {
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
         const ids = Array.from(new Set((donationsList || []).map(d => d?.DonationId).filter(Boolean)));
         if (ids.length === 0) return;
-        const results = await Promise.allSettled(
+        
+        // Fetch boxes for all donations
+        const boxResults = await Promise.allSettled(
             ids.map(id => axios.get(`https://apiv2.medleb.org/boxes/byDonation/${id}`, { headers }))
         );
+        
         const map = {};
-        results.forEach((res, idx) => {
+        
+        // For each donation, get actual pack counts from batchserial table
+        for (let idx = 0; idx < boxResults.length; idx++) {
             const id = ids[idx];
-            if (res.status === 'fulfilled') {
-                const boxes = Array.isArray(res.value?.data) ? res.value.data : [];
-                map[id] = boxes.filter(b => (b?.NumberOfPacks || 0) > 0).length;
+            const boxRes = boxResults[idx];
+            
+            if (boxRes.status === 'fulfilled') {
+                const boxes = Array.isArray(boxRes.value?.data) ? boxRes.value.data : [];
+                
+                // Fetch actual pack counts for each box
+                const packCountResults = await Promise.allSettled(
+                    boxes.map(box => 
+                        axios.get(`https://apiv2.medleb.org/batchserial/byBox/${box.BoxId}`, { headers })
+                    )
+                );
+                
+                // Count boxes that have at least one pack
+                let nonEmptyCount = 0;
+                packCountResults.forEach((packRes) => {
+                    if (packRes.status === 'fulfilled') {
+                        const packs = Array.isArray(packRes.value?.data?.data) ? packRes.value.data.data : [];
+                        if (packs.length > 0) {
+                            nonEmptyCount++;
+                        }
+                    }
+                });
+                
+                map[id] = nonEmptyCount;
             }
-        });
+        }
+        
         if (Object.keys(map).length) setNonEmptyBoxCounts(prev => ({ ...prev, ...map }));
     };
 
     const getComputedBoxCount = (donation) => {
         const id = donation?.DonationId;
         if (id && nonEmptyBoxCounts[id] != null) return nonEmptyBoxCounts[id];
-        return donation?.NumberOfBoxes ?? 0;
+        return null; // unknown until counts ready
     };
 
     const renderDatePicker = (type) => {
@@ -472,49 +503,57 @@ const RecipientList = () => {
                     <Image source={require('./assets/separator-green.png')} style={styles.separatorFlex} />
                     <SortToggle sortAsc={sortAsc} onToggle={() => setSortAsc(!sortAsc)} />
                 </View>
-                <Text style={styles.resultCount}>Number of result(s): {donations.length}</Text>
+                <Text style={styles.resultCount}>Number of result(s): {boxCountsReady ? donations.length : '...'}</Text>
 
                 {/* Donations List */}
-                <ScrollView>
-                    {[...donations].sort((a,b)=>{
-                        const parse=(d)=> (d? Date.parse(d):0);
-                        const ad=parse(a?.DonationDate)||parse(a?.CreatedDate)||0;
-                        const bd=parse(b?.DonationDate)||parse(b?.CreatedDate)||0;
-                        return sortAsc? (ad-bd):(bd-ad);
-                    }).map((donation, index) => (
-                        <TouchableOpacity
-                            key={index}
-                            style={styles.card}
-                            onPress={() => navigation.navigate('DonationDetails', { donation })}
-                        >
-                            <View style={styles.cardHeader}>
-                                <Text style={[styles.statusText, { color: getStatusColor(donation.status) }]}>{donation.status}</Text>
-                            </View>
-
-                            <View style={styles.cardContent}>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                    {/* Left Column */}
-                                    <View style={{ flex: 1, marginRight: 10, marginLeft: 10 }}>
-                                        <Text style={[styles.cardTitle]}>Donation Title</Text>
-                                        <Text style={[styles.cardText]}>{donation.DonationTitle}</Text>
-                                        <Text style={[styles.cardTitle]}>Date</Text>
-                                        <Text style={styles.cardText}>{donation.DonationDate}</Text>
+                {!boxCountsReady ? (
+                    <View style={styles.stateContainer}>
+                        <ActivityIndicator size="small" color="#00A651" />
+                        <Text style={styles.emptyText}>Loading box counts...</Text>
+                    </View>
+                ) : (
+                    <ScrollView>
+                        {[...donations]
+                            .sort((a,b)=>{
+                                const parse=(d)=> (d? Date.parse(d):0);
+                                const ad=parse(a?.DonationDate)||parse(a?.CreatedDate)||0;
+                                const bd=parse(b?.DonationDate)||parse(b?.CreatedDate)||0;
+                                return sortAsc? (ad-bd):(bd-ad);
+                            }).map((donation, index) => (
+                                <TouchableOpacity
+                                    key={index}
+                                    style={styles.card}
+                                    onPress={() => navigation.navigate('DonationDetails', { donation })}
+                                >
+                                    <View style={styles.cardHeader}>
+                                        <Text style={[styles.statusText, { color: getStatusColor(donation.status) }]}>{donation.status}</Text>
                                     </View>
 
-                                    {/* Right Column */}
-                                    <View style={{ flex: 1, marginLeft: 10, paddingBottom: 20 }}>
-                                        <Text style={[styles.cardTitle]}>From</Text>
-                                        <Text style={[styles.cardText]}>{donation.DonorName}</Text>
-                                        <Text style={[styles.cardTitle]}>To</Text>
-                                        <Text style={[styles.cardText]}>{donation.RecipientName}</Text>
-                                        <Text style={[styles.cardTitle]}>Number of Boxes</Text>
-                                        <Text style={styles.cardText}>{getComputedBoxCount(donation)}</Text>
+                                    <View style={styles.cardContent}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                            {/* Left Column */}
+                                            <View style={{ flex: 1, marginRight: 10, marginLeft: 10 }}>
+                                                <Text style={[styles.cardTitle]}>Donation Title</Text>
+                                                <Text style={[styles.cardText]}>{donation.DonationTitle}</Text>
+                                                <Text style={[styles.cardTitle]}>Date</Text>
+                                                <Text style={styles.cardText}>{donation.DonationDate}</Text>
+                                            </View>
+
+                                            {/* Right Column */}
+                                            <View style={{ flex: 1, marginLeft: 10, paddingBottom: 20 }}>
+                                                <Text style={[styles.cardTitle]}>From</Text>
+                                                <Text style={[styles.cardText]}>{donation.DonorName}</Text>
+                                                <Text style={[styles.cardTitle]}>To</Text>
+                                                <Text style={[styles.cardText]}>{donation.RecipientName}</Text>
+                                                <Text style={[styles.cardTitle]}>Number of Boxes</Text>
+                                                <Text style={styles.cardText}>{getComputedBoxCount(donation) ?? 0}</Text>
+                                            </View>
+                                        </View>
                                     </View>
-                                </View>
-                            </View>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
+                                </TouchableOpacity>
+                            ))}
+                    </ScrollView>
+                )}
             </ScrollView>
 
             {/* Bottom Navigation Bar */}

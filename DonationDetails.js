@@ -6,6 +6,9 @@ import BottomNavBar from './BottomNavBar'; // Import BottomNavBar for Donor
 import BottomNavBarInspection from './BottomNavBarInspection'; // Import BottomNavBarInspection for Admin
 import BottomNavBarRecipient from './BottomNavBarRecipient'; // Import Recipient BottomNav
 import * as Font from 'expo-font';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import * as XLSX from 'xlsx';
 
 const DonationDetails = ({ route, navigation }) => {
     const { donation } = route.params;
@@ -41,7 +44,11 @@ const DonationDetails = ({ route, navigation }) => {
                     <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
                 </TouchableOpacity>
             ),
-            headerRight: () => null,
+            headerRight: () => (
+                <TouchableOpacity onPress={handleExportAllBoxes}>
+                    <Text style={styles.headerButtonText}>Export as XLS</Text>
+                </TouchableOpacity>
+            ),
             headerTitleAlign: 'center',
             headerTitleStyle: {
                 marginTop: 30,
@@ -54,7 +61,7 @@ const DonationDetails = ({ route, navigation }) => {
                 backgroundColor: '#f9f9f9',
             },
         });
-    }, [navigation]);
+    }, [navigation, boxes]);
     const fetchUserRole = async () => {
         try {
             const role = await AsyncStorage.getItem('userRole');
@@ -75,6 +82,25 @@ const DonationDetails = ({ route, navigation }) => {
             console.error('Error fetching username:', error);
         }
     };
+    const normalizeBoxLabels = (boxes = []) => {
+        const used = new Set();
+        return boxes.map((box) => {
+            const raw = typeof box.BoxLabel === 'string' ? box.BoxLabel : '';
+            const match = raw.match(/Box\s+(\d+)/i);
+            const parsed = match ? parseInt(match[1], 10) : null;
+
+            if (parsed && !Number.isNaN(parsed) && !used.has(parsed)) {
+                used.add(parsed);
+                return { ...box, DisplayLabel: `Box ${parsed}` };
+            }
+
+            let next = 1;
+            while (used.has(next)) next += 1;
+            used.add(next);
+            return { ...box, DisplayLabel: `Box ${next}` };
+        });
+    };
+
     const fetchBoxes = async () => {
         setLoading(true);
         try {
@@ -97,8 +123,12 @@ const DonationDetails = ({ route, navigation }) => {
                     }
                 })
             );
-            
-            setBoxes(boxesWithActualCounts);
+
+            // Ensure unique, sequential labels per donation for legacy data
+            // Keep only non-empty boxes, then normalize labels 1..N
+            const nonEmpty = boxesWithActualCounts.filter(b => (b.NumberOfPacks || 0) > 0);
+            const normalized = normalizeBoxLabels(nonEmpty);
+            setBoxes(normalized);
         } catch (error) {
             console.error('Error fetching boxes:', error);
             Alert.alert('Error', 'Failed to load boxes.');
@@ -107,19 +137,114 @@ const DonationDetails = ({ route, navigation }) => {
     };
 
     const handleBoxPress = (box) => {
+        // Use normalized label if present
+        const displayLabel = box.DisplayLabel || box.BoxLabel;
+
         // Navigate to different screens based on user role
         if (userRole === 'Admin') {
-            navigation.navigate('BoxInspection', { boxId: box.BoxId });
+            navigation.navigate('BoxInspection', { boxId: box.BoxId, displayLabel });
         } else {
             navigation.navigate('BoxDetails', { 
                 box: {
                     BoxId: box.BoxId,
-                    BoxLabel: box.BoxLabel,  // Pass BoxLabel
-                    DonorName: donation.DonorName,  // Assuming donation has DonorName
+                    BoxLabel: box.BoxLabel,
+                    DisplayLabel: displayLabel,
+                    DonorName: donation.DonorName,
                     RecipientName: donation.RecipientName,
-                    DonationTitle: donation.DonationTitle// Pass RecipientName
+                    DonationTitle: donation.DonationTitle
                 }
             });
+        }
+    };
+
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        try {
+            const date = new Date(dateString);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day} ${hours}:${minutes}`;
+        } catch (error) {
+            return 'N/A';
+        }
+    };
+
+    const handleExportAllBoxes = async () => {
+        try {
+            const token = await AsyncStorage.getItem('token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            
+            // Filter to only non-empty boxes
+            const nonEmptyBoxes = boxes.filter(box => (box.NumberOfPacks || 0) > 0);
+            
+            if (nonEmptyBoxes.length === 0) {
+                Alert.alert('No Data', 'There are no boxes to export.');
+                return;
+            }
+
+            // Create a new workbook
+            const wb = XLSX.utils.book_new();
+
+            // For each non-empty box, fetch its data and create a sheet
+            for (const box of nonEmptyBoxes) {
+                try {
+                    const response = await axios.get(`https://apiv2.medleb.org/batchserial/byBox/${box.BoxId}`, { headers });
+                    const batchLots = response.data.data || [];
+
+                    // Prepare data for this box (same structure as BoxDetails export)
+                    const dataForExcel = [
+                        ['Donor Name', 'Recipient Name', 'Donation Title', 'Box Label'],
+                        [donation.DonorName, donation.RecipientName, donation.DonationTitle, box.DisplayLabel || box.BoxLabel],
+                        [],
+                        ['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Status', 'Last Updated'],
+                        ...batchLots.map((lot, index) => [
+                            index + 1,
+                            lot.DrugName || 'N/A',
+                            lot.Presentation || 'N/A',
+                            lot.Form || 'N/A',
+                            lot.Laboratory || 'N/A',
+                            lot.LaboratoryCountry || 'N/A',
+                            `'${lot.GTIN || 'N/A'}`,
+                            lot.BatchNumber || 'N/A',
+                            lot.ExpiryDate || 'N/A',
+                            lot.SerialNumber || 'N/A',
+                            lot.Inspection || 'N/A',
+                            formatDate(lot.lastUpdated)
+                        ])
+                    ];
+
+                    // Create worksheet for this box
+                    const ws = XLSX.utils.aoa_to_sheet(dataForExcel);
+                    
+                    // Use DisplayLabel as sheet name (e.g., "Box 1", "Box 2")
+                    const sheetName = (box.DisplayLabel || box.BoxLabel || `Box ${box.BoxId}`).substring(0, 31); // Excel sheet names max 31 chars
+                    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                } catch (error) {
+                    console.warn(`Failed to fetch data for box ${box.BoxId}:`, error);
+                    // Continue with other boxes even if one fails
+                }
+            }
+
+            // Write workbook to file
+            const wbout = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
+            const fileName = `${donation.DonorName}_${donation.RecipientName}_${donation.DonationTitle}_AllBoxes.xlsx`.replace(/[/\\?%*:|"<>]/g, '-');
+            const uri = `${FileSystem.documentDirectory}${fileName}`;
+            
+            await FileSystem.writeAsStringAsync(uri, wbout, {
+                encoding: 'base64',
+            });
+            
+            if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(uri);
+            } else {
+                Alert.alert('Success', `File saved to ${uri}`);
+            }
+        } catch (error) {
+            console.error('Error exporting all boxes:', error);
+            Alert.alert('Error', 'Failed to export boxes. Please try again.');
         }
     };
 
@@ -145,6 +270,7 @@ const DonationDetails = ({ route, navigation }) => {
         <View style={styles.container}>
             <Text style={styles.subtitle}>To: {donation.RecipientName}</Text>
             <Text style={styles.subtitle}>Date: {donation.DonationDate}</Text>
+            <Text style={styles.subtitle}>Total Packs: {(boxes || []).reduce((sum, b) => sum + (b.NumberOfPacks || 0), 0)}</Text>
     
             {loading ? (
                 <Text>Loading...</Text>
@@ -169,7 +295,7 @@ const DonationDetails = ({ route, navigation }) => {
                         .map((box, index) => (
                             <TouchableOpacity key={index} style={styles.card} onPress={() => handleBoxPress(box)}>
                                 <View style={styles.cardContent}>
-                                    <Text style={styles.cardTitle}>{box.BoxLabel}</Text>
+                                    <Text style={styles.cardTitle}>{box.DisplayLabel || box.BoxLabel}</Text>
                                     <Text style={styles.cardText}>Number of Packs: {box.NumberOfPacks || 0}</Text>
                                 </View>
                             </TouchableOpacity>
@@ -279,6 +405,13 @@ const styles = StyleSheet.create({
         height: 15,
         marginLeft: 10,
         marginTop:30,
+      },
+      headerButtonText: {
+        fontSize: 14,
+        color: '#00A651',
+        marginRight: 15,
+        marginTop: 30,
+        fontFamily: 'RobotoCondensed-Bold',
       },
       startDonationButton: {
         backgroundColor: '#00A651',

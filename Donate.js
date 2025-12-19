@@ -42,6 +42,7 @@ const createEmptyBatchLot = () => ({
   drugValid: null,
   drugValidationMessage: "",
   donationDate: new Date().toISOString(),
+  isNotFoundInFrenchDB: false,
 })
 
 const FieldLabel = ({ label }) => <Text style={styles.fieldLabel}>{label}</Text>
@@ -154,6 +155,7 @@ const BatchLotForm = React.forwardRef(
           onChangeText={(text) => handleFieldChange(index, "drugName", text)}
           onBlur={() => searchDrugByNameInstamed(index, form.drugName)}
           onFocus={() => setIsInputFocused(true)}
+          editable={!form.isNotFoundInFrenchDB}
         />
         {validationErrors[index]?.drugName && (
           <Text style={styles.errorMessage}>{validationErrors[index].drugName}</Text>
@@ -177,6 +179,7 @@ const BatchLotForm = React.forwardRef(
               onChangeText={(text) => handleFieldChange(index, "presentation", text)}
               onFocus={() => setIsInputFocused(true)}
               onBlur={() => setIsInputFocused(false)}
+              editable={!form.isNotFoundInFrenchDB}
             />
           </View>
           <View style={styles.halfWidth}>
@@ -190,6 +193,7 @@ const BatchLotForm = React.forwardRef(
               onChangeText={(text) => handleFieldChange(index, "form", text)}
               onFocus={() => setIsInputFocused(true)}
               onBlur={() => setIsInputFocused(false)}
+              editable={!form.isNotFoundInFrenchDB}
             />
           </View>
         </View>
@@ -205,6 +209,7 @@ const BatchLotForm = React.forwardRef(
               onChangeText={(text) => handleFieldChange(index, "owner", text)}
               onFocus={() => setIsInputFocused(true)}
               onBlur={() => setIsInputFocused(false)}
+              editable={!form.isNotFoundInFrenchDB}
             />
           </View>
           <View style={styles.halfWidth}>
@@ -218,6 +223,7 @@ const BatchLotForm = React.forwardRef(
               onChangeText={(text) => handleFieldChange(index, "country", text)}
               onFocus={() => setIsInputFocused(true)}
               onBlur={() => setIsInputFocused(false)}
+              editable={!form.isNotFoundInFrenchDB}
             />
           </View>
         </View>
@@ -340,55 +346,63 @@ const Donate = ({ route }) => {
   // Query BDPM GF API by GTIN (cip13) strictly via presentations -> CIS -> specialite
   const fetchSpecialiteByCip13 = async (code) => {
     if (!code) return null
-    try {
-      // 1) Search presentations with q=<gtin> to get CIS
-      console.log("BDPM: querying presentations with", code)
-      const presResp = await axios.get(`${BDPM_BASE}medicaments/presentations`, {
-        params: { q: code, limit: 1 },
-      })
-      const dataArr = presResp?.data?.data || presResp?.data || []
-      const first = Array.isArray(dataArr) ? dataArr[0] : null
-      const cis = first?.cis
-      console.log("BDPM: presentations returned cis:", cis)
-      // Fallback: some scans provide GTIN-14; retry with derived CIP13 if no CIS
-      let resolvedCis = cis
-      if (!resolvedCis) {
-        const alt = toCip13(code)
-        if (alt && alt !== code) {
-          console.log("BDPM: retrying presentations with normalized CIP13:", alt)
-          try {
-            const presResp2 = await axios.get(`${BDPM_BASE}medicaments/presentations`, {
-              params: { q: alt, limit: 1 },
-            })
-            const dataArr2 = presResp2?.data?.data || presResp2?.data || []
-            const first2 = Array.isArray(dataArr2) ? dataArr2[0] : null
-            resolvedCis = first2?.cis
-            console.log("BDPM: retry returned cis:", resolvedCis)
-          } catch (innerRetry) {
-            console.log("BDPM: retry with normalized CIP13 failed", innerRetry?.response?.status)
-          }
-        }
-      }
-      if (!resolvedCis) return null
+    const raw = String(code).trim()
+    const candidates = [raw]
+    const normalized = toCip13(raw)
+    if (normalized && normalized !== raw) candidates.push(normalized)
 
-      // 2) Fetch the specialite details using CIS
-      const url = `${BDPM_BASE}medicaments/specialites/${encodeURIComponent(resolvedCis)}`
-      console.log("BDPM: fetching specialite URL:", url)
-      const byCis = await axios.get(url)
-      return byCis?.data || null
-    } catch (e) {
-      console.error("BDPM fetch (presentations -> CIS -> specialite) failed:", e)
-      return null
+    for (const candidate of candidates) {
+      try {
+        console.log("BDPM: querying presentations with", candidate)
+        const presResp = await axios.get(`${BDPM_BASE}medicaments/presentations`, {
+          params: { q: candidate, limit: 10 },
+        })
+        const dataArr = presResp?.data?.data || presResp?.data || []
+        if (!Array.isArray(dataArr) || dataArr.length === 0) {
+          continue
+        }
+
+        // Only accept exact match on cip13/code (never fallback to cip7)
+        const exact = dataArr.find((item) => {
+          const cip13 = String(item?.cip13 || "").trim()
+          const itemCode = String(item?.code || "").trim()
+          return cip13 === candidate || itemCode === candidate
+        })
+
+        const chosen = exact || dataArr[0]
+        const cis = chosen?.cis
+        if (!cis) continue
+
+        const url = `${BDPM_BASE}medicaments/specialites/${encodeURIComponent(cis)}`
+        console.log("BDPM: fetching specialite URL:", url)
+        const byCis = await axios.get(url)
+        if (byCis?.data) {
+          return { ...byCis.data, matchedPresentationCip: exact?.cip13 || candidate }
+        }
+      } catch (e) {
+        console.error("BDPM fetch (presentations -> CIS -> specialite) failed:", e?.message)
+      }
     }
+    return null
   }
 
-  // Apply specialite fields to a batchLot row
-  const applySpecialiteToForm = (index, sp) => {
+  // Apply specialite fields to a batchLot row, matching the scanned GTIN to the correct presentation
+  const applySpecialiteToForm = (index, sp, scannedGtin) => {
     if (!sp) return
     const denomination = sp.denomination || ""
     const form = sp.forme_pharma || ""
-    const presentation = sp.libelle || sp?.presentations?.[0]?.libelle || ""
     const titulaire = sp.titulaire || ""
+
+    const preferredCodes = [String(scannedGtin || "").trim(), toCip13(scannedGtin), String(sp.matchedPresentationCip || "").trim()].filter(Boolean)
+
+    let presentation = sp.libelle || ""
+    if (Array.isArray(sp.presentations) && sp.presentations.length > 0) {
+      const matchedPresentation = sp.presentations.find((p) => {
+        const codes = [String(p?.cip13 || "").trim(), String(p?.code || "").trim()]
+        return preferredCodes.some((c) => codes.includes(c))
+      })
+      presentation = matchedPresentation?.libelle || presentation || sp.presentations[0]?.libelle || ""
+    }
 
     if (isTeva(titulaire)) {
       Alert.alert("Not Allowed", "This is not accepted to be entered on Lebanese territory.")
@@ -620,12 +634,39 @@ const Donate = ({ route }) => {
         const specialite = await fetchSpecialiteByCip13(codeForLookup)
         if (specialite) {
           console.log("BDPM: specialite found for GTIN:", codeForLookup)
-          applySpecialiteToForm(cameraIndex, specialite)
+          applySpecialiteToForm(cameraIndex, specialite, codeForLookup)
         } else {
           console.log("BDPM: no specialite found for GTIN:", codeForLookup)
+          
+          // Mark this form as not found in French DB to disable field editing
+          setBatchLots((prev) => {
+            const updated = [...prev]
+            if (updated[cameraIndex]) {
+              updated[cameraIndex].isNotFoundInFrenchDB = true
+            }
+            return updated
+          })
+          
           Alert.alert(
-            "Not found",
-            "This GTIN was not found in the French database. You can fill the information manually or search by drug name.",
+            "Not Found in Database",
+            "This GTIN was not found in the French database. Please scan again.",
+            [
+              {
+                text: "Scan Again",
+                onPress: () => {
+                  // Clear the not found flag and re-open camera
+                  setBatchLots((prev) => {
+                    const updated = [...prev]
+                    if (updated[cameraIndex]) {
+                      updated[cameraIndex].isNotFoundInFrenchDB = false
+                    }
+                    return updated
+                  })
+                  handleOpenCamera(cameraIndex)
+                },
+              },
+            ],
+            { cancelable: false }
           )
         }
       }
@@ -886,6 +927,26 @@ const Donate = ({ route }) => {
     if (tevaFound) {
       Alert.alert("Not Allowed", "This is not accepted to be entered on Lebanese territory.")
       return
+    }
+
+    // Guard: the same GTIN must always map to the same drug/presentation/owner to avoid cross-contamination on rapid scans
+    const gtinSignatureMap = new Map()
+    for (let i = 0; i < batchLots.length; i++) {
+      const lot = batchLots[i]
+      const gtin = String(lot.gtin || "").trim()
+      if (!gtin) continue
+      const signature = [lot.drugName, lot.form, lot.presentation, lot.owner]
+        .map((v) => String(v || "").trim())
+        .join(" | ")
+      const existing = gtinSignatureMap.get(gtin)
+      if (existing && existing !== signature) {
+        Alert.alert(
+          "Data mismatch detected",
+          `GTIN ${gtin} has conflicting data between entries.\n\nPrevious: ${existing}\nCurrent: ${signature}\n\nPlease rescan to ensure the correct drug is associated with this GTIN.`,
+        )
+        return
+      }
+      gtinSignatureMap.set(gtin, signature)
     }
 
     try {
@@ -1170,6 +1231,7 @@ const Donate = ({ route }) => {
                 onChangeText={(text) => handleFieldChange(0, "drugName", text)}
                 onBlur={() => searchDrugByNameInstamed(0, batchLots[0].drugName)}
                 onFocus={() => setIsInputFocused(true)}
+                editable={!batchLots[0].isNotFoundInFrenchDB}
               />
 
               {batchLots[0].drugValid && <Icon name="check" size={30} color="green" style={{ marginLeft: 270 }} />}
@@ -1190,6 +1252,7 @@ const Donate = ({ route }) => {
                       onChangeText={(text) => handleFieldChange(0, "presentation", text)}
                       onFocus={() => setIsInputFocused(true)}
                       onBlur={() => setIsInputFocused(false)}
+                      editable={!batchLots[0].isNotFoundInFrenchDB}
                     />
                   </View>
                   <View style={styles.halfWidth}>
@@ -1200,6 +1263,7 @@ const Donate = ({ route }) => {
                       onChangeText={(text) => handleFieldChange(0, "form", text)}
                       onFocus={() => setIsInputFocused(true)}
                       onBlur={() => setIsInputFocused(false)}
+                      editable={!batchLots[0].isNotFoundInFrenchDB}
                     />
                   </View>
                 </View>
@@ -1214,6 +1278,7 @@ const Donate = ({ route }) => {
                       onChangeText={(text) => handleFieldChange(0, "owner", text)}
                       onFocus={() => setIsInputFocused(true)}
                       onBlur={() => setIsInputFocused(false)}
+                      editable={!batchLots[0].isNotFoundInFrenchDB}
                     />
                   </View>
                   <View style={styles.halfWidth}>
@@ -1224,6 +1289,7 @@ const Donate = ({ route }) => {
                       onChangeText={(text) => handleFieldChange(0, "country", text)}
                       onFocus={() => setIsInputFocused(true)}
                       onBlur={() => setIsInputFocused(false)}
+                      editable={!batchLots[0].isNotFoundInFrenchDB}
                     />
                   </View>
                 </View>

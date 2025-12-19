@@ -15,6 +15,7 @@ const List = () => {
     const [donations, setDonations] = useState([]);
     const [importations, setImportations] = useState([]);
     const [nonEmptyBoxCounts, setNonEmptyBoxCounts] = useState({}); // DonationId -> count of boxes with packs
+    const [boxCountsReady, setBoxCountsReady] = useState(false);
     const [donors, setDonors] = useState([]);
     const [recipients, setRecipients] = useState([]);
     const [selectedType, setSelectedType] = useState('Donations'); // New: Donations or Importations
@@ -127,9 +128,12 @@ const List = () => {
                     setDonations(response.data);
                     // Prefetch non-empty box counts for display
                     try {
+                        setBoxCountsReady(false);
                         await prefetchNonEmptyBoxCounts(response.data);
                     } catch (e) {
                         console.warn('[List] prefetchNonEmptyBoxCounts failed:', e?.message);
+                    } finally {
+                        setBoxCountsReady(true);
                     }
                 } else {
                     console.error('Unexpected response format:', response.data);
@@ -194,7 +198,7 @@ const List = () => {
     const getComputedBoxCount = (donation) => {
         const id = donation?.DonationId;
         if (id && nonEmptyBoxCounts[id] != null) return nonEmptyBoxCounts[id];
-        return donation?.NumberOfBoxes ?? 0;
+        return null; // unknown until counts ready
     };
                         
 
@@ -344,7 +348,7 @@ const List = () => {
                 </View>
                 {selectedType === 'Donations' ? (
                     <Text style={styles.resultCount}>
-                        Number of result(s): {donations.filter(d => (getComputedBoxCount(d) || 0) > 0).length}
+                        Number of result(s): {boxCountsReady ? donations.length : '...'}
                     </Text>
                 ) : (
                     <Text style={styles.resultCount}>
@@ -353,95 +357,100 @@ const List = () => {
                 )}
 
                 {/* Data List */}
-                <ScrollView>
-                    {selectedType === 'Donations' ? (
-                        [...donations]
-                        .filter(d => (getComputedBoxCount(d) || 0) > 0)
-                        .sort((a,b)=>{
-                            const parse=(d)=> (d? Date.parse(d):0);
-                            const ad=parse(a?.DonationDate)||parse(a?.CreatedDate)||0;
-                            const bd=parse(b?.DonationDate)||parse(b?.CreatedDate)||0;
-                            return sortAsc? (ad-bd):(bd-ad);
-                        }).map((donation, index) => (
-                            <TouchableOpacity 
-                                key={index} 
-                                style={styles.card} 
-                                onPress={() => navigation.navigate('DonationDetails', { donation })}
-                            >
-                                <View style={styles.cardHeader}>
-                                    <Text style={[styles.statusText, { color: getStatusColor(donation.status) }]}>{donation.status}</Text>
-                                </View>
+                {!boxCountsReady && selectedType === 'Donations' ? (
+                    <View style={styles.stateContainer}>
+                        <Text style={styles.emptyText}>Loading box counts...</Text>
+                    </View>
+                ) : (
+                    <ScrollView>
+                        {selectedType === 'Donations' ? (
+                            [...donations]
+                            .sort((a,b)=>{
+                                const parse=(d)=> (d? Date.parse(d):0);
+                                const ad=parse(a?.DonationDate)||parse(a?.CreatedDate)||0;
+                                const bd=parse(b?.DonationDate)||parse(b?.CreatedDate)||0;
+                                return sortAsc? (ad-bd):(bd-ad);
+                            }).map((donation, index) => (
+                                <TouchableOpacity 
+                                    key={index} 
+                                    style={styles.card} 
+                                    onPress={() => navigation.navigate('DonationDetails', { donation })}
+                                >
+                                    <View style={styles.cardHeader}>
+                                        <Text style={[styles.statusText, { color: getStatusColor(donation.status) }]}>{donation.status}</Text>
+                                    </View>
+                                    
+                                    <View style={styles.cardContent}>
+                                        {/* Two columns: left for Donation Title and Date, right for From, To, and Number of boxes */}
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                            
+                                            {/* Left column */}
+                                            <View style={{ flex: 1, marginRight: 10, marginLeft: 10,}}>
+                                                <Text style={[styles.cardTitle, ]}>Donation Title</Text>
+                                                <Text style={[styles.cardText, ]}>{donation.DonationTitle}</Text>
+                                                <Text style={[styles.cardTitle, ]}>Date</Text>
+                                                <Text style={styles.cardText}>{donation.DonationDate}</Text>
+                                            </View>
                                 
-                                <View style={styles.cardContent}>
-                                    {/* Two columns: left for Donation Title and Date, right for From, To, and Number of boxes */}
-                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                        
-                                        {/* Left column */}
-                                        <View style={{ flex: 1, marginRight: 10, marginLeft: 10,}}>
-                                            <Text style={[styles.cardTitle, ]}>Donation Title</Text>
-                                            <Text style={[styles.cardText, ]}>{donation.DonationTitle}</Text>
-                                            <Text style={[styles.cardTitle, ]}>Date</Text>
-                                            <Text style={styles.cardText}>{donation.DonationDate}</Text>
-                                        </View>
-                            
-                                        {/* Right column */}
-                                        <View style={{ flex: 1, marginLeft: 10, paddingBottom:20, }}>
-                                            <Text style={[styles.cardTitle, ]}>From</Text>
-                                            <Text style={[styles.cardText, ]}>{donation.DonorName}</Text>
-                                            <Text style={[styles.cardTitle, ]}>To</Text>
-                                            <Text style={[styles.cardText, ]}>{donation.RecipientName}</Text>
-                                            <Text style={[styles.cardTitle,]}>nb of box(es)</Text>
-                                            <Text style={styles.cardText}>{getComputedBoxCount(donation)}</Text>
+                                            {/* Right column */}
+                                            <View style={{ flex: 1, marginLeft: 10, paddingBottom:20, }}>
+                                                <Text style={[styles.cardTitle, ]}>From</Text>
+                                                <Text style={[styles.cardText, ]}>{donation.DonorName}</Text>
+                                                <Text style={[styles.cardTitle, ]}>To</Text>
+                                                <Text style={[styles.cardText, ]}>{donation.RecipientName}</Text>
+                                                <Text style={[styles.cardTitle,]}>nb of box(es)</Text>
+                                                <Text style={styles.cardText}>{getComputedBoxCount(donation) ?? 0}</Text>
+                                            </View>
                                         </View>
                                     </View>
-                                </View>
-                            </TouchableOpacity>
-                        ))
-                    ) : (
-                        [...importations]
-                        .filter(i => (i?.NumberOfBoxes || 0) > 0)
-                        .sort((a,b)=>{
-                            const parse=(d)=> (d? Date.parse(d):0);
-                            const ad=parse(a?.ImportationDate)||parse(a?.CreatedDate)||0;
-                            const bd=parse(b?.ImportationDate)||parse(b?.CreatedDate)||0;
-                            return sortAsc? (ad-bd):(bd-ad);
-                        }).map((importation, index) => (
-                            <TouchableOpacity 
-                                key={index} 
-                                style={styles.card} 
-                                onPress={() => navigation.navigate('ImportationDetails', { importation })}
-                            >
-                                <View style={styles.cardHeader}>
-                                    <Text style={[styles.statusText, { color: getStatusColor(importation.status) }]}>{importation.status}</Text>
-                                </View>
+                                </TouchableOpacity>
+                            ))
+                        ) : (
+                            [...importations]
+                            .filter(i => (i?.NumberOfBoxes || 0) > 0)
+                            .sort((a,b)=>{
+                                const parse=(d)=> (d? Date.parse(d):0);
+                                const ad=parse(a?.ImportationDate)||parse(a?.CreatedDate)||0;
+                                const bd=parse(b?.ImportationDate)||parse(b?.CreatedDate)||0;
+                                return sortAsc? (ad-bd):(bd-ad);
+                            }).map((importation, index) => (
+                                <TouchableOpacity 
+                                    key={index} 
+                                    style={styles.card} 
+                                    onPress={() => navigation.navigate('ImportationDetails', { importation })}
+                                >
+                                    <View style={styles.cardHeader}>
+                                        <Text style={[styles.statusText, { color: getStatusColor(importation.status) }]}>{importation.status}</Text>
+                                    </View>
+                                    
+                                    <View style={styles.cardContent}>
+                                        {/* Two columns: left for Importation Title and Date, right for Company and Number of boxes */}
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                            
+                                            {/* Left column */}
+                                            <View style={{ flex: 1, marginRight: 10, marginLeft: 10,}}>
+                                                <Text style={[styles.cardTitle, ]}>Importation Title</Text>
+                                                <Text style={[styles.cardText, ]}>{importation.ImportationTitle || 'N/A'}</Text>
+                                                <Text style={[styles.cardTitle, ]}>Date</Text>
+                                                <Text style={styles.cardText}>{importation.ImportationDate || importation.CreatedDate}</Text>
+                                            </View>
                                 
-                                <View style={styles.cardContent}>
-                                    {/* Two columns: left for Importation Title and Date, right for Company and Number of boxes */}
-                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                        
-                                        {/* Left column */}
-                                        <View style={{ flex: 1, marginRight: 10, marginLeft: 10,}}>
-                                            <Text style={[styles.cardTitle, ]}>Importation Title</Text>
-                                            <Text style={[styles.cardText, ]}>{importation.ImportationTitle || 'N/A'}</Text>
-                                            <Text style={[styles.cardTitle, ]}>Date</Text>
-                                            <Text style={styles.cardText}>{importation.ImportationDate || importation.CreatedDate}</Text>
-                                        </View>
-                            
-                                        {/* Right column */}
-                                        <View style={{ flex: 1, marginLeft: 10, paddingBottom:20, }}>
-                                            <Text style={[styles.cardTitle, ]}>Company</Text>
-                                            <Text style={[styles.cardText, ]}>{importation.CompanyName || 'N/A'}</Text>
-                                            <Text style={[styles.cardTitle, ]}>Country</Text>
-                                            <Text style={[styles.cardText, ]}>{importation.CountryName || 'N/A'}</Text>
-                                            <Text style={[styles.cardTitle,]}>nb of box(es)</Text>
-                                            <Text style={styles.cardText}>{importation.NumberOfBoxes || 0}</Text>
+                                            {/* Right column */}
+                                            <View style={{ flex: 1, marginLeft: 10, paddingBottom:20, }}>
+                                                <Text style={[styles.cardTitle, ]}>Company</Text>
+                                                <Text style={[styles.cardText, ]}>{importation.CompanyName || 'N/A'}</Text>
+                                                <Text style={[styles.cardTitle, ]}>Country</Text>
+                                                <Text style={[styles.cardText, ]}>{importation.CountryName || 'N/A'}</Text>
+                                                <Text style={[styles.cardTitle,]}>nb of box(es)</Text>
+                                                <Text style={styles.cardText}>{importation.NumberOfBoxes || 0}</Text>
+                                            </View>
                                         </View>
                                     </View>
-                                </View>
-                            </TouchableOpacity>
-                        ))
-                    )}
-                </ScrollView>
+                                </TouchableOpacity>
+                            ))
+                        )}
+                    </ScrollView>
+                )}
             </ScrollView>
 
             {/* Bottom Navigation Bar by role */}

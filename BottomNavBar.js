@@ -1,6 +1,7 @@
 // BottomNavBar.js
 import React from 'react';
-import { View, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Image, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
 const BottomNavBar = () => {
@@ -13,35 +14,40 @@ const BottomNavBar = () => {
     const isListActive = route.name === 'DonorList' || route.name === 'DonationDetails';
 
     return (
-        <View style={styles.container}>
-            <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Landing')}>
-                <Image 
-                    source={isHomeActive ? require('./assets/home-green.png') : require('./assets/home-grey.png')} 
-                    style={styles.icon} 
-                />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('AddDonor')}>
-                <Image 
-                    source={isDonateActive ? require('./assets/donate-green.png') : require('./assets/donate-grey.png')} 
-                    style={styles.icon} 
-                />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('DonorList')}>
-                <Image 
-                    source={isListActive ? require('./assets/list-green.png') : require('./assets/list-grey.png')} 
-                    style={styles.icon} 
-                />
-            </TouchableOpacity>
-        </View>
+        <SafeAreaView edges={['bottom']} style={styles.safeArea}>
+            <View style={styles.container}>
+                <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Landing')}>
+                    <Image 
+                        source={isHomeActive ? require('./assets/home-green.png') : require('./assets/home-grey.png')} 
+                        style={styles.icon} 
+                    />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('AddDonor')}>
+                    <Image 
+                        source={isDonateActive ? require('./assets/donate-green.png') : require('./assets/donate-grey.png')} 
+                        style={styles.icon} 
+                    />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('DonorList')}>
+                    <Image 
+                        source={isListActive ? require('./assets/list-green.png') : require('./assets/list-grey.png')} 
+                        style={styles.icon} 
+                    />
+                </TouchableOpacity>
+            </View>
+        </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
+    safeArea: {
+        backgroundColor: '#f9f9f9',
+    },
     container: {
         flexDirection: 'row',
         justifyContent: 'space-around',
         alignItems: 'center',
-     
+        paddingVertical: 10,
         borderTopWidth: 1,
         borderTopColor: '#f9f9f9',
         backgroundColor: '#f9f9f9',

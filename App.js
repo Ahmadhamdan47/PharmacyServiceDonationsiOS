@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import * as SplashScreen from 'expo-splash-screen';
@@ -187,32 +188,34 @@ const App = () => {
   }
 
   return (
-    <NavigationContainer ref={navigationRef}>
-      <Stack.Navigator
-        initialRouteName={isLoggedIn ? 'Landing' : 'SignIn'}
-        screenOptions={{ headerTitleAlign: 'center' }}
-      >
-        <Stack.Screen name="Landing" component={Landing} options={{ title: 'Home' }} />
-        <Stack.Screen name="SignIn" component={SignIn} options={{ title: 'Sign In' }} />
-        <Stack.Screen name="SignUp" component={SignUp} options={{ title: 'Sign Up' }} />
-        <Stack.Screen name="AddDonor" component={AddDonor} options={{ title: 'Donate' }} />
-        <Stack.Screen name="Donate" component={Donate} options={{ title: 'Donate' }} />
-        <Stack.Screen name="List" component={List} options={{ title: 'List' }} />
-        <Stack.Screen name="Inspect" component={Inspect} options={{ title: 'Inspect' }} />
-        <Stack.Screen name="DonorList" component={DonorList} options={{ title: 'Donor List' }} />
-        <Stack.Screen name="RecipientList" component={RecipientList} options={{ title: 'Recipient List' }} />
-        <Stack.Screen name="DonationDetails" component={DonationDetails} options={{ title: 'Donation Details' }} />
-        <Stack.Screen name="BoxDetails" component={BoxDetails} options={{ title: 'Boxes List' }} />
-        <Stack.Screen name="PackInspection" component={PackInspection} options={{ title: 'Pack Inspection' }} />
-        <Stack.Screen name="BoxInspection" component={BoxInspection} options={{ title: 'Box Inspection' }} />
-        <Stack.Screen name="Validate" component={Validate} options={{ title: 'Validate' }} />
-        <Stack.Screen name="DonorDetails" component={DonorDetails} options={{ title: 'Donor Details' }} />
-        <Stack.Screen name="DonorAgreements" component={DonorAgreements} options={{ title: 'Donor Agreements' }} />
-        <Stack.Screen name="AgreementDetails" component={AgreementDetails} options={{ title: 'Agreement Details' }} />
-        <Stack.Screen name="RecipientAgreements" component={RecipientAgreement} options={{ title: 'Recipient Agreement' }} />
-        <Stack.Screen name="Settings" component={Settings} options={{ title: 'Settings' }} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <SafeAreaProvider>
+      <NavigationContainer ref={navigationRef}>
+        <Stack.Navigator
+          initialRouteName={isLoggedIn ? 'Landing' : 'SignIn'}
+          screenOptions={{ headerTitleAlign: 'center' }}
+        >
+          <Stack.Screen name="Landing" component={Landing} options={{ title: 'Home' }} />
+          <Stack.Screen name="SignIn" component={SignIn} options={{ title: 'Sign In' }} />
+          <Stack.Screen name="SignUp" component={SignUp} options={{ title: 'Sign Up' }} />
+          <Stack.Screen name="AddDonor" component={AddDonor} options={{ title: 'Donate' }} />
+          <Stack.Screen name="Donate" component={Donate} options={{ title: 'Donate' }} />
+          <Stack.Screen name="List" component={List} options={{ title: 'List' }} />
+          <Stack.Screen name="Inspect" component={Inspect} options={{ title: 'Inspect' }} />
+          <Stack.Screen name="DonorList" component={DonorList} options={{ title: 'Donor List' }} />
+          <Stack.Screen name="RecipientList" component={RecipientList} options={{ title: 'Recipient List' }} />
+          <Stack.Screen name="DonationDetails" component={DonationDetails} options={{ title: 'Donation Details' }} />
+          <Stack.Screen name="BoxDetails" component={BoxDetails} options={{ title: 'Boxes List' }} />
+          <Stack.Screen name="PackInspection" component={PackInspection} options={{ title: 'Pack Inspection' }} />
+          <Stack.Screen name="BoxInspection" component={BoxInspection} options={{ title: 'Box Inspection' }} />
+          <Stack.Screen name="Validate" component={Validate} options={{ title: 'Validate' }} />
+          <Stack.Screen name="DonorDetails" component={DonorDetails} options={{ title: 'Donor Details' }} />
+          <Stack.Screen name="DonorAgreements" component={DonorAgreements} options={{ title: 'Donor Agreements' }} />
+          <Stack.Screen name="AgreementDetails" component={AgreementDetails} options={{ title: 'Agreement Details' }} />
+          <Stack.Screen name="RecipientAgreements" component={RecipientAgreement} options={{ title: 'Recipient Agreement' }} />
+          <Stack.Screen name="Settings" component={Settings} options={{ title: 'Settings' }} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 };
 

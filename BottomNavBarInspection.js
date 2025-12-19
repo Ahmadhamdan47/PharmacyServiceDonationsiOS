@@ -1,36 +1,42 @@
 // BottomNavBarInspection.js
 import React from 'react';
-import { View, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Image, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 
 const BottomNavBarInspection = ({ currentScreen }) => {
     const navigation = useNavigation();
 
     return (
-        <View style={styles.container}>
-            <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Landing')}>
-                <Image
-                    source={currentScreen === 'Landing' ? require('./assets/home-green.png') : require('./assets/home-grey.png')}
-                    style={styles.icon}
-                />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Inspect')}>
-                <Image
-                    source={currentScreen === 'Inspect' ? require('./assets/Inspect-green.png') : require('./assets/inspect-grey.png')}
-                    style={styles.icon}
-                />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('List')}>
-                <Image
-                    source={currentScreen === 'List' ? require('./assets/list-green.png') : require('./assets/list-grey.png')}
-                    style={styles.icon}
-                />
-            </TouchableOpacity>
-        </View>
+        <SafeAreaView edges={['bottom']} style={styles.safeArea}>
+            <View style={styles.container}>
+                <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Landing')}>
+                    <Image
+                        source={currentScreen === 'Landing' ? require('./assets/home-green.png') : require('./assets/home-grey.png')}
+                        style={styles.icon}
+                    />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Inspect')}>
+                    <Image
+                        source={currentScreen === 'Inspect' ? require('./assets/Inspect-green.png') : require('./assets/inspect-grey.png')}
+                        style={styles.icon}
+                    />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('List')}>
+                    <Image
+                        source={currentScreen === 'List' ? require('./assets/list-green.png') : require('./assets/list-grey.png')}
+                        style={styles.icon}
+                    />
+                </TouchableOpacity>
+            </View>
+        </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
+    safeArea: {
+        backgroundColor: '#f9f9f9',
+    },
     container: {
         flexDirection: 'row',
         justifyContent: 'space-around',

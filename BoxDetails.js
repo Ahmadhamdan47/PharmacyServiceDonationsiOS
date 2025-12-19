@@ -4,7 +4,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Table, Row, Rows } from 'react-native-table-component';
 import BottomNavBar from './BottomNavBar';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as XLSX from 'xlsx';
 import * as Font from 'expo-font';
@@ -15,8 +15,8 @@ const BoxDetails = ({ route, navigation }) => {
     const { box } = route.params;
     const [batchLots, setBatchLots] = useState([]);  // Initialize as an empty array
     const [loading, setLoading] = useState(true);
-    const [tableHead] = useState(['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Status']);
-    const [widthArr] = useState([30, 100, 80, 80, 100, 80, 100, 80, 80, 100, 100]);
+    const [tableHead] = useState(['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Status', 'Last Updated']);
+    const [widthArr] = useState([30, 100, 80, 80, 100, 80, 100, 80, 80, 100, 100, 120]);
     const { height, width } = useWindowDimensions(); // Get device dimensions
     const isLandscape = width > height; // Determine if the device is in landscape mode
     const [isFontLoaded, setIsFontLoaded] = useState(false);
@@ -93,38 +93,65 @@ const BoxDetails = ({ route, navigation }) => {
         setLoading(false);
     };
 
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        try {
+            const date = new Date(dateString);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day} ${hours}:${minutes}`;
+        } catch (error) {
+            return 'N/A';
+        }
+    };
+
     const handleExportAsExcel = async () => {
-        const dataForExcel = [
-            ['Donor Name', 'Recipient Name', 'Donation Title', 'Box Label'],
-            [box.DonorName, box.RecipientName, box.DonationTitle, box.BoxLabel],
-            [],
-            ['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Status'],
-            ...batchLots.map((lot, index) => [
-                index + 1,
-                lot.DrugName || 'N/A',
-                lot.Presentation || 'N/A',
-                lot.Form || 'N/A',
-                lot.Laboratory || 'N/A',
-                lot.LaboratoryCountry || 'N/A',
-                `'${lot.GTIN || 'N/A'}`,
-                lot.BatchNumber || 'N/A',
-                lot.ExpiryDate || 'N/A',
-                lot.SerialNumber || 'N/A',
-                lot.Inspection || 'N/A'
-            ])
-        ];
+        try {
+            const dataForExcel = [
+                ['Donor Name', 'Recipient Name', 'Donation Title', 'Box Label'],
+                [box.DonorName, box.RecipientName, box.DonationTitle, box.BoxLabel],
+                [],
+                ['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Status', 'Last Updated'],
+                ...batchLots.map((lot, index) => [
+                    index + 1,
+                    lot.DrugName || 'N/A',
+                    lot.Presentation || 'N/A',
+                    lot.Form || 'N/A',
+                    lot.Laboratory || 'N/A',
+                    lot.LaboratoryCountry || 'N/A',
+                    `'${lot.GTIN || 'N/A'}`,
+                    lot.BatchNumber || 'N/A',
+                    lot.ExpiryDate || 'N/A',
+                    lot.SerialNumber || 'N/A',
+                    lot.Inspection || 'N/A',
+                    formatDate(lot.lastUpdated)
+                ])
+            ];
 
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.aoa_to_sheet(dataForExcel);
-        XLSX.utils.book_append_sheet(wb, ws, 'Box Details');
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(dataForExcel);
+            XLSX.utils.book_append_sheet(wb, ws, 'Box Details');
 
-        const wbout = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
-        const fileName = `${box.DonorName}_${box.RecipientName}_${box.DonationTitle}_${box.BoxLabel}.xlsx`.replace(/[/\\?%*:|"<>]/g, '-');
-        const uri = `${FileSystem.documentDirectory}${fileName}`;
-        await FileSystem.writeAsStringAsync(uri, wbout, {
-            encoding: FileSystem.EncodingType.Base64,
-        });
-        await Sharing.shareAsync(uri);
+            const wbout = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
+            const fileName = `${box.DonorName}_${box.RecipientName}_${box.DonationTitle}_${box.BoxLabel}.xlsx`.replace(/[/\\?%*:|"<>]/g, '-');
+            const uri = `${FileSystem.documentDirectory}${fileName}`;
+            
+            await FileSystem.writeAsStringAsync(uri, wbout, {
+                encoding: 'base64',
+            });
+            
+            if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(uri);
+            } else {
+                Alert.alert('Success', `File saved to ${uri}`);
+            }
+        } catch (error) {
+            console.error('Error exporting to Excel:', error);
+            Alert.alert('Error', 'Failed to export to Excel. Please try again.');
+        }
     };
 
     const handleQrCodeShare = async () => {
@@ -182,7 +209,8 @@ const BoxDetails = ({ route, navigation }) => {
                                                 source={lot.inspectedBy === 'Pack' ? require('./assets/checkGreen.png') : require('./assets/checkWhite.png')}
                                                 style={{ width: 11, height: 11, alignSelf: 'center' }}
                                             />
-                                        ) : lot.Inspection || 'N/A'
+                                        ) : lot.Inspection || 'N/A',
+                                        formatDate(lot.lastUpdated)
                                     ])}
                                     textStyle={styles.text}
                                     widthArr={widthArr}
