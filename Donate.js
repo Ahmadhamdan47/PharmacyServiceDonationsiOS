@@ -490,14 +490,160 @@ const Donate = ({ route }) => {
     )
   }
   const generateUniqueSerialNumber = () => {
-    const length = Math.floor(Math.random() * (12 - 6 + 1)) + 6
-    const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-    let result = ""
-    for (let i = 0; i < length; i++) {
-      result += characters.charAt(Math.floor(Math.random() * characters.length))
-    }
-    return result
+    // Generate truly unique serial number using:
+    // - Timestamp (milliseconds since epoch)
+    // - DonorId (from route params)
+    // - Random suffix for additional uniqueness
+    const timestamp = Date.now().toString(36) // Convert to base36 for shorter string
+    const donorIdPart = (donorId || 'UNK').toString().slice(-4) // Last 4 chars of donorId
+    const randomSuffix = Math.random().toString(36).substring(2, 8) // 6 random chars
+    
+    return `${timestamp}-${donorIdPart}-${randomSuffix}`.toUpperCase()
   }
+
+  // Validate serial numbers against the database and auto-regenerate duplicates if app-generated
+  const validateSerialNumbers = async (batchLotsToValidate) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      let updatedBatchLots = [...batchLotsToValidate];
+      let hasChanges = false;
+      const maxRetries = 5; // Prevent infinite loops
+      
+      // Keep checking and regenerating until all serial numbers are unique
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const validationResults = await Promise.all(
+          updatedBatchLots.map(async (batchLot, index) => {
+            try {
+              const response = await axios.post(
+                "https://apiv2.medleb.org/batchserial/checkDonationStatus",
+                {
+                  GTIN: batchLot.gtin,
+                  BatchNumber: batchLot.lotNumber,
+                  SerialNumber: batchLot.serialNumber,
+                  ExpiryDate: batchLot.expiryDate,
+                },
+                { headers }
+              );
+              
+              const { isValid, isDonated, messageEN } = response.data;
+              
+              if (isValid || isDonated) {
+                return {
+                  index,
+                  valid: false,
+                  isDuplicate: true,
+                  isGenerated: batchLot.isSerialNumberGenerated,
+                  message: messageEN || 'Serial number already exists in database',
+                  serialNumber: batchLot.serialNumber
+                };
+              }
+              
+              return { index, valid: true };
+            } catch (error) {
+              // If the API call fails (e.g., 404 meaning not found), consider it valid
+              if (error.response?.status === 404) {
+                return { index, valid: true };
+              }
+              console.error('Error validating serial number:', error);
+              return { 
+                index, 
+                valid: false,
+                isDuplicate: false,
+                isGenerated: batchLot.isSerialNumberGenerated,
+                message: 'Error validating serial number',
+                serialNumber: batchLot.serialNumber
+              };
+            }
+          })
+        );
+        
+        // Find invalid results
+        const invalidResults = validationResults.filter(r => !r.valid);
+        
+        if (invalidResults.length === 0) {
+          // All serial numbers are valid
+          if (hasChanges) {
+            // Update the state with the regenerated serial numbers
+            setBatchLots(updatedBatchLots);
+            console.log('Auto-regenerated duplicate serial numbers successfully');
+          }
+          return true;
+        }
+        
+        // Separate duplicates by whether they were generated or scanned
+        const scannedDuplicates = invalidResults.filter(r => r.isDuplicate && !r.isGenerated);
+        const generatedDuplicates = invalidResults.filter(r => r.isDuplicate && r.isGenerated);
+        const errors = invalidResults.filter(r => !r.isDuplicate);
+        
+        // If there are scanned duplicates or errors, block submission
+        if (scannedDuplicates.length > 0 || errors.length > 0) {
+          const messages = [];
+          
+          if (scannedDuplicates.length > 0) {
+            messages.push('❌ Scanned Barcodes with Duplicate Serial Numbers:');
+            scannedDuplicates.forEach(r => {
+              messages.push(`  Pack ${r.index + 1}: ${r.message}`);
+              messages.push(`  Serial Number: ${r.serialNumber}`);
+            });
+          }
+          
+          if (errors.length > 0) {
+            messages.push('\n⚠️ Validation Errors:');
+            errors.forEach(r => {
+              messages.push(`  Pack ${r.index + 1}: ${r.message}`);
+            });
+          }
+          
+          Alert.alert(
+            'Cannot Submit Donation',
+            messages.join('\n'),
+            [{ text: 'OK' }]
+          );
+          
+          return false;
+        }
+        
+        // Regenerate serial numbers for app-generated duplicates
+        if (generatedDuplicates.length > 0) {
+          console.log(`Found ${generatedDuplicates.length} app-generated duplicate(s). Auto-regenerating...`);
+          
+          generatedDuplicates.forEach(r => {
+            const newSerialNumber = generateUniqueSerialNumber();
+            console.log(`Regenerating Pack ${r.index + 1}: ${r.serialNumber} → ${newSerialNumber}`);
+            updatedBatchLots[r.index] = {
+              ...updatedBatchLots[r.index],
+              serialNumber: newSerialNumber,
+              isSerialNumberGenerated: true
+            };
+          });
+          
+          hasChanges = true;
+          // Continue to next iteration to validate the new serial numbers
+          continue;
+        }
+      }
+      
+      // If we exhausted retries
+      Alert.alert(
+        'Validation Error',
+        'Unable to generate unique serial numbers after multiple attempts. Please try again.',
+        [{ text: 'OK' }]
+      );
+      return false;
+      
+    } catch (error) {
+      console.error('Error during serial number validation:', error);
+      Alert.alert(
+        'Validation Error',
+        'Unable to validate serial numbers. Please try again.',
+        [{ text: 'OK' }]
+      );
+      return false;
+    }
+  };
+
   const excludedOwners = []
 
   const fetchDrugNames = async (query = "") => {
@@ -607,12 +753,18 @@ const Donate = ({ route }) => {
 
       // If the drug is found but not donated, continue with the donation process
       const updatedBatchLots = [...batchLots]
+      
+      // PRIORITY: Use serial number from barcode if available, only generate if missing
+      const serialNumber = response.sn && response.sn.trim() 
+        ? response.sn.trim() // Use scanned serial number
+        : generateUniqueSerialNumber(); // Generate only if barcode has no serial number
+      
       updatedBatchLots[cameraIndex] = {
         ...updatedBatchLots[cameraIndex],
         gtin: response.gtin,
         lotNumber: response.lot,
         expiryDate: response.exp ? response.exp.toISOString().split("T")[0] : "",
-        serialNumber: response.sn || generateUniqueSerialNumber(), // Only generate if not found in barcode
+        serialNumber: serialNumber,
         isSerialNumberGenerated: !response.sn, // Flag to indicate if the serial number was generated
       }
 
@@ -955,6 +1107,17 @@ const Donate = ({ route }) => {
       // Get the authentication token
       const token = await AsyncStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      // CRITICAL: Validate all serial numbers before submission to prevent duplicates
+      console.log('Validating serial numbers before submission...');
+      const isValid = await validateSerialNumbers(batchLots);
+      
+      if (!isValid) {
+        console.log('Serial number validation failed. Aborting submission.');
+        return; // Stop submission if validation fails
+      }
+      
+      console.log('Serial number validation passed. Proceeding with submission.');
       
       // Ensure we have a box created for this donation before submitting packs
       const ensureCurrentBox = async () => {
