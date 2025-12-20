@@ -259,7 +259,8 @@ const DonorList = ({ navigation }) => {
             const id = ids[idx];
             if (res.status === 'fulfilled') {
                 const boxes = Array.isArray(res.value?.data) ? res.value.data : [];
-                map[id] = boxes.filter(b => (b?.NumberOfPacks || 0) > 0).length;
+                // Backend now returns only non-empty boxes with correct pack counts
+                map[id] = boxes.length;
             }
         });
         if (Object.keys(map).length) {

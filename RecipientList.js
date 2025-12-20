@@ -365,42 +365,20 @@ const RecipientList = () => {
         const ids = Array.from(new Set((donationsList || []).map(d => d?.DonationId).filter(Boolean)));
         if (ids.length === 0) return;
         
-        // Fetch boxes for all donations
+        // Backend now returns only non-empty boxes directly
         const boxResults = await Promise.allSettled(
             ids.map(id => axios.get(`https://apiv2.medleb.org/boxes/byDonation/${id}`, { headers }))
         );
         
         const map = {};
-        
-        // For each donation, get actual pack counts from batchserial table
-        for (let idx = 0; idx < boxResults.length; idx++) {
+        boxResults.forEach((res, idx) => {
             const id = ids[idx];
-            const boxRes = boxResults[idx];
-            
-            if (boxRes.status === 'fulfilled') {
-                const boxes = Array.isArray(boxRes.value?.data) ? boxRes.value.data : [];
-                
-                // Fetch actual pack counts for each box
-                const packCountResults = await Promise.allSettled(
-                    boxes.map(box => 
-                        axios.get(`https://apiv2.medleb.org/batchserial/byBox/${box.BoxId}`, { headers })
-                    )
-                );
-                
-                // Count boxes that have at least one pack
-                let nonEmptyCount = 0;
-                packCountResults.forEach((packRes) => {
-                    if (packRes.status === 'fulfilled') {
-                        const packs = Array.isArray(packRes.value?.data?.data) ? packRes.value.data.data : [];
-                        if (packs.length > 0) {
-                            nonEmptyCount++;
-                        }
-                    }
-                });
-                
-                map[id] = nonEmptyCount;
+            if (res.status === 'fulfilled') {
+                const boxes = Array.isArray(res.value?.data) ? res.value.data : [];
+                // Just count the boxes - backend already filtered non-empty ones
+                map[id] = boxes.length;
             }
-        }
+        });
         
         if (Object.keys(map).length) setNonEmptyBoxCounts(prev => ({ ...prev, ...map }));
     };

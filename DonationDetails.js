@@ -110,24 +110,9 @@ const DonationDetails = ({ route, navigation }) => {
             const response = await axios.get(`https://apiv2.medleb.org/boxes/byDonation/${donation.DonationId}`, { headers });
             const boxesData = response.data;
             
-            // Fetch actual pack counts from batchserial table for each box
-            const boxesWithActualCounts = await Promise.all(
-                boxesData.map(async (box) => {
-                    try {
-                        const packsResponse = await axios.get(`https://apiv2.medleb.org/batchserial/byBox/${box.BoxId}`, { headers });
-                        const actualPackCount = Array.isArray(packsResponse.data?.data) ? packsResponse.data.data.length : 0;
-                        return { ...box, NumberOfPacks: actualPackCount };
-                    } catch (error) {
-                        console.warn(`Failed to fetch packs for box ${box.BoxId}:`, error);
-                        return box; // Keep original count if fetch fails
-                    }
-                })
-            );
-
+            // Backend now returns only non-empty boxes with correct pack counts
             // Ensure unique, sequential labels per donation for legacy data
-            // Keep only non-empty boxes, then normalize labels 1..N
-            const nonEmpty = boxesWithActualCounts.filter(b => (b.NumberOfPacks || 0) > 0);
-            const normalized = normalizeBoxLabels(nonEmpty);
+            const normalized = normalizeBoxLabels(boxesData);
             setBoxes(normalized);
         } catch (error) {
             console.error('Error fetching boxes:', error);
