@@ -9,8 +9,8 @@
     },
     "ios": {
       "bundleIdentifier": "org.name.PharmacyServiceDonations",
-      "icon": "./assets/icon/ios-icon.png",
-      "buildNumber": "5",
+      "icon": "./assets/icon/android-icon.png",
+      "buildNumber": "7",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
