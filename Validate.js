@@ -237,7 +237,7 @@ const Validate = () => {
                 <View style={styles.dateRangeContainer}>
                     <TouchableOpacity style={styles.dateContainer} onPress={() => setShowFromDatePicker(true)}>
                         <Text style={styles.dateText}>From</Text>
-                        <Text style={styles.dateValue}>{fromDate ? fromDate.toISOString().split('T')[0] : '01/01/24'}</Text>
+                        <Text style={styles.dateValue}>{fromDate ? fromDate.toISOString().split('T')[0] : 'Choose date'}</Text>
                     </TouchableOpacity>
 
                     <View style={styles.dateIcon}>
@@ -246,7 +246,7 @@ const Validate = () => {
 
                     <TouchableOpacity style={styles.dateContainer} onPress={() => setShowToDatePicker(true)}>
                         <Text style={styles.dateText}>To</Text>
-                        <Text style={styles.dateValue}>{toDate ? toDate.toISOString().split('T')[0] : '01/08/24'}</Text>
+                        <Text style={styles.dateValue}>{toDate ? toDate.toISOString().split('T')[0] : 'Choose date'}</Text>
                     </TouchableOpacity>
                 </View>
                 {showFromDatePicker && renderDatePicker('from')}

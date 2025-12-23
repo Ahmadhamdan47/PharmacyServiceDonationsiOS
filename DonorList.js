@@ -31,6 +31,8 @@ const DonorList = ({ navigation }) => {
     const [allDonations, setAllDonations] = useState([]);
     // Map DonationId -> non-empty box count (NumberOfPacks > 0)
     const [nonEmptyBoxCounts, setNonEmptyBoxCounts] = useState({});
+    // Map DonationId -> total pack count (sum of NumberOfPacks from all boxes)
+    const [packCounts, setPackCounts] = useState({});
     const fetchFonts = async () => {
       await Font.loadAsync({
         'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
@@ -254,24 +256,36 @@ const DonorList = ({ navigation }) => {
         const results = await Promise.allSettled(
             ids.map(id => axios.get(`https://apiv2.medleb.org/boxes/byDonation/${id}`, { headers }))
         );
-        const map = {};
+        const boxMap = {};
+        const packMap = {};
         results.forEach((res, idx) => {
             const id = ids[idx];
             if (res.status === 'fulfilled') {
                 const boxes = Array.isArray(res.value?.data) ? res.value.data : [];
                 // Backend now returns only non-empty boxes with correct pack counts
-                map[id] = boxes.length;
+                boxMap[id] = boxes.length;
+                // Calculate total packs by summing NumberOfPacks from all boxes
+                packMap[id] = boxes.reduce((sum, box) => sum + (box.NumberOfPacks || 0), 0);
             }
         });
-        if (Object.keys(map).length) {
-            setNonEmptyBoxCounts(prev => ({ ...prev, ...map }));
+        if (Object.keys(boxMap).length) {
+            setNonEmptyBoxCounts(prev => ({ ...prev, ...boxMap }));
+        }
+        if (Object.keys(packMap).length) {
+            setPackCounts(prev => ({ ...prev, ...packMap }));
         }
     };
 
     const getComputedBoxCount = (donation) => {
         const id = donation?.DonationId;
         if (id && nonEmptyBoxCounts[id] != null) return nonEmptyBoxCounts[id];
-        return donation?.NumberOfBoxes ?? 0;
+        return null;
+    };
+
+    const getComputedPackCount = (donation) => {
+        const id = donation?.DonationId;
+        if (id && packCounts[id] != null) return packCounts[id];
+        return null;
     };
 
     const parseDateSafe = (value) => {
@@ -378,14 +392,14 @@ const DonorList = ({ navigation }) => {
                     <View style={styles.dateRangeContainer}>
                         <TouchableOpacity style={styles.dateContainer} onPress={() => setShowFromDatePicker(true)}>
                             <Text style={styles.dateText}>From</Text>
-                            <Text style={styles.dateValue}>{fromDate ? new Date(fromDate).toISOString().split('T')[0] : '01/01/24'}</Text>
+                            <Text style={styles.dateValue}>{fromDate ? new Date(fromDate).toISOString().split('T')[0] : 'Choose date'}</Text>
                         </TouchableOpacity>
                         <View style={styles.dateIcon}>
                             <Image source={require('./assets/calendar.png')} style={styles.calendarIcon} />
                         </View>
                         <TouchableOpacity style={styles.dateContainer} onPress={() => setShowToDatePicker(true)}>
                             <Text style={styles.dateText}>To</Text>
-                            <Text style={styles.dateValue}>{toDate ? new Date(toDate).toISOString().split('T')[0] : '01/08/24'}</Text>
+                            <Text style={styles.dateValue}>{toDate ? new Date(toDate).toISOString().split('T')[0] : 'Choose date'}</Text>
                         </TouchableOpacity>
                     </View>
                     {showFromDatePicker && (
@@ -455,7 +469,7 @@ const DonorList = ({ navigation }) => {
                         </View>
                     )}
                     {(() => {
-                        const filtered = donations.filter(d => (getComputedBoxCount(d) ?? 0) > 0 || ((d?.BatchLotTrackings ?? []).length > 0));
+                        const filtered = donations.filter(d => (getComputedBoxCount(d) ?? 0) > 0 || (getComputedPackCount(d) ?? 0) > 0);
                         const toRenderBase = filtered.length > 0 ? filtered : donations;
                         const parse = (d) => (d ? Date.parse(d) : 0);
                         const getDate = (obj) => parse(obj?.DonationDate) || parse(obj?.CreatedDate) || 0;
@@ -503,7 +517,7 @@ const DonorList = ({ navigation }) => {
                                                         <Text style={[styles.cardTitle]}>Date</Text>
                                                         <Text style={[styles.cardText]}>{donation.DonationDate || 'N/A'}</Text>
                                                         <Text style={[styles.cardTitle]}>Boxes/Packs</Text>
-                                                        <Text style={[styles.cardText]}>{getComputedBoxCount(donation)}/{(donation.BatchLotTrackings ?? []).length}</Text>
+                                                        <Text style={[styles.cardText]}>{getComputedBoxCount(donation) ?? 0}/{getComputedPackCount(donation) ?? 0}</Text>
                                                     </View>
                                                 </View>
                                             </View>

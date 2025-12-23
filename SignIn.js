@@ -472,21 +472,8 @@ const SignIn = () => {
         <StatusBar backgroundColor="#f9f9f9" barStyle="dark-content" />
 
         {/* Title */}
-        <Text style={[
-          styles.title, 
-          isKeyboardVisible && showOtpInput && { marginTop: 10, marginBottom: 10, fontSize: 14 },
-          isKeyboardVisible && !showOtpInput && { marginTop: 20, marginBottom: 20 }
-        ]}>
-          Medication Donation To Lebanon
-        </Text>
 
-        {/* Paragraph - Hide when keyboard is visible or showing OTP */}
-        {!isKeyboardVisible && !showOtpInput && (
-          <Text style={styles.paragraph}>
-            This application is developed for the Pharmacy Service at the Ministry of Public Health, to manage the drug
-            donation procedure to Lebanon.
-          </Text>
-        )}
+
 
         {isLocked ? (
           <View style={styles.lockedContainer}>
@@ -569,6 +556,9 @@ const SignIn = () => {
             </Text>
           </View>
         )}
+        
+        {/* Version Info */}
+        <Text style={styles.versionText}>v3.0.15 (6) - December 23, 2025</Text>
       </View>
         </ScrollView>
       </TouchableWithoutFeedback>
@@ -756,6 +746,14 @@ const styles = StyleSheet.create({
     height: 50,
     alignSelf: "center",
     minWidth: 150,
+  },
+  versionText: {
+    fontFamily: "RobotoCondensed-Regular",
+    fontSize: 12,
+    textAlign: "center",
+    color: "#999",
+    marginTop: 20,
+    marginBottom: 10,
   },
 })
 

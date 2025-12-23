@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert,Image } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -35,6 +36,13 @@ const DonationDetails = ({ route, navigation }) => {
         fetchUsername();  // Fetch the username from AsyncStorage
         fetchBoxes();     // Fetch the boxes data
     }, []);
+
+    // Refetch boxes whenever the screen comes into focus
+    useFocusEffect(
+        useCallback(() => {
+            fetchBoxes();
+        }, [])
+    );
 
     React.useLayoutEffect(() => {
         navigation.setOptions({

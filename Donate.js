@@ -19,6 +19,7 @@ import {
 } from "react-native"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { CameraView, useCameraPermissions } from "expo-camera"
+import DateTimePicker from "@react-native-community/datetimepicker"
 import axios from "axios"
 import Icon from "react-native-vector-icons/FontAwesome"
 import { useNavigation } from "@react-navigation/native"
@@ -309,6 +310,8 @@ const Donate = ({ route }) => {
   const [newPackCount, setNewPackCount] = useState(0)
   const [confirmModalVisible, setConfirmModalVisible] = useState(false)
   const [isFontLoaded, setIsFontLoaded] = useState(false)
+  const [boxCreatedDate, setBoxCreatedDate] = useState(new Date())
+  const [showDatePicker, setShowDatePicker] = useState(false)
   const fetchFonts = async () => {
     await Font.loadAsync({
       "RobotoCondensed-Bold": require("./assets/fonts/RobotoCondensed-Bold.ttf"),
@@ -1137,6 +1140,7 @@ const Donate = ({ route }) => {
         const createResp = await axios.post("https://apiv2.medleb.org/boxes/add", {
           DonationId: donationId,
           BoxLabel: label,
+          CreatedDate: boxCreatedDate.toISOString(),
         }, { headers })
         if (createResp.status === 201) {
           setCurrentBox(createResp.data.BoxId)
@@ -1236,12 +1240,14 @@ const Donate = ({ route }) => {
       const response = await axios.post("https://apiv2.medleb.org/boxes/add", {
         DonationId: donationId,
         BoxLabel: label,
+        CreatedDate: boxCreatedDate.toISOString(),
       }, { headers })
 
       if (response.status === 201) {
         setCurrentBox(response.data.BoxId)
         setBoxLabelCounter(nextNumber + 1)
         setBatchLots([createEmptyBatchLot()])
+        setBoxCreatedDate(new Date()) // Reset date to current date for new box
       } else {
         Alert.alert("Error", "Failed to add a new box.")
       }
@@ -1320,6 +1326,38 @@ const Donate = ({ route }) => {
           scrollEnabled={scrollEnabled}
         >
           <View style={styles.originalFormContainer}>
+            <View style={styles.boxInfoContainer}>
+              <Text style={styles.boxTitleText}>Box {boxLabelCounter}</Text>
+              <View style={styles.datePickerContainer}>
+                <Text style={styles.dateLabel}>Box Created Date:</Text>
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Text style={styles.dateButtonText}>
+                    {boxCreatedDate.toLocaleDateString('en-GB', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit'
+                    })}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {showDatePicker && (
+                <DateTimePicker
+                  value={boxCreatedDate}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, selectedDate) => {
+                    setShowDatePicker(Platform.OS === 'ios');
+                    if (selectedDate) {
+                      setBoxCreatedDate(selectedDate);
+                    }
+                  }}
+                  maximumDate={new Date()}
+                />
+              )}
+            </View>
             <TouchableOpacity
               onPress={() => handleOpenCamera(0)}
               activeOpacity={0.6}
@@ -1919,6 +1957,43 @@ const styles = StyleSheet.create({
   tevaWarningText: {
     color: "#e60000",
     fontFamily: "RobotoCondensed-Bold",
+  },
+  boxInfoContainer: {
+    backgroundColor: "#f0f0f0",
+    padding: 15,
+    marginBottom: 15,
+    borderRadius: 10,
+    marginHorizontal: 10,
+  },
+  boxTitleText: {
+    fontSize: 20,
+    fontFamily: "RobotoCondensed-Bold",
+    color: "#00a651",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  datePickerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  dateLabel: {
+    fontSize: 14,
+    fontFamily: "RobotoCondensed-Medium",
+    color: "#333",
+  },
+  dateButton: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#00a651",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+  },
+  dateButtonText: {
+    fontSize: 14,
+    fontFamily: "RobotoCondensed-Medium",
+    color: "#333",
   },
 })
 

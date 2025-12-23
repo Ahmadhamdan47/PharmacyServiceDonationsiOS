@@ -54,6 +54,9 @@ const BoxDetails = ({ route, navigation }) => {
                 <TouchableOpacity onPress={handleExportAsExcel}>
                     <Text style={styles.headerButtonText}>Export as XLS</Text>
                 </TouchableOpacity>
+                <TouchableOpacity onPress={handleDeleteBox}>
+                    <Text style={[styles.headerButtonText, styles.deleteButtonText]}>Delete Box</Text>
+                </TouchableOpacity>
             </View>
         ),
         headerTitle: () => (
@@ -91,6 +94,38 @@ const BoxDetails = ({ route, navigation }) => {
             Alert.alert('Error', 'Failed to load serial numbers.');
         }
         setLoading(false);
+    };
+
+    const handleDeleteBox = async () => {
+        Alert.alert(
+            'Delete Box',
+            `Are you sure you want to delete ${box.BoxLabel || box.DisplayLabel}? This action cannot be undone.`,
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            const token = await AsyncStorage.getItem('token');
+                            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+                            
+                            await axios.delete(`https://apiv2.medleb.org/boxes/${box.BoxId}`, { headers });
+                            
+                            Alert.alert('Success', 'Box deleted successfully.');
+                            // Navigate back - DonationDetails will auto-refresh via useFocusEffect
+                            navigation.goBack();
+                        } catch (error) {
+                            console.error('Error deleting box:', error);
+                            Alert.alert('Error', error.response?.data?.message || 'Failed to delete box. Please try again.');
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const formatDate = (dateString) => {
@@ -315,6 +350,9 @@ const styles = StyleSheet.create({
         color: '#00A651',
         marginLeft: 15,
         fontFamily: 'RobotoCondensed-Bold',
+    },
+    deleteButtonText: {
+        color: '#DC3545',
     },
 });
 
