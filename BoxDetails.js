@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, TouchableOpacity, Image, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, TouchableOpacity, Image, useWindowDimensions, Platform } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Table, Row, Rows } from 'react-native-table-component';
@@ -22,6 +23,7 @@ const BoxDetails = ({ route, navigation }) => {
     const [isFontLoaded, setIsFontLoaded] = useState(false);
     const [isQrCodeVisible, setIsQrCodeVisible] = useState(false); // Start with the QR code hidden
     const qrCodeRef = useRef(); // Reference for capturing QR code
+    const insets = useSafeAreaInsets(); // Get safe area insets
 
     const fetchFonts = async () => {
         await Font.loadAsync({
@@ -42,12 +44,12 @@ const BoxDetails = ({ route, navigation }) => {
 
     navigation.setOptions({
         headerLeft: () => (
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButtonContainer, { marginTop: insets.top }]}>
                 <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
             </TouchableOpacity>
         ),
         headerRight: () => (
-            <View style={styles.headerRightContainer}>
+            <View style={[styles.headerRightContainer, { marginTop: insets.top }]}>
                 <TouchableOpacity onPress={handleQrCodeShare}>
                     <Text style={styles.headerButtonText}>Box QR Code</Text>
                 </TouchableOpacity>
@@ -61,17 +63,16 @@ const BoxDetails = ({ route, navigation }) => {
         ),
         headerTitle: () => (
             <View>
-                <Text style={styles.title}> {box.DonationTitle} - {box.BoxLabel} </Text>
+                <Text style={[styles.title, { marginTop: insets.top }]}> {box.DonationTitle} - {box.BoxLabel} </Text>
             </View>
         ),
         headerTitleAlign: 'left',
         headerTitleStyle: {
-            marginTop: 42,
             position: 'relative',
             backgroundColor: '#f9f9f9',
         },
         headerStyle: {
-            height: 100,
+            height: 100 + insets.top,
             backgroundColor: '#f9f9f9',
         },
     });
@@ -293,7 +294,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     title: {
-        marginTop: 30,
         fontSize: 14,
         fontFamily: 'RobotoCondensed-Bold',
     },
@@ -336,14 +336,12 @@ const styles = StyleSheet.create({
         width: 41,
         height: 15,
         marginLeft: 10,
-        marginTop: 30,
     },
     headerRightContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         marginRight: 10,
-        marginTop: 30,
     },
     headerButtonText: {
         fontSize: 14,
