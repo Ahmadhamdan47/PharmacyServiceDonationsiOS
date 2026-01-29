@@ -305,6 +305,7 @@ const Donate = ({ route }) => {
   const [currentBox, setCurrentBox] = useState(null)
   const [packCount, setPackCount] = useState(0)
   const [boxLabelCounter, setBoxLabelCounter] = useState(1)
+  const [customBoxLabel, setCustomBoxLabel] = useState('') // Custom box name
   const [packCounter, setPackCounter] = useState(1) // Initialize packCounter with 1
   const [finishModalVisible, setFinishModalVisible] = useState(false)
   const [newPackCount, setNewPackCount] = useState(0)
@@ -408,18 +409,25 @@ const Donate = ({ route }) => {
     }
 
     if (isTeva(titulaire)) {
-      Alert.alert("Not Allowed", "This is not accepted to be entered on Lebanese territory.")
-      setBatchLots((prev) => {
-        const updated = [...prev]
-        if (!updated[index]) return prev
-        updated[index].drugValid = false
-        updated[index].drugValidationMessage = "Not accepted in Lebanese territory"
-        const parsed = parseOwnerCountry(titulaire)
-        updated[index].owner = parsed.owner
-        updated[index].country = parsed.country
-        return updated
-      })
-      return
+      Alert.alert(
+        "Not Allowed", 
+        "This drug is not allowed to be donated (TEVA manufacturer blocked)",
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              if (index === 0) {
+                // Main pack form - just clear fields
+                clearPackForm(index);
+              } else {
+                // Additional pack form - remove entirely
+                removePack(index);
+              }
+            }
+          }
+        ]
+      );
+      return;
     }
 
     const parsed = parseOwnerCountry(titulaire)
@@ -441,16 +449,61 @@ const Donate = ({ route }) => {
     fetchFonts() // Load fonts on component mount
   }, [fetchFonts])
 
+  // Fetch existing boxes when continuing a donation to set correct box counter
   useEffect(() => {
+    const fetchExistingBoxes = async () => {
+      if (!donationId) return;
+      
+      try {
+        const token = await AsyncStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        
+        const response = await axios.get(
+          `https://apiv2.medleb.org/boxes/byDonation/${donationId}`,
+          { headers }
+        );
+        
+        const existing = Array.isArray(response.data) ? response.data : [];
+        let nextNumber = 1;
+        
+        existing.forEach(b => {
+          const match = typeof b.BoxLabel === 'string' && b.BoxLabel.match(/Box\s+(\d+)/i);
+          if (match) {
+            const n = parseInt(match[1], 10);
+            if (!Number.isNaN(n)) {
+              nextNumber = Math.max(nextNumber, n + 1);
+            }
+          }
+        });
+        
+        setBoxLabelCounter(nextNumber);
+        setCustomBoxLabel(`Box ${nextNumber}`);
+      } catch (error) {
+        console.error('Error fetching existing boxes:', error);
+      }
+    };
+    
+    fetchExistingBoxes();
+  }, [donationId]);
+
+  // Calculate filled packs count
+  const getFilledPacksCount = () => {
+    return batchLots.filter(pack => 
+      pack.gtin || pack.lotNumber || pack.serialNumber
+    ).length;
+  };
+
+  useEffect(() => {
+    const filledCount = getFilledPacksCount();
     navigation.setOptions({
       headerRight: () => (
         <View style={styles.packContainer}>
-          <Text style={styles.packText}>{packCounter}</Text>
+          <Text style={styles.packText}>{filledCount}</Text>
           <Text style={styles.packText2}>Pack(s)</Text>
         </View>
       ),
     })
-  }, [navigation, packCounter])
+  }, [navigation, batchLots])
 
   useEffect(() => {
     fetchDrugNames()
@@ -580,12 +633,12 @@ const Donate = ({ route }) => {
         const generatedDuplicates = invalidResults.filter(r => r.isDuplicate && r.isGenerated);
         const errors = invalidResults.filter(r => !r.isDuplicate);
         
-        // If there are scanned duplicates or errors, block submission
+        // If there are scanned duplicates or errors, block submission and clear/remove forms
         if (scannedDuplicates.length > 0 || errors.length > 0) {
           const messages = [];
           
           if (scannedDuplicates.length > 0) {
-            messages.push('❌ Scanned Barcodes with Duplicate Serial Numbers:');
+            messages.push('❌ This drug has already been donated in this donation or a previous one:');
             scannedDuplicates.forEach(r => {
               messages.push(`  Pack ${r.index + 1}: ${r.message}`);
               messages.push(`  Serial Number: ${r.serialNumber}`);
@@ -602,7 +655,24 @@ const Donate = ({ route }) => {
           Alert.alert(
             'Cannot Submit Donation',
             messages.join('\n'),
-            [{ text: 'OK' }]
+            [{ 
+              text: 'OK',
+              onPress: () => {
+                // Clear or remove problematic packs
+                const problematicIndices = [...scannedDuplicates, ...errors].map(r => r.index);
+                problematicIndices.sort((a, b) => b - a); // Sort in descending order to avoid index issues
+                
+                problematicIndices.forEach(idx => {
+                  if (idx === 0) {
+                    // Main pack form - just clear fields
+                    clearPackForm(idx);
+                  } else {
+                    // Additional pack form - remove entirely
+                    removePack(idx);
+                  }
+                });
+              }
+            }]
           );
           
           return false;
@@ -727,7 +797,7 @@ const Donate = ({ route }) => {
       // Close the camera immediately after scanning
       setIsCameraOpen(false)
 
-      // Get the authentication token for API calls
+      // Get the auth token for API calls
       const token = await AsyncStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -741,12 +811,23 @@ const Donate = ({ route }) => {
 
       const { isValid, isDonated, messageEN } = donationStatusResponse.data
 
-      if (isValid) {
+      if (isDonated) {
         setTimeout(() => {
           Alert.alert(
-            "Drug Status",
+            "Drug Already Donated",
             messageEN, // Display the message from the API response
-            [{ text: "OK" }],
+            [{ 
+              text: "OK",
+              onPress: () => {
+                if (cameraIndex === 0) {
+                  // Main pack form - just clear fields
+                  clearPackForm(cameraIndex);
+                } else {
+                  // Additional pack form - remove entirely
+                  removePack(cameraIndex);
+                }
+              }
+            }],
           )
         }, 100)
 
@@ -1031,6 +1112,29 @@ const Donate = ({ route }) => {
     console.log(packCounter)
   }
 
+  // Clear pack form (for main pack or any pack)
+  const clearPackForm = (index) => {
+    setBatchLots((prev) => {
+      const updated = [...prev];
+      updated[index] = createEmptyBatchLot();
+      return updated;
+    });
+    // Clear validation errors for this pack
+    setValidationErrors((prev) => {
+      const updated = [...prev];
+      updated[index] = {};
+      return updated;
+    });
+  };
+
+  // Remove pack form (for additional packs only)
+  const removePack = (index) => {
+    if (index === 0) return; // Never remove the first pack
+    setBatchLots((prev) => prev.filter((_, i) => i !== index));
+    setValidationErrors((prev) => prev.filter((_, i) => i !== index));
+    setPackCounter(prev => Math.max(1, prev - 1));
+  };
+
   // Validate required fields and set field-level errors
   const validateFields = () => {
     let isAllFieldsValid = true
@@ -1136,7 +1240,7 @@ const Donate = ({ route }) => {
             if (!Number.isNaN(n)) nextNumber = Math.max(nextNumber, n + 1)
           }
         })
-        const label = `Box ${nextNumber}`
+        const label = customBoxLabel.trim() || `Box ${nextNumber}`
         const createResp = await axios.post("https://apiv2.medleb.org/boxes/add", {
           DonationId: donationId,
           BoxLabel: label,
@@ -1145,6 +1249,7 @@ const Donate = ({ route }) => {
         if (createResp.status === 201) {
           setCurrentBox(createResp.data.BoxId)
           setBoxLabelCounter(nextNumber + 1)
+          setCustomBoxLabel(`Box ${nextNumber + 1}`)
           return createResp.data.BoxId
         }
         throw new Error('Failed to create box')
@@ -1246,6 +1351,7 @@ const Donate = ({ route }) => {
       if (response.status === 201) {
         setCurrentBox(response.data.BoxId)
         setBoxLabelCounter(nextNumber + 1)
+        setCustomBoxLabel(`Box ${nextNumber + 1}`)
         setBatchLots([createEmptyBatchLot()])
         setBoxCreatedDate(new Date()) // Reset date to current date for new box
       } else {
@@ -1328,6 +1434,19 @@ const Donate = ({ route }) => {
           <View style={styles.originalFormContainer}>
             <View style={styles.boxInfoContainer}>
               <Text style={styles.boxTitleText}>Box {boxLabelCounter}</Text>
+              
+              {/* Custom Box Name Input */}
+              <View style={styles.boxNameInputContainer}>
+                <Text style={styles.boxNameLabel}>Box Name:</Text>
+                <TextInput
+                  style={styles.boxNameInput}
+                  value={customBoxLabel}
+                  onChangeText={setCustomBoxLabel}
+                  placeholder={`Box ${boxLabelCounter}`}
+                  placeholderTextColor="#999"
+                />
+              </View>
+              
               <View style={styles.datePickerContainer}>
                 <Text style={styles.dateLabel}>Box Created Date:</Text>
                 <TouchableOpacity
@@ -1524,7 +1643,7 @@ const Donate = ({ route }) => {
               ]}
               onPress={() => (isFormValid ? addBatchLotForm() : validateFields())}
             >
-              <Text style={[styles.addMoreButtonText, !isFormValid && styles.disabledAddMoreButtonText]}>Add more</Text>
+              <Text style={[styles.addMoreButtonText, !isFormValid && styles.disabledAddMoreButtonText]}>Add More Packs</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, !isFormValid ? { backgroundColor: "grey" } : {}]}
@@ -1551,7 +1670,7 @@ const Donate = ({ route }) => {
               <Text style={styles.modalCloseText}>✕</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>{newPackCount} Packs in this box</Text>
-            <Text style={styles.modalSubtitle}>{`"Box ${boxLabelCounter - 1}"`}</Text>
+            <Text style={styles.modalSubtitle}>{`"${customBoxLabel || `Box ${boxLabelCounter - 1}`}"`}</Text>
 
             <View style={styles.modalButtonContainer}>
               <TouchableOpacity
@@ -1562,7 +1681,7 @@ const Donate = ({ route }) => {
                   setPackCount(0) // Reset pack count
                 }}
               >
-                <Text style={styles.AddBoxButtonText}>Add Box</Text>
+                <Text style={styles.AddBoxButtonText}>Add More Boxes</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -1971,6 +2090,26 @@ const styles = StyleSheet.create({
     color: "#00a651",
     marginBottom: 10,
     textAlign: "center",
+  },
+  boxNameInputContainer: {
+    marginBottom: 15,
+  },
+  boxNameLabel: {
+    fontSize: 14,
+    fontFamily: "RobotoCondensed-Medium",
+    color: "#333",
+    marginBottom: 5,
+  },
+  boxNameInput: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#00a651",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    fontSize: 16,
+    fontFamily: "RobotoCondensed-Regular",
+    color: "#333",
   },
   datePickerContainer: {
     flexDirection: "row",

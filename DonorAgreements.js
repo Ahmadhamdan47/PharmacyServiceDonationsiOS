@@ -22,6 +22,8 @@ const DonorAgreement = () => {
     const [sortAsc, setSortAsc] = useState(false);
     // Map of DonationId -> DonationTitle fetched directly from the donation
     const [donationTitles, setDonationTitles] = useState({});
+    // Map of AgreementId -> donation status (hasStarted, donationId)
+    const [donationStatuses, setDonationStatuses] = useState({});
 
     const fetchFonts = async () => {
         await Font.loadAsync({
@@ -136,6 +138,8 @@ const DonorAgreement = () => {
                 setAgreements(sortedDesc);
                 // Fetch authoritative donation titles for these agreements
                 fetchDonationTitles(sortedDesc).catch((e) => console.warn('Failed fetching donation titles:', e?.message));
+                // Fetch donation statuses for agreed agreements
+                fetchDonationStatuses(sortedDesc.filter(a => a.Agreed_Upon === 'agreed')).catch((e) => console.warn('Failed fetching donation statuses:', e?.message));
             } else {
                 console.error('Unexpected response structure:', response.data);
                 setAgreements([]);
@@ -167,6 +171,44 @@ const DonorAgreement = () => {
         if (Object.keys(mapUpdate).length) {
             setDonationTitles(prev => ({ ...prev, ...mapUpdate }));
         }
+    };
+
+    // Fetch donation status (hasStarted) for agreements
+    const fetchDonationStatuses = async (agreedAgreements = []) => {
+        const token = await AsyncStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        
+        const statusMap = {};
+        for (const agreement of agreedAgreements) {
+            try {
+                // Check if boxes exist for this donation
+                const response = await axios.get(
+                    `https://apiv2.medleb.org/boxes/byDonation/${agreement.DonationId}`, 
+                    { headers }
+                );
+                const boxes = response.data || [];
+                const hasStarted = boxes.length > 0;
+                
+                statusMap[agreement.AgreementId] = {
+                    hasStarted,
+                    donationId: agreement.DonationId,
+                    boxCount: boxes.length
+                };
+            } catch (error) {
+                console.warn(`Failed to fetch status for agreement ${agreement.AgreementId}:`, error?.message);
+                statusMap[agreement.AgreementId] = { hasStarted: false, donationId: agreement.DonationId };
+            }
+        }
+        
+        setDonationStatuses(statusMap);
+    };
+
+    const getButtonText = (agreement) => {
+        const status = donationStatuses[agreement.AgreementId];
+        if (status?.hasStarted) {
+            return 'Continue Donation';
+        }
+        return 'Start Donation';
     };
 
     const getAgreedUponText = (agreedUpon) => {
@@ -318,7 +360,7 @@ const DonorAgreement = () => {
                                     style={styles.startDonationButton}
                                     onPress={() => handleStartDonation(agreement)}
                                 >
-                                    <Text style={styles.startDonationButtonText}>Start Donation Process</Text>
+                                    <Text style={styles.startDonationButtonText}>{getButtonText(agreement)}</Text>
                                 </TouchableOpacity>
                             )}
                         </View>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert,Image } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert, Image, TextInput } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomNavBar from './BottomNavBar'; // Import BottomNavBar for Donor
@@ -18,6 +18,7 @@ const DonationDetails = ({ route, navigation }) => {
     const [userRole, setUserRole] = useState('');  // State to store user role
     const [username, setUsername] = useState('');
     const [isFontLoaded, setIsFontLoaded] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
     const fetchFonts = async () => {
       await Font.loadAsync({
         'RobotoCondensed-Bold': require('./assets/fonts/RobotoCondensed-Bold.ttf'),
@@ -181,18 +182,33 @@ const DonationDetails = ({ route, navigation }) => {
             // Create a new workbook
             const wb = XLSX.utils.book_new();
 
+            // Create Summary Sheet
+            const totalPacks = nonEmptyBoxes.reduce((sum, box) => sum + (box.NumberOfPacks || 0), 0);
+            const summaryData = [
+                ['Donation Export Summary'],
+                [],
+                ['Donation Title', donation.DonationTitle],
+                ['Donor', donation.DonorName],
+                ['Recipient', donation.RecipientName],
+                ['Date', donation.DonationDate || formatDate(donation.CreatedDate)],
+                ['Total Boxes', nonEmptyBoxes.length],
+                ['Total Packs', totalPacks],
+            ];
+            const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+            XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
+
             // For each non-empty box, fetch its data and create a sheet
             for (const box of nonEmptyBoxes) {
                 try {
                     const response = await axios.get(`https://apiv2.medleb.org/batchserial/byBox/${box.BoxId}`, { headers });
                     const batchLots = response.data.data || [];
 
-                    // Prepare data for this box (same structure as BoxDetails export)
+                    // Prepare data for this box (without Status column)
                     const dataForExcel = [
                         ['Donor Name', 'Recipient Name', 'Donation Title', 'Box Label'],
                         [donation.DonorName, donation.RecipientName, donation.DonationTitle, box.DisplayLabel || box.BoxLabel],
                         [],
-                        ['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Status', 'Last Updated'],
+                        ['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Last Updated'],
                         ...batchLots.map((lot, index) => [
                             index + 1,
                             lot.DrugName || 'N/A',
@@ -204,7 +220,6 @@ const DonationDetails = ({ route, navigation }) => {
                             lot.BatchNumber || 'N/A',
                             lot.ExpiryDate || 'N/A',
                             lot.SerialNumber || 'N/A',
-                            lot.Inspection || 'N/A',
                             formatDate(lot.lastUpdated)
                         ])
                     ];
@@ -265,6 +280,16 @@ const DonationDetails = ({ route, navigation }) => {
             <Text style={styles.subtitle}>Date: {donation.DonationDate}</Text>
             <Text style={styles.subtitle}>Total Packs: {(boxes || []).reduce((sum, b) => sum + (b.NumberOfPacks || 0), 0)}</Text>
     
+            {/* Search Bar */}
+            <View style={styles.searchContainer}>
+                <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search by brand name in boxes..."
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                />
+            </View>
+
             {loading ? (
                 <Text>Loading...</Text>
             ) : (
@@ -285,6 +310,11 @@ const DonationDetails = ({ route, navigation }) => {
 
                     {boxes
                         .filter(box => box.NumberOfPacks > 0) // Filter out boxes with 0 packs
+                        .filter(box => {
+                            // Filter boxes by search query in brand names
+                            if (!searchQuery) return true;
+                            return box.DrugNames?.toLowerCase().includes(searchQuery.toLowerCase()) || false;
+                        })
                         .map((box, index) => (
                             <TouchableOpacity key={index} style={styles.card} onPress={() => handleBoxPress(box)}>
                                 <View style={styles.cardContent}>
@@ -325,6 +355,21 @@ const styles = StyleSheet.create({
         marginBottom: 5,
         marginLeft:30,
         fontFamily: 'RobotoCondensed-Medium',
+    },
+    searchContainer: {
+        marginHorizontal: 30,
+        marginTop: 15,
+        marginBottom: 5,
+    },
+    searchInput: {
+        height: 40,
+        borderWidth: 1,
+        borderColor: '#00A651',
+        borderRadius: 8,
+        paddingHorizontal: 15,
+        backgroundColor: '#fff',
+        fontFamily: 'RobotoCondensed-Regular',
+        fontSize: 14,
     },
     scrollView: {
         marginTop: 20,

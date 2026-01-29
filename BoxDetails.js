@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, TouchableOpacity, Image, useWindowDimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, TouchableOpacity, Image, useWindowDimensions, Platform, TextInput } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -16,8 +16,9 @@ const BoxDetails = ({ route, navigation }) => {
     const { box } = route.params;
     const [batchLots, setBatchLots] = useState([]);  // Initialize as an empty array
     const [loading, setLoading] = useState(true);
-    const [tableHead] = useState(['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Status', 'Last Updated']);
-    const [widthArr] = useState([30, 100, 80, 80, 100, 80, 100, 80, 80, 100, 100, 120]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [tableHead] = useState(['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Last Updated']);
+    const [widthArr] = useState([30, 100, 80, 80, 100, 80, 100, 80, 80, 100, 120]);
     const { height, width } = useWindowDimensions(); // Get device dimensions
     const isLandscape = width > height; // Determine if the device is in landscape mode
     const [isFontLoaded, setIsFontLoaded] = useState(false);
@@ -44,36 +45,34 @@ const BoxDetails = ({ route, navigation }) => {
 
     navigation.setOptions({
         headerLeft: () => (
-            <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButtonContainer, { marginTop: insets.top }]}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
                 <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
             </TouchableOpacity>
         ),
-        headerRight: () => (
-            <View style={[styles.headerRightContainer, { marginTop: insets.top }]}>
-                <TouchableOpacity onPress={handleQrCodeShare}>
-                    <Text style={styles.headerButtonText}>Box QR Code</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleExportAsExcel}>
-                    <Text style={styles.headerButtonText}>Export as XLS</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleDeleteBox}>
-                    <Text style={[styles.headerButtonText, styles.deleteButtonText]}>Delete Box</Text>
-                </TouchableOpacity>
-            </View>
-        ),
+        headerRight: () => null,
         headerTitle: () => (
-            <View>
-                <Text style={[styles.title, { marginTop: insets.top }]}> {box.DonationTitle} - {box.BoxLabel} </Text>
+            <View style={styles.headerContainer}>
+                <Text style={styles.headerTitleText}>{box.DonationTitle} - {box.BoxLabel}</Text>
+                <View style={styles.headerButtonsRow}>
+                    <TouchableOpacity onPress={handleQrCodeShare} style={styles.headerButton}>
+                        <Text style={styles.headerButtonText}>Box QR Code</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleExportAsExcel} style={styles.headerButton}>
+                        <Text style={styles.headerButtonText}>Export as XLS</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleDeleteBox} style={styles.headerButton}>
+                        <Text style={[styles.headerButtonText, styles.deleteButtonText]}>Delete Box</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         ),
-        headerTitleAlign: 'left',
-        headerTitleStyle: {
-            position: 'relative',
-            backgroundColor: '#f9f9f9',
-        },
+        headerTitleAlign: 'center',
         headerStyle: {
-            height: 100 + insets.top,
+            height: 120,
             backgroundColor: '#f9f9f9',
+            elevation: 0,
+            shadowOpacity: 0,
+            borderBottomWidth: 0,
         },
     });
 
@@ -150,7 +149,7 @@ const BoxDetails = ({ route, navigation }) => {
                 ['Donor Name', 'Recipient Name', 'Donation Title', 'Box Label'],
                 [box.DonorName, box.RecipientName, box.DonationTitle, box.BoxLabel],
                 [],
-                ['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Status', 'Last Updated'],
+                ['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Last Updated'],
                 ...batchLots.map((lot, index) => [
                     index + 1,
                     lot.DrugName || 'N/A',
@@ -162,7 +161,6 @@ const BoxDetails = ({ route, navigation }) => {
                     lot.BatchNumber || 'N/A',
                     lot.ExpiryDate || 'N/A',
                     lot.SerialNumber || 'N/A',
-                    lot.Inspection || 'N/A',
                     formatDate(lot.lastUpdated)
                 ])
             ];
@@ -224,12 +222,21 @@ const BoxDetails = ({ route, navigation }) => {
                     style={styles.verticalScroll}
                     contentContainerStyle={styles.scrollContentContainer}
                 >
+                    <TextInput
+                        style={styles.searchBar}
+                        placeholder="Search by brand name..."
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                    />
                     <ScrollView horizontal>
                         <View>
                             <Table borderStyle={{ borderWidth: 1, borderColor: '#C1C0B9' }}>
                                 <Row data={tableHead} style={styles.head} textStyle={styles.headText} widthArr={widthArr} />
                                 <Rows
-                                    data={batchLots.map((lot, index) => [
+                                    data={batchLots.filter(lot => 
+                                        !searchQuery || 
+                                        (lot.DrugName && lot.DrugName.toLowerCase().includes(searchQuery.toLowerCase()))
+                                    ).map((lot, index) => [
                                         index + 1,
                                         lot.DrugName || 'N/A',
                                         lot.Presentation || 'N/A',
@@ -240,12 +247,6 @@ const BoxDetails = ({ route, navigation }) => {
                                         lot.BatchNumber || 'N/A',
                                         lot.ExpiryDate || 'N/A',
                                         lot.SerialNumber || 'N/A',
-                                        lot.Inspection === 'inspected' ? (
-                                            <Image
-                                                source={lot.inspectedBy === 'Pack' ? require('./assets/checkGreen.png') : require('./assets/checkWhite.png')}
-                                                style={{ width: 11, height: 11, alignSelf: 'center' }}
-                                            />
-                                        ) : lot.Inspection || 'N/A',
                                         formatDate(lot.lastUpdated)
                                     ])}
                                     textStyle={styles.text}
@@ -258,16 +259,20 @@ const BoxDetails = ({ route, navigation }) => {
                     {isQrCodeVisible && (
                         <View style={styles.qrCodeContainer}>
                             <ViewShot ref={qrCodeRef} options={{ format: "png", quality: 0.9 }}>
-                                <QRCode value={box.BoxId.toString()} size={150} />
-                                <View style={styles.qrCodeInfo}>
-                                <Text style={styles.qrCodeText}>Donation Title: {box.DonationTitle}</Text>
-                                <Text style={styles.qrCodeText}>Box Number: {box.BoxLabel}</Text>
-                                <Text style={styles.qrCodeText}>Donor: {box.DonorName}</Text>
-                                <Text style={styles.qrCodeText}>Recipient: {box.RecipientName}</Text>
-                            </View>
+                                <View style={styles.qrCodeContent}>
+                                    <QRCode 
+                                        value={`https://pharmacy.com/api/box/${box.BoxId}/download`} 
+                                        size={150} 
+                                    />
+                                    <View style={styles.qrCodeInfo}>
+                                        <Text style={styles.qrCodeText}>Donation: {box.DonationTitle}</Text>
+                                        <Text style={styles.qrCodeText}>Box: {box.BoxLabel}</Text>
+                                        <Text style={styles.qrCodeText}>Packs: {batchLots.length}</Text>
+                                        <Text style={styles.qrCodeText}>Donor: {box.DonorName}</Text>
+                                        <Text style={styles.qrCodeText}>Recipient: {box.RecipientName}</Text>
+                                    </View>
+                                </View>
                             </ViewShot>
-
-                          
                         </View>
                     )}
                 </ScrollView>
@@ -315,16 +320,36 @@ const styles = StyleSheet.create({
     text: {
         margin: 6,
         textAlign: 'center',
-        fontSize: 10,
-        fontFamily: 'RobotoCondensed-Regular',
+        justifyContent: 'center',
+        padding: 20,
+        backgroundColor: '#fff',
     },
-    qrCodeContainer: {
-        marginTop: 20,
+    qrCodeContent: {
         alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#fff',
+        padding: 20,
     },
     qrCodeInfo: {
-        marginTop: 10,
+        marginTop: 15,
         alignItems: 'center',
+    },
+    qrCodeText: {
+        fontSize: 14,
+        fontFamily: 'RobotoCondensed-Bold',
+        marginVertical: 3,
+        textAlign: 'center',
+        color: '#000',
+    },
+    searchBar: {
+        height: 40,
+        borderColor: '#C1C0B9',
+        borderWidth: 1,
+        borderRadius: 5,
+        paddingHorizontal: 10,
+        marginBottom: 10,
+        backgroundColor: '#fff',
+        fontFamily: 'RobotoCondensed-Regular',
     },
     qrCodeText: {
         fontSize: 14,
@@ -337,16 +362,34 @@ const styles = StyleSheet.create({
         height: 15,
         marginLeft: 10,
     },
-    headerRightContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+    backButtonContainer: {
+  
         alignItems: 'center',
-        marginRight: 10,
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    headerContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingTop: 10,
+    },
+    headerTitleText: {
+        fontSize: 16,
+        fontFamily: 'RobotoCondensed-Bold',
+        color: '#000',
+        marginBottom: 10,
+    },
+    headerButtonsRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    headerButton: {
+        marginHorizontal: 10,
     },
     headerButtonText: {
         fontSize: 14,
         color: '#00A651',
-        marginLeft: 15,
         fontFamily: 'RobotoCondensed-Bold',
     },
     deleteButtonText: {

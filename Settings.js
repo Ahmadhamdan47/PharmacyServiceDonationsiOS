@@ -626,8 +626,8 @@ const Settings = () => {
                                 data={subAccounts}
                                 keyExtractor={(item) => (item.UserId ? item.UserId.toString() : `${item.Username}-${item.Email}`)}
                                 renderItem={({ item }) => renderSubAccountItem({ item })}
-                                nestedScrollEnabled={true}
-                                showsVerticalScrollIndicator={true}
+                                scrollEnabled={false}
+                                showsVerticalScrollIndicator={false}
                             />
                         ) : (
                             <Text style={styles.noSubAccountsText}>
@@ -669,7 +669,7 @@ const Settings = () => {
                 <View style={styles.subAccountActions}>
                     <TouchableOpacity
                         style={styles.editPermissionsButton}
-                        onPress={() => showPermissionsModal(item)}
+                        onPress={() => navigation.navigate('EditSubAccount', { subAccount: item })}
                     >
                         <Text style={styles.editPermissionsText}>Edit</Text>
                     </TouchableOpacity>
@@ -1228,7 +1228,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     subAccountList: {
-        maxHeight: 300,
+        // Height constraint removed to allow natural scrolling
     },
     subAccountItem: {
         backgroundColor: 'white',

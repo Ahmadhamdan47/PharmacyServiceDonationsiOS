@@ -26,6 +26,7 @@ import DonorAgreements from './DonorAgreements';
 import AgreementDetails from './AgreementDetails';
 import RecipientAgreement from './RecipientAgreements';
 import Settings from './Settings';
+import EditSubAccount from './EditSubAccount';
 const Stack = createStackNavigator();
 
 // Keep the native splash screen visible until we manually hide it
@@ -213,6 +214,7 @@ const App = () => {
           <Stack.Screen name="AgreementDetails" component={AgreementDetails} options={{ title: 'Agreement Details' }} />
           <Stack.Screen name="RecipientAgreements" component={RecipientAgreement} options={{ title: 'Recipient Agreement' }} />
           <Stack.Screen name="Settings" component={Settings} options={{ title: 'Settings' }} />
+          <Stack.Screen name="EditSubAccount" component={EditSubAccount} options={{ title: 'Edit Sub-Account' }} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

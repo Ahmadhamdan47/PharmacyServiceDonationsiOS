@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, StatusBar, TextInput } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import SortToggle from './SortToggle';
 import axios from 'axios';
@@ -22,7 +22,11 @@ const List = () => {
     const [donorId, setDonorId] = useState('');
     const [recipientId, setRecipientId] = useState('');
     const [status, setStatus] = useState('All');
-    // Removed date filtering per requirement
+    const [searchQuery, setSearchQuery] = useState('');
+    const [fromDate, setFromDate] = useState(null);
+    const [toDate, setToDate] = useState(null);
+    const [showFromPicker, setShowFromPicker] = useState(false);
+    const [showToPicker, setShowToPicker] = useState(false);
     const [showDonorPicker, setShowDonorPicker] = useState(false);
     const [showRecipientPicker, setShowRecipientPicker] = useState(false);
     const [showStatusPicker, setShowStatusPicker] = useState(false);
@@ -93,7 +97,16 @@ const List = () => {
             fetchData();
         }, 150);
         return () => clearTimeout(id);
-    }, [userRole, selectedType, donorId, recipientId, status]);
+    }, [userRole, selectedType, donorId, recipientId, status, fromDate, toDate]);
+
+    // Debounced search effect
+    useEffect(() => {
+        if (!userRole || userRole === 'Recipient') return;
+        const timer = setTimeout(() => {
+            fetchData();
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
 
 
     const getUsername = async () => {
@@ -110,18 +123,31 @@ const List = () => {
     const fetchData = async () => {
         const token = await AsyncStorage.getItem('token');
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        
+
         if (selectedType === 'Donations') {
-            setDonations([]);
+            setImportations([]);
             try {
-                const response = await axios.get('https://apiv2.medleb.org/donation/filtered', {
+                let params = {
+                    donorId,
+                    recipientId,
+                    status: status === 'All' ? '' : status,
+                };
+                
+                if (searchQuery) {
+                    params.search = searchQuery;
+                }
+                
+                if (fromDate) {
+                    params.fromDate = fromDate.toISOString().split('T')[0];
+                }
+                
+                if (toDate) {
+                    params.toDate = toDate.toISOString().split('T')[0];
+                }
+
+                const response = await axios.get('https://apiv2.medleb.org/donations/filtered', {
                     headers,
-                    params: {
-                        donorId,
-                        recipientId,
-                        status: status === 'All' ? '' : status,
-                        // Date filters removed
-                    },
+                    params,
                 });
 
                 if (Array.isArray(response.data)) {
@@ -201,7 +227,6 @@ const List = () => {
         if (id && nonEmptyBoxCounts[id] != null) return nonEmptyBoxCounts[id];
         return null; // unknown until counts ready
     };
-                        
 
     const fetchDonors = async () => {
         try {
@@ -224,6 +249,35 @@ const List = () => {
             setRecipients(response.data);
         } catch (error) {
             console.error('Error fetching recipients:', error);
+        }
+    };
+
+    // Date validation helpers
+    const validateDates = (from, to) => {
+        if (from && to && from > to) {
+            alert('From date cannot be after To date');
+            return false;
+        }
+        return true;
+    };
+
+    const handleFromDateChange = (event, selectedDate) => {
+        setShowFromPicker(false);
+        if (selectedDate) {
+            if (toDate && !validateDates(selectedDate, toDate)) {
+                return;
+            }
+            setFromDate(selectedDate);
+        }
+    };
+
+    const handleToDateChange = (event, selectedDate) => {
+        setShowToPicker(false);
+        if (selectedDate) {
+            if (fromDate && !validateDates(fromDate, selectedDate)) {
+                return;
+            }
+            setToDate(selectedDate);
         }
     };
 
@@ -252,7 +306,45 @@ const List = () => {
                 <TouchableOpacity style={styles.typeButton} onPress={() => setSelectedType(selectedType === 'Donations' ? 'Importations' : 'Donations')}>
                     <Text style={styles.typeButtonText}>{selectedType}</Text>
                 </TouchableOpacity>
-                {/* Date filters removed */}
+                
+                {/* Search Bar */}
+                {selectedType === 'Donations' && (
+                    <TextInput
+                        style={styles.searchBar}
+                        placeholder="Search by brand name..."
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                    />
+                )}
+                
+                {/* Date Filters Row */}
+                {selectedType === 'Donations' && (
+                    <View style={styles.filterRow}>
+                        <View style={styles.filterColumn}>
+                            <Text style={styles.filterLabel}>From Date</Text>
+                            <TouchableOpacity 
+                                style={styles.filterButton} 
+                                onPress={() => setShowFromPicker(true)}
+                            >
+                                <Text style={styles.filterText}>
+                                    {fromDate ? fromDate.toLocaleDateString() : 'Select'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                        
+                        <View style={styles.filterColumn}>
+                            <Text style={styles.filterLabel}>To Date</Text>
+                            <TouchableOpacity 
+                                style={styles.filterButton} 
+                                onPress={() => setShowToPicker(true)}
+                            >
+                                <Text style={styles.filterText}>
+                                    {toDate ? toDate.toLocaleDateString() : 'Select'}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
            
 
                 {/* Second Row: Donor & Recipient (for Donations) */}
@@ -454,6 +546,27 @@ const List = () => {
                 )}
             </ScrollView>
 
+            {/* Date Pickers */}
+            {showFromPicker && (
+                <DateTimePicker
+                    value={fromDate || new Date()}
+                    mode="date"
+                    display="default"
+                    onChange={handleFromDateChange}
+                    maximumDate={new Date()}
+                />
+            )}
+
+            {showToPicker && (
+                <DateTimePicker
+                    value={toDate || new Date()}
+                    mode="date"
+                    display="default"
+                    onChange={handleToDateChange}
+                    maximumDate={new Date()}
+                />
+            )}
+
             {/* Bottom Navigation Bar by role */}
             {userRole === 'Donor' ? (
                 <BottomNavBar />
@@ -651,9 +764,18 @@ const styles = StyleSheet.create({
         borderColor: '#00A651',
         borderRadius: 20,
         paddingVertical: 10,
-        paddingHorizontal: 20,
-        marginBottom: 15,
-        alignSelf: 'center',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    searchBar: {
+        height: 40,
+        borderColor: '#00A651',
+        borderWidth: 1,
+        borderRadius: 20,
+        paddingHorizontal: 15,
+        marginBottom: 10,
+        backgroundColor: '#fff',
+        fontFamily: 'RobotoCondensed-Regular',
     },
     typeButtonText: {
         fontSize: 16,
