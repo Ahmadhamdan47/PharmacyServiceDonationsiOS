@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
+import * as Updates from 'expo-updates';
 
 import SignIn from './SignIn';
 import SignUp from './SignUp';
@@ -163,6 +164,30 @@ const App = () => {
       setIsLoggedIn(false);
     }
   };
+
+  // Check for updates on app launch
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      if (__DEV__) {
+        console.log('⚠️ Updates disabled in development mode');
+        return;
+      }
+
+      try {
+        const update = await Updates.checkForUpdateAsync();
+        if (update.isAvailable) {
+          console.log('📥 Downloading update...');
+          await Updates.fetchUpdateAsync();
+          console.log('✅ Update downloaded, reloading app...');
+          await Updates.reloadAsync();
+        }
+      } catch (error) {
+        console.error('Error checking for updates:', error);
+      }
+    };
+
+    checkForUpdates();
+  }, []);
 
   // Prepare app: wait for auth check (and fonts) before hiding splash
   useEffect(() => {

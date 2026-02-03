@@ -3,6 +3,7 @@
     "name": "MedLeb PS",
     "slug": "PharmacyServiceDonations",
     "scheme": "pharmacydonations",
+    "platforms": ["ios", "android"],
     "splash": {
       "image": "./assets/Icons.png",
       "resizeMode": "contain",
@@ -11,7 +12,7 @@
     "ios": {
       "bundleIdentifier": "org.name.PharmacyServiceDonations",
       "icon": "./assets/icon/android-icon.png",
-      "buildNumber": "12",
+      "buildNumber": "13",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
