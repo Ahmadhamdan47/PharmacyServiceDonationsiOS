@@ -16,6 +16,7 @@ import {
   TouchableWithoutFeedback,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from "react-native"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { CameraView, useCameraPermissions } from "expo-camera"
@@ -62,6 +63,7 @@ const BatchLotForm = React.forwardRef(
       setIsInputFocused,
       setIsDropDownOpen,
       validationErrors,
+      onRemove,
     },
     ref,
   ) => {
@@ -84,6 +86,12 @@ const BatchLotForm = React.forwardRef(
         {index > 0 && (
           <View style={styles.newDrugSeparator}>
             <Text style={styles.newDrugTitle}>New Drug</Text>
+            <TouchableOpacity
+              style={styles.removeFormButton}
+              onPress={() => onRemove && onRemove(index)}
+            >
+              <Text style={styles.removeFormButtonText}>✕ Remove</Text>
+            </TouchableOpacity>
           </View>
         )}
         <FieldLabel label="GTIN" />
@@ -268,7 +276,16 @@ const Donate = ({ route }) => {
   useEffect(() => {
     navigation.setOptions({
       headerLeft: () => (
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
+        <TouchableOpacity 
+          onPress={() => {
+            if (isCameraOpen) {
+              setIsCameraOpen(false)
+            } else {
+              showExitConfirmation()
+            }
+          }} 
+          style={styles.backButtonContainer}
+        >
           <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
         </TouchableOpacity>
       ),
@@ -286,7 +303,7 @@ const Donate = ({ route }) => {
         borderBottomWidth: 0,
       },
     })
-  }, [navigation]) // Add packCounter to dependencies
+  }, [navigation, isCameraOpen]) // Add isCameraOpen to dependencies
 
   const { donorId, recipientId, donationPurpose, donationId } = route.params || {}
   const navigation = useNavigation()
@@ -295,6 +312,7 @@ const Donate = ({ route }) => {
   const [batchLots, setBatchLots] = useState([createEmptyBatchLot()])
   const [isCameraOpen, setIsCameraOpen] = useState(false)
   const [cameraIndex, setCameraIndex] = useState(null)
+  const [isProcessingScan, setIsProcessingScan] = useState(false)
   const [drugItems, setDrugItems] = useState([])
   const [scrollEnabled, setScrollEnabled] = useState(true)
   const [isInputFocused, setIsInputFocused] = useState(false)
@@ -516,6 +534,12 @@ const Donate = ({ route }) => {
     const keyboardDidHideListener = Keyboard.addListener("keyboardDidHide", () => setIsInputFocused(false))
 
     const backAction = () => {
+      // If camera is open, close it and go back to Donate page
+      if (isCameraOpen) {
+        setIsCameraOpen(false)
+        return true
+      }
+      // Otherwise show exit confirmation
       showExitConfirmation()
       return true
     }
@@ -526,20 +550,57 @@ const Donate = ({ route }) => {
       keyboardDidHideListener.remove()
       backHandler.remove()
     }
-  }, [])
+  }, [isCameraOpen])
 
   const showExitConfirmation = () => {
     Alert.alert(
       "Confirm Exit",
-      "Are you sure you want to cancel the Donation?",
+      "Do you want to discard changes or go back to the donation?",
       [
         {
-          text: "Cancel",
-          style: "cancel",
+          text: "Discard",
+          style: "destructive",
+          onPress: () => {
+            // Navigate back to DonationDetails page if we have donation params
+            if (donationId) {
+              navigation.navigate('DonationDetails', {
+                donation: {
+                  DonationId: donationId,
+                  DonorId: donorId,
+                  RecipientId: recipientId,
+                  DonorName: route.params?.donorName || '',
+                  RecipientName: route.params?.recipientName || '',
+                  DonationPurpose: donationPurpose || '',
+                  DonationTitle: route.params?.donationTitle || '',
+                  DonationDate: route.params?.donationDate || new Date().toISOString(),
+                }
+              });
+            } else {
+              navigation.goBack();
+            }
+          },
         },
         {
-          text: "Yes",
-          onPress: () => navigation.goBack(),
+          text: "Back",
+          onPress: () => {
+            // Navigate back to DonationDetails page if we have donation params
+            if (donationId) {
+              navigation.navigate('DonationDetails', {
+                donation: {
+                  DonationId: donationId,
+                  DonorId: donorId,
+                  RecipientId: recipientId,
+                  DonorName: route.params?.donorName || '',
+                  RecipientName: route.params?.recipientName || '',
+                  DonationPurpose: donationPurpose || '',
+                  DonationTitle: route.params?.donationTitle || '',
+                  DonationDate: route.params?.donationDate || new Date().toISOString(),
+                }
+              });
+            } else {
+              navigation.goBack();
+            }
+          },
         },
       ],
       { cancelable: false },
@@ -796,6 +857,8 @@ const Donate = ({ route }) => {
 
       // Close the camera immediately after scanning
       setIsCameraOpen(false)
+      // Show loading animation
+      setIsProcessingScan(true)
 
       // Get the auth token for API calls
       const token = await AsyncStorage.getItem('token');
@@ -814,6 +877,7 @@ const Donate = ({ route }) => {
 
         if (duplicateIndex !== -1) {
           // Found duplicate in forms above - prevent scan
+          setIsProcessingScan(false)
           setTimeout(() => {
             Alert.alert(
               "Duplicate Pack Detected",
@@ -836,11 +900,22 @@ const Donate = ({ route }) => {
       const { isValid, isDonated, messageEN } = donationStatusResponse.data
 
       if (isDonated) {
+        setIsProcessingScan(false)
         setTimeout(() => {
           Alert.alert(
             "Drug Already Donated",
             `${messageEN}\n\nPlease scan a different pack.`, // Display the message from the API response
-            [{ text: "OK" }]
+            [{ 
+              text: "OK",
+              onPress: () => {
+                // Clear form if it's the initial one, or remove if it's a dynamic form
+                if (cameraIndex === 0) {
+                  clearPackForm(cameraIndex);
+                } else {
+                  removePack(cameraIndex);
+                }
+              }
+            }]
           )
         }, 100)
 
@@ -884,6 +959,8 @@ const Donate = ({ route }) => {
         if (specialite) {
           console.log("BDPM: specialite found for GTIN:", codeForLookup)
           applySpecialiteToForm(cameraIndex, specialite, codeForLookup)
+          // Hide loading animation after successful processing
+          setTimeout(() => setIsProcessingScan(false), 500)
         } else {
           console.log("BDPM: no specialite found for GTIN:", codeForLookup)
           
@@ -895,6 +972,9 @@ const Donate = ({ route }) => {
             }
             return updated
           })
+          
+          // Hide loading animation
+          setIsProcessingScan(false)
           
           Alert.alert(
             "Not Found in Database",
@@ -920,6 +1000,7 @@ const Donate = ({ route }) => {
         }
       }
     } catch (error) {
+      setIsProcessingScan(false)
       console.error("Error checking donation status or parsing scanned data:", error)
       
       // Handle authentication errors specifically
@@ -1249,9 +1330,29 @@ const Donate = ({ route }) => {
   // Remove pack form (for additional packs only)
   const removePack = (index) => {
     if (index === 0) return; // Never remove the first pack
-    setBatchLots((prev) => prev.filter((_, i) => i !== index));
-    setValidationErrors((prev) => prev.filter((_, i) => i !== index));
-    setPackCounter(prev => Math.max(1, prev - 1));
+    
+    Alert.alert(
+      "Remove Pack",
+      "Are you sure you want to remove this pack form?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => {
+            setBatchLots((prev) => prev.filter((_, i) => i !== index));
+            setValidationErrors((prev) => prev.filter((_, i) => i !== index));
+            setPackCounter(prev => Math.max(1, prev - 1));
+            // Update refs array
+            batchLotRefs.current = batchLotRefs.current.filter((_, i) => i !== index);
+          },
+        },
+      ],
+      { cancelable: false }
+    );
   };
 
   // Validate required fields and set field-level errors
@@ -1534,15 +1635,33 @@ const Donate = ({ route }) => {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.container}>
       {isCameraOpen ? (
-        <CameraView
-          style={{ ...StyleSheet.absoluteFillObject, height: "100%" }}
-          facing="back"
-          onBarcodeScanned={handleBarcodeDetected}
-          barcodeScannerSettings={{
-            barcodeTypes: ["datamatrix", "qr", "code128", "code39", "ean13", "ean8", "upc_a", "upc_e"],
-          }}
-        />
+        <View style={{ flex: 1 }}>
+          <CameraView
+            style={{ ...StyleSheet.absoluteFillObject, height: "100%" }}
+            facing="back"
+            onBarcodeScanned={handleBarcodeDetected}
+            barcodeScannerSettings={{
+              barcodeTypes: ["datamatrix", "qr", "code128", "code39", "ean13", "ean8", "upc_a", "upc_e"],
+            }}
+          />
+          <TouchableOpacity
+            style={styles.closeCameraButton}
+            onPress={() => setIsCameraOpen(false)}
+          >
+            <Text style={styles.closeCameraButtonText}>✕ Close Camera</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
+        <>
+          {isProcessingScan && (
+            <View style={styles.loadingOverlay}>
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#00a651" />
+                <Text style={styles.loadingText}>Processing scan...</Text>
+                <Text style={styles.loadingSubText}>Verifying product information</Text>
+              </View>
+            </View>
+          )}
         <ScrollView
           ref={scrollViewRef}
           onScroll={(event) => setScrollPosition(event.nativeEvent.contentOffset.y)}
@@ -1749,6 +1868,7 @@ const Donate = ({ route }) => {
               setIsInputFocused={setIsInputFocused}
               setIsDropDownOpen={setIsDropDownOpen}
               validationErrors={validationErrors}
+              onRemove={removePack}
               ref={(el) => (batchLotRefs.current[index + 1] = el)}
             />
           ))}
@@ -1772,6 +1892,7 @@ const Donate = ({ route }) => {
             </TouchableOpacity>
           </View>
         </ScrollView>
+        </>
       )}
       {!isCameraOpen && !isInputFocused && !isDropDownOpen && <BottomNavBar />}
       <Modal
@@ -1985,6 +2106,9 @@ const styles = StyleSheet.create({
   newDrugSeparator: {
     backgroundColor: "#f9f9f9",
     padding: 5, // Reduced padding
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   newDrugTitle: {
     color: "#00a651",
@@ -1992,6 +2116,19 @@ const styles = StyleSheet.create({
     fontFamily: "RobotoCondensed-Bold",
     marginLeft: 35,
     backgroundColor: "#f9f9f9",
+    flex: 1,
+  },
+  removeFormButton: {
+    backgroundColor: "#ff4444",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    marginRight: 35,
+  },
+  removeFormButtonText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontFamily: "RobotoCondensed-Bold",
   },
   row: {
     flexDirection: "row",
@@ -2252,6 +2389,60 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "RobotoCondensed-Medium",
     color: "#333",
+  },
+  closeCameraButton: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    zIndex: 10,
+  },
+  closeCameraButtonText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontFamily: "RobotoCondensed-Bold",
+  },
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+  loadingContainer: {
+    backgroundColor: "#ffffff",
+    borderRadius: 15,
+    padding: 30,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    minWidth: 200,
+  },
+  loadingText: {
+    marginTop: 15,
+    fontSize: 18,
+    fontFamily: "RobotoCondensed-Bold",
+    color: "#333",
+  },
+  loadingSubText: {
+    marginTop: 8,
+    fontSize: 14,
+    fontFamily: "RobotoCondensed-Regular",
+    color: "#666",
+    textAlign: "center",
   },
 })
 

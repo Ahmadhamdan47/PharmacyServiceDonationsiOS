@@ -416,6 +416,7 @@ const RecipientList = () => {
                 value={type === 'from' ? (fromDate || new Date()) : (toDate || new Date())}
                 mode="date"
                 display="default"
+                maximumDate={new Date()}
                 onChange={(event, selectedDate) => {
                     const currentDate = selectedDate || (type === 'from' ? fromDate : toDate);
                     if (type === 'from') {

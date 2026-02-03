@@ -182,9 +182,11 @@ const DonationDetails = ({ route, navigation }) => {
             // Create a new workbook
             const wb = XLSX.utils.book_new();
 
-            // Create Summary Sheet
+            // Calculate total packs
             const totalPacks = nonEmptyBoxes.reduce((sum, box) => sum + (box.NumberOfPacks || 0), 0);
-            const summaryData = [
+
+            // Start with summary data at the top
+            const combinedData = [
                 ['Donation Export Summary'],
                 [],
                 ['Donation Title', donation.DonationTitle],
@@ -193,15 +195,13 @@ const DonationDetails = ({ route, navigation }) => {
                 ['Date', donation.DonationDate || formatDate(donation.CreatedDate)],
                 ['Total Boxes', nonEmptyBoxes.length],
                 ['Total Packs', totalPacks],
-            ];
-            const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
-            XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
-
-            // Collect all packets from all boxes into a single sheet
-            const allPacketsData = [
+                [],
+                [],
+                // Packet details header
                 ['Box Name', '#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Last Updated']
             ];
 
+            // Collect all packets from all boxes
             let globalIndex = 1;
             for (const box of nonEmptyBoxes) {
                 try {
@@ -211,7 +211,7 @@ const DonationDetails = ({ route, navigation }) => {
 
                     // Add all packets from this box to the combined data
                     batchLots.forEach((lot) => {
-                        allPacketsData.push([
+                        combinedData.push([
                             boxName,
                             globalIndex++,
                             lot.DrugName || 'N/A',
@@ -232,9 +232,9 @@ const DonationDetails = ({ route, navigation }) => {
                 }
             }
 
-            // Create the Packets sheet
-            const packetsSheet = XLSX.utils.aoa_to_sheet(allPacketsData);
-            XLSX.utils.book_append_sheet(wb, packetsSheet, 'Packets');
+            // Create a single sheet with all data
+            const sheet = XLSX.utils.aoa_to_sheet(combinedData);
+            XLSX.utils.book_append_sheet(wb, sheet, 'Donation Details');
 
             // Write workbook to file
             const wbout = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });

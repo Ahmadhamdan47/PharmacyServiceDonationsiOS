@@ -425,6 +425,7 @@ const DonorList = ({ navigation }) => {
                             value={fromDate ? new Date(fromDate) : new Date()}
                             mode="date"
                             display="default"
+                            maximumDate={new Date()}
                             onChange={(event, selectedDate) => {
                                 setShowFromDatePicker(false);
                                 if (event.type !== 'dismissed') setFromDate(selectedDate);
@@ -436,6 +437,7 @@ const DonorList = ({ navigation }) => {
                             value={toDate ? new Date(toDate) : new Date()}
                             mode="date"
                             display="default"
+                            maximumDate={new Date()}
                             onChange={(event, selectedDate) => {
                                 setShowToDatePicker(false);
                                 if (event.type !== 'dismissed') setToDate(selectedDate);
