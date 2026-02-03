@@ -95,7 +95,7 @@ const Inspect = ({ route }) => {
         );
 
         const backAction = () => {
-            navigation.navigate('Landing');
+            navigation.goBack();
             return true;
         };
 

@@ -268,7 +268,7 @@ const Donate = ({ route }) => {
   useEffect(() => {
     navigation.setOptions({
       headerLeft: () => (
-        <TouchableOpacity onPress={() => navigation.navigate("Landing")} style={styles.backButtonContainer}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
           <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
         </TouchableOpacity>
       ),
@@ -539,7 +539,7 @@ const Donate = ({ route }) => {
         },
         {
           text: "Yes",
-          onPress: () => navigation.navigate("Landing"),
+          onPress: () => navigation.goBack(),
         },
       ],
       { cancelable: false },
@@ -801,7 +801,31 @@ const Donate = ({ route }) => {
       const token = await AsyncStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-      // Call the checkDonationStatus API
+      const gtinTrimmed = String(response.gtin || "").trim();
+      const serialTrimmed = String(response.sn || "").trim();
+
+      // FIRST: Check for duplicates in forms above the current one
+      if (gtinTrimmed && serialTrimmed) {
+        const duplicateIndex = batchLots.findIndex((lot, idx) => {
+          if (idx >= cameraIndex) return false; // Only check forms above
+          return String(lot.gtin || "").trim() === gtinTrimmed && 
+                 String(lot.serialNumber || "").trim() === serialTrimmed;
+        });
+
+        if (duplicateIndex !== -1) {
+          // Found duplicate in forms above - prevent scan
+          setTimeout(() => {
+            Alert.alert(
+              "Duplicate Pack Detected",
+              `This pack has already been scanned in Pack ${duplicateIndex + 1} above.\n\nGTIN: ${gtinTrimmed}\nSerial Number: ${serialTrimmed}\n\nPlease scan a different pack.`,
+              [{ text: "OK" }]
+            );
+          }, 100);
+          return; // Stop processing
+        }
+      }
+
+      // SECOND: Check the database for already donated packs
       const donationStatusResponse = await axios.post("https://apiv2.medleb.org/batchserial/checkDonationStatus", {
         GTIN: response.gtin,
         BatchNumber: response.lot,
@@ -815,19 +839,8 @@ const Donate = ({ route }) => {
         setTimeout(() => {
           Alert.alert(
             "Drug Already Donated",
-            messageEN, // Display the message from the API response
-            [{ 
-              text: "OK",
-              onPress: () => {
-                if (cameraIndex === 0) {
-                  // Main pack form - just clear fields
-                  clearPackForm(cameraIndex);
-                } else {
-                  // Additional pack form - remove entirely
-                  removePack(cameraIndex);
-                }
-              }
-            }],
+            `${messageEN}\n\nPlease scan a different pack.`, // Display the message from the API response
+            [{ text: "OK" }]
           )
         }, 100)
 
@@ -1087,7 +1100,98 @@ const Donate = ({ route }) => {
     setIsFormValid(allFilled)
   }
 
-  const handleFieldChange = (index, field, value) => {
+  // Check for duplicate packets in current batch (same GTIN + serial number)
+  const checkForDuplicateInBatch = async (index, gtin, serialNumber) => {
+    // Skip if either field is empty
+    if (!gtin || !serialNumber) return;
+
+    const gtinTrimmed = String(gtin).trim();
+    const serialTrimmed = String(serialNumber).trim();
+
+    // Check against forms above this one (previously scanned packs)
+    const duplicateIndex = batchLots.findIndex((lot, idx) => {
+      if (idx >= index) return false; // Only check forms above (with lower index)
+      return String(lot.gtin || "").trim() === gtinTrimmed && 
+             String(lot.serialNumber || "").trim() === serialTrimmed;
+    });
+
+    if (duplicateIndex !== -1) {
+      // Found duplicate in forms above
+      Alert.alert(
+        "Duplicate Pack Detected",
+        `This pack has already been scanned in Pack ${duplicateIndex + 1} above.\n\nGTIN: ${gtinTrimmed}\nSerial Number: ${serialTrimmed}\n\nWould you like to clear this duplicate entry?`,
+        [
+          {
+            text: "Cancel",
+            style: "cancel"
+          },
+          {
+            text: "Clear Data",
+            onPress: () => {
+              if (index === 0) {
+                clearPackForm(index);
+              } else {
+                removePack(index);
+              }
+            }
+          }
+        ]
+      );
+      return true; // Is duplicate
+    }
+
+    // Check against database for already donated packets
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      const response = await axios.post(
+        "https://apiv2.medleb.org/batchserial/checkDonationStatus",
+        {
+          GTIN: gtinTrimmed,
+          SerialNumber: serialTrimmed,
+          BatchNumber: batchLots[index]?.lotNumber || "",
+          ExpiryDate: batchLots[index]?.expiryDate || "",
+        },
+        { headers }
+      );
+
+      const { isDonated, messageEN } = response.data;
+
+      if (isDonated) {
+        Alert.alert(
+          "Drug Already Donated",
+          `${messageEN || "This pack has already been donated."}\n\nGTIN: ${gtinTrimmed}\nSerial Number: ${serialTrimmed}\n\nWould you like to clear this entry?`,
+          [
+            {
+              text: "Cancel",
+              style: "cancel"
+            },
+            {
+              text: "Clear Data",
+              onPress: () => {
+                if (index === 0) {
+                  clearPackForm(index);
+                } else {
+                  removePack(index);
+                }
+              }
+            }
+          ]
+        );
+        return true; // Is already donated
+      }
+    } catch (error) {
+      // Only log errors, don't block if API check fails
+      if (error.response?.status !== 404) {
+        console.error("Error checking for duplicate:", error);
+      }
+    }
+
+    return false; // Not a duplicate
+  };
+
+  const handleFieldChange = async (index, field, value) => {
     setBatchLots((prevBatchLots) => {
       const updatedBatchLots = [...prevBatchLots]
       updatedBatchLots[index][field] = value
@@ -1100,6 +1204,21 @@ const Donate = ({ route }) => {
 
       return updatedBatchLots
     })
+
+    // After updating the field, check for duplicates if both GTIN and serial number are filled
+    // Wait a bit to allow state to update
+    setTimeout(async () => {
+      const currentBatch = batchLots[index] || {};
+      const updatedValue = field === 'gtin' || field === 'serialNumber' ? value : currentBatch[field];
+      
+      const gtin = field === 'gtin' ? value : currentBatch.gtin;
+      const serialNumber = field === 'serialNumber' ? value : currentBatch.serialNumber;
+
+      // Only check when both GTIN and serial number are present
+      if (gtin && serialNumber && (field === 'gtin' || field === 'serialNumber')) {
+        await checkForDuplicateInBatch(index, gtin, serialNumber);
+      }
+    }, 300);
   }
 
   useEffect(() => {

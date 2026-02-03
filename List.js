@@ -22,12 +22,14 @@ const List = () => {
     const [donorId, setDonorId] = useState('');
     const [recipientId, setRecipientId] = useState('');
     const [status, setStatus] = useState('All');
+    const [inspectionStatus, setInspectionStatus] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
     const [fromDate, setFromDate] = useState(null);
     const [toDate, setToDate] = useState(null);
     const [showFromPicker, setShowFromPicker] = useState(false);
     const [showToPicker, setShowToPicker] = useState(false);
     const [showDonorPicker, setShowDonorPicker] = useState(false);
+    const [showInspectionStatusPicker, setShowInspectionStatusPicker] = useState(false);
     const [showRecipientPicker, setShowRecipientPicker] = useState(false);
     const [showStatusPicker, setShowStatusPicker] = useState(false);
     const [username, setUsername] = useState('');
@@ -283,18 +285,41 @@ const List = () => {
 
     // Date pickers removed
 
-    // Add this function to determine the color based on status
-    const getStatusColor = (status) => {
-        switch (status.toLowerCase()) {
-            case 'pending':
-                return 'orange';
-            case 'approved':
-                return 'green';
-            case 'inspect':
-                return 'red';
-            default:
-                return 'black';
+    // Helper to get primary display status (Processing or Sent)
+    const getPrimaryStatus = (backendStatus) => {
+        if (!backendStatus) return 'Unknown';
+        const status = backendStatus.toLowerCase();
+        if (status === 'pending') {
+            return 'Processing';
         }
+        // approved, inspect, inspected, refused are all "Sent"
+        return 'Sent';
+    };
+
+    // Helper to get inspection substatus when status is "Sent"
+    const getInspectionStatus = (backendStatus) => {
+        if (!backendStatus) return null;
+        const status = backendStatus.toLowerCase();
+        if (status === 'pending') return null; // No inspection status for Processing
+        // Map backend status to inspection display
+        if (status === 'approved') return 'Approved';
+        if (status === 'inspect') return 'Inspected';
+        if (status === 'inspected') return 'Inspected';
+        if (status === 'refused') return 'Refused';
+        return null;
+    };
+
+    // Add this function to determine the color based on status
+    const getStatusColor = (backendStatus) => {
+        if (!backendStatus) return 'black';
+        const status = backendStatus.toLowerCase();
+        // Processing = orange
+        if (status === 'pending') return 'orange';
+        // Sent statuses - color by inspection result
+        if (status === 'approved') return 'green';
+        if (status === 'inspect' || status === 'inspected') return 'blue';
+        if (status === 'refused') return 'red';
+        return 'black';
     };
 
     return (
@@ -416,8 +441,12 @@ const List = () => {
                         {showStatusPicker && (
                             <View style={styles.dropdown}>
                                 <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
-                                    {['All', 'Pending', 'Approved', 'Inspect'].map((s) => (
-                                        <TouchableOpacity key={s} onPress={() => { setStatus(s); setShowStatusPicker(false); }}>
+                                    {['All', 'Processing', 'Sent'].map((s) => (
+                                        <TouchableOpacity key={s} onPress={() => { 
+                                            setStatus(s); 
+                                            setShowStatusPicker(false);
+                                            if (s !== 'Sent') setInspectionStatus('All'); // Reset inspection status if not Sent
+                                        }}>
                                             <Text style={styles.dropdownText}>{s}</Text>
                                         </TouchableOpacity>
                                     ))}
@@ -425,6 +454,28 @@ const List = () => {
                             </View>
                         )}
                     </View>
+                    {status === 'Sent' && (
+                        <View style={styles.filterColumnInline}>
+                            <Text style={styles.filterLabel}>Inspection</Text>
+                            <TouchableOpacity onPress={() => setShowInspectionStatusPicker(!showInspectionStatusPicker)} style={styles.filterButton}>
+                                <View style={styles.pickerContent}>
+                                    <Text style={styles.filterText} numberOfLines={1} ellipsizeMode='tail'>{inspectionStatus}</Text>
+                                    <MaterialCommunityIcons name={showInspectionStatusPicker ? 'chevron-up' : 'chevron-down'} size={20} color="#000000ff" />
+                                </View>
+                            </TouchableOpacity>
+                            {showInspectionStatusPicker && (
+                                <View style={styles.dropdown}>
+                                    <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
+                                        {['All', 'Approved', 'Inspected', 'Refused'].map((s) => (
+                                            <TouchableOpacity key={s} onPress={() => { setInspectionStatus(s); setShowInspectionStatusPicker(false); }}>
+                                                <Text style={styles.dropdownText}>{s}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                </View>
+                            )}
+                        </View>
+                    )}
                     <View style={styles.filterColumnInline}>
                         <Text style={styles.filterLabel}>Refresh</Text>
                         <TouchableOpacity style={styles.searchButton} onPress={fetchData}>
@@ -470,7 +521,10 @@ const List = () => {
                                     onPress={() => navigation.navigate('DonationDetails', { donation })}
                                 >
                                     <View style={styles.cardHeader}>
-                                        <Text style={[styles.statusText, { color: getStatusColor(donation.status) }]}>{donation.status}</Text>
+                                        <Text style={[styles.statusText, { color: getStatusColor(donation.status) }]}>
+                                            {getPrimaryStatus(donation.status)}
+                                            {getInspectionStatus(donation.status) && ` - ${getInspectionStatus(donation.status)}`}
+                                        </Text>
                                     </View>
                                     
                                     <View style={styles.cardContent}>

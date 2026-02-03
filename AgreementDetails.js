@@ -156,11 +156,7 @@ const AgreementDetails = ({ route }) => {
   }
 
   const navigateToAgreements = () => {
-    if (userRole === 'Recipient') {
-      navigation.navigate('RecipientAgreements')
-    } else {
-      navigation.navigate('DonorAgreements')
-    }
+    navigation.goBack()
   }
 
   const updateAgreementStatus = async (status) => {

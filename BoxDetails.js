@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator, TouchableOpacity, Image, useWindowDimensions, Platform, TextInput } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Table, Row, Rows } from 'react-native-table-component';
@@ -25,6 +26,8 @@ const BoxDetails = ({ route, navigation }) => {
     const [isQrCodeVisible, setIsQrCodeVisible] = useState(false); // Start with the QR code hidden
     const qrCodeRef = useRef(); // Reference for capturing QR code
     const insets = useSafeAreaInsets(); // Get safe area insets
+    const [uploadedFileUrl, setUploadedFileUrl] = useState(null); // Store uploaded Excel file URL
+    const [isUploadingFile, setIsUploadingFile] = useState(false); // Track upload progress
 
     const fetchFonts = async () => {
         await Font.loadAsync({
@@ -42,6 +45,16 @@ const BoxDetails = ({ route, navigation }) => {
     useEffect(() => {
         fetchSerialNumbers();
     }, []);
+
+    // Auto-regenerate Excel file when batchLots data changes
+    useFocusEffect(
+        useCallback(() => {
+            if (batchLots.length > 0 && !loading) {
+                // Regenerate file when data changes (after manual edits)
+                uploadExcelFile();
+            }
+        }, [batchLots])
+    );
 
     navigation.setOptions({
         headerLeft: () => (
@@ -143,6 +156,95 @@ const BoxDetails = ({ route, navigation }) => {
         }
     };
 
+    const uploadExcelFile = async () => {
+        try {
+            setIsUploadingFile(true);
+            
+            // Generate Excel file
+            const dataForExcel = [
+                ['Donor Name', 'Recipient Name', 'Donation Title', 'Box Label'],
+                [box.DonorName, box.RecipientName, box.DonationTitle, box.BoxLabel],
+                [],
+                ['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Last Updated'],
+                ...batchLots.map((lot, index) => [
+                    index + 1,
+                    lot.DrugName || 'N/A',
+                    lot.Presentation || 'N/A',
+                    lot.Form || 'N/A',
+                    lot.Laboratory || 'N/A',
+                    lot.LaboratoryCountry || 'N/A',
+                    `'${lot.GTIN || 'N/A'}`,
+                    lot.BatchNumber || 'N/A',
+                    lot.ExpiryDate || 'N/A',
+                    lot.SerialNumber || 'N/A',
+                    formatDate(lot.lastUpdated)
+                ])
+            ];
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(dataForExcel);
+            XLSX.utils.book_append_sheet(wb, ws, 'Box Details');
+
+            const wbout = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
+            const fileName = `${box.DonorName}_${box.RecipientName}_${box.DonationTitle}_${box.BoxLabel}.xlsx`.replace(/[/\\?%*:|"<>]/g, '-');
+            const uri = `${FileSystem.documentDirectory}${fileName}`;
+            
+            await FileSystem.writeAsStringAsync(uri, wbout, {
+                encoding: 'base64',
+            });
+
+            // Prepare FormData for upload
+            const formData = new FormData();
+            formData.append('file', {
+                uri: uri,
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                name: fileName,
+            });
+
+            const metadata = {
+                originalName: fileName,
+                boxId: box.BoxId,
+                donationTitle: box.DonationTitle,
+                boxLabel: box.BoxLabel || box.DisplayLabel,
+                donorName: box.DonorName,
+                recipientName: box.RecipientName,
+                numberOfPacks: batchLots.length,
+                purpose: 'box_export'
+            };
+            
+            formData.append('metadata', JSON.stringify(metadata));
+
+            // Get auth token and upload
+            const token = await AsyncStorage.getItem('token');
+            const headers = {
+                'Content-Type': 'multipart/form-data',
+            };
+            
+            if (token) {
+                headers.Authorization = `Bearer ${token}`;
+            }
+
+            const response = await axios.post('https://apiv2.medleb.org/files/upload', formData, { headers });
+            
+            let fileUrl = response.data.downloadUrl || response.data.url || response.data.fileUrl;
+            
+            // If the URL is relative, prepend the base URL
+            if (fileUrl && !fileUrl.startsWith('http')) {
+                fileUrl = `https://apiv2.medleb.org${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
+            }
+            
+            setUploadedFileUrl(fileUrl);
+            setIsUploadingFile(false);
+            
+            return fileUrl;
+        } catch (error) {
+            setIsUploadingFile(false);
+            console.error('Error uploading Excel file:', error);
+            Alert.alert('Upload Error', 'Failed to upload box file. Please try again.');
+            return null;
+        }
+    };
+
     const handleExportAsExcel = async () => {
         try {
             const dataForExcel = [
@@ -189,23 +291,37 @@ const BoxDetails = ({ route, navigation }) => {
     };
 
     const handleQrCodeShare = async () => {
-        setIsQrCodeVisible(true); // Make QR code visible
-
-        // Wait a moment to ensure QR code is rendered
-        setTimeout(async () => {
-            try {
-                // Capture the QR code as an image
-                const uri = await qrCodeRef.current.capture();
-
-                // Share the captured image
-                await Sharing.shareAsync(uri);
-            } catch (error) {
-                console.error('Error sharing QR code:', error);
-                Alert.alert('Error', 'Failed to share QR code.');
+        try {
+            // Upload Excel file first if not already uploaded
+            let fileUrl = uploadedFileUrl;
+            if (!fileUrl) {
+                fileUrl = await uploadExcelFile();
+                if (!fileUrl) {
+                    return; // Upload failed, error already shown
+                }
             }
 
-            setIsQrCodeVisible(false); // Hide the QR code again after sharing
-        }, 500); // 500ms delay to ensure the QR code is rendered
+            setIsQrCodeVisible(true); // Make QR code visible
+
+            // Wait a moment to ensure QR code is rendered
+            setTimeout(async () => {
+                try {
+                    // Capture the QR code as an image
+                    const uri = await qrCodeRef.current.capture();
+
+                    // Share the captured image
+                    await Sharing.shareAsync(uri);
+                } catch (error) {
+                    console.error('Error sharing QR code:', error);
+                    Alert.alert('Error', 'Failed to share QR code.');
+                }
+
+                setIsQrCodeVisible(false); // Hide the QR code again after sharing
+            }, 500); // 500ms delay to ensure the QR code is rendered
+        } catch (error) {
+            console.error('Error preparing QR code:', error);
+            Alert.alert('Error', 'Failed to prepare QR code.');
+        }
     };
 
     return (
@@ -261,7 +377,7 @@ const BoxDetails = ({ route, navigation }) => {
                             <ViewShot ref={qrCodeRef} options={{ format: "png", quality: 0.9 }}>
                                 <View style={styles.qrCodeContent}>
                                     <QRCode 
-                                        value={`https://pharmacy.com/api/box/${box.BoxId}/download`} 
+                                        value={uploadedFileUrl || `https://apiv2.medleb.org/files/box/${box.BoxId}`} 
                                         size={150} 
                                     />
                                     <View style={styles.qrCodeInfo}>
@@ -355,7 +471,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontFamily: 'RobotoCondensed-Bold',
         marginBottom: 5,
-        color:'#f9f9f9'
+        color:'#000'
     },
     backButtonImage: {
         width: 41,

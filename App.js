@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import * as SplashScreen from 'expo-splash-screen';
@@ -190,7 +191,33 @@ const App = () => {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer ref={navigationRef}>
+      <NavigationContainer 
+        ref={navigationRef}
+        linking={{
+          prefixes: ['https://apiv2.medleb.org', 'pharmacydonations://'],
+          config: {
+            screens: {
+              BoxDetails: {
+                path: 'files/:fileId',
+                parse: {
+                  fileId: (fileId) => fileId,
+                },
+              },
+            },
+          },
+          async getInitialURL() {
+            // Check if app was opened by a deep link
+            const url = await Linking.getInitialURL();
+            return url;
+          },
+          subscribe(listener) {
+            // Listen for deep links while app is open
+            const onReceiveURL = ({ url }) => listener(url);
+            const subscription = Linking.addEventListener('url', onReceiveURL);
+            return () => subscription.remove();
+          },
+        }}
+      >
         <Stack.Navigator
           initialRouteName={isLoggedIn ? 'Landing' : 'SignIn'}
           screenOptions={{ headerTitleAlign: 'center' }}

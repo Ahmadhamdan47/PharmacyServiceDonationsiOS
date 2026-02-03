@@ -25,7 +25,9 @@ const DonorList = ({ navigation }) => {
     const [showFromDatePicker, setShowFromDatePicker] = useState(false);
     const [showToDatePicker, setShowToDatePicker] = useState(false);
     const [status, setStatus] = useState('All');
+    const [inspectionStatus, setInspectionStatus] = useState('All');
     const [showStatusPicker, setShowStatusPicker] = useState(false);
+    const [showInspectionStatusPicker, setShowInspectionStatusPicker] = useState(false);
     const [sortAsc, setSortAsc] = useState(true); // true = oldest→newest
     // Keep unfiltered list separate
     const [allDonations, setAllDonations] = useState([]);
@@ -298,12 +300,28 @@ const DonorList = ({ navigation }) => {
         }
     };
 
-    const applyFilters = (data, { fromDate, toDate, status }) => {
+    const applyFilters = (data, { fromDate, toDate, status, inspectionStatus }) => {
         let out = Array.isArray(data) ? [...data] : [];
-        // Status filter
+        // Status filter - map display status to backend status
         const st = (status || 'All').toLowerCase();
         if (st !== 'all') {
-            out = out.filter(d => (d?.status || '').toLowerCase() === st);
+            if (st === 'processing') {
+                // Processing = backend "pending"
+                out = out.filter(d => (d?.status || '').toLowerCase() === 'pending');
+            } else if (st === 'sent') {
+                // Sent = any inspection status, filtered by inspectionStatus if specified
+                const ist = (inspectionStatus || 'All').toLowerCase();
+                out = out.filter(d => {
+                    const ds = (d?.status || '').toLowerCase();
+                    const isSent = ds === 'approved' || ds === 'inspect' || ds === 'inspected' || ds === 'refused';
+                    if (!isSent) return false;
+                    if (ist === 'all') return true;
+                    return ds === ist;
+                });
+            } else {
+                // Direct backend status match (for backward compatibility)
+                out = out.filter(d => (d?.status || '').toLowerCase() === st);
+            }
         }
         // Date range filter on DonationDate
         const start = fromDate ? new Date(new Date(fromDate).setHours(0, 0, 0, 0)) : null;
@@ -327,7 +345,7 @@ const DonorList = ({ navigation }) => {
             Alert.alert('Invalid range', 'From date cannot be after To date.');
             return;
         }
-        const filtered = applyFilters(allDonations, { fromDate, toDate, status });
+        const filtered = applyFilters(allDonations, { fromDate, toDate, status, inspectionStatus });
         setDonations(filtered);
         setShowStatusPicker(false);
     };
@@ -438,8 +456,12 @@ const DonorList = ({ navigation }) => {
                             {showStatusPicker && (
                                 <View style={styles.dropdown}>
                                     <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
-                                        {['All', 'Pending', 'Approved', 'Inspected', 'refused'].map((s) => (
-                                            <TouchableOpacity key={s} onPress={() => { setStatus(s); setShowStatusPicker(false); }}>
+                                        {['All', 'Processing', 'Sent'].map((s) => (
+                                            <TouchableOpacity key={s} onPress={() => { 
+                                                setStatus(s); 
+                                                setShowStatusPicker(false);
+                                                if (s !== 'Sent') setInspectionStatus('All'); // Reset inspection status if not Sent
+                                            }}>
                                                 <Text style={styles.dropdownText}>{s}</Text>
                                             </TouchableOpacity>
                                         ))}
@@ -447,6 +469,28 @@ const DonorList = ({ navigation }) => {
                                 </View>
                             )}
                         </View>
+                        {status === 'Sent' && (
+                            <View style={styles.filterColumnInline}>
+                                <Text style={styles.filterLabel}>Inspection</Text>
+                                <TouchableOpacity onPress={() => setShowInspectionStatusPicker(!showInspectionStatusPicker)} style={styles.filterButton}>
+                                    <View style={styles.pickerContent}>
+                                        <Text style={styles.filterText} numberOfLines={1} ellipsizeMode="tail">{inspectionStatus}</Text>
+                                        <MaterialCommunityIcons name={showInspectionStatusPicker ? 'chevron-up' : 'chevron-down'} size={20} color="#000000ff" />
+                                    </View>
+                                </TouchableOpacity>
+                                {showInspectionStatusPicker && (
+                                    <View style={styles.dropdown}>
+                                        <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
+                                            {['All', 'Approved', 'Inspected', 'Refused'].map((s) => (
+                                                <TouchableOpacity key={s} onPress={() => { setInspectionStatus(s); setShowInspectionStatusPicker(false); }}>
+                                                    <Text style={styles.dropdownText}>{s}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </ScrollView>
+                                    </View>
+                                )}
+                            </View>
+                        )}
                         <View style={styles.filterColumnInline}>
                             <Text style={styles.filterLabel}>Search</Text>
                             <TouchableOpacity style={styles.searchButton} onPress={onSearch}>
@@ -498,7 +542,8 @@ const DonorList = ({ navigation }) => {
                                         <TouchableOpacity onPress={() => handlePressDonation(donation)}>
                                             <View style={styles.cardHeader}>
                                                 <Text style={[styles.statusText, { color: getStatusColor(donation?.status) }]}>
-                                                    {donation?.status || 'N/A'}
+                                                    {getPrimaryStatus(donation?.status)}
+                                                    {getInspectionStatus(donation?.status) && ` - ${getInspectionStatus(donation?.status)}`}
                                                 </Text>
                                             </View>
 
@@ -537,18 +582,40 @@ const DonorList = ({ navigation }) => {
     
 };
 
+// Helper to get primary display status (Processing or Sent)
+const getPrimaryStatus = (backendStatus) => {
+    if (!backendStatus) return 'Unknown';
+    const status = String(backendStatus).toLowerCase();
+    if (status === 'pending') {
+        return 'Processing';
+    }
+    // approved, inspect, inspected, refused are all "Sent"
+    return 'Sent';
+};
+
+// Helper to get inspection substatus when status is "Sent"
+const getInspectionStatus = (backendStatus) => {
+    if (!backendStatus) return null;
+    const status = String(backendStatus).toLowerCase();
+    if (status === 'pending') return null; // No inspection status for Processing
+    // Map backend status to inspection display
+    if (status === 'approved') return 'Approved';
+    if (status === 'inspect') return 'Inspected';
+    if (status === 'inspected') return 'Inspected';
+    if (status === 'refused') return 'Refused';
+    return null;
+};
+
 const getStatusColor = (status) => {
     if (!status) return '#121212';
-    switch (String(status).toLowerCase()) {
-        case 'pending':
-            return '#DB7B2B';
-        case 'approved':
-            return '#00A651';
-        case 'inspect':
-            return '#B00020';
-        default:
-            return '#121212';
-    }
+    const st = String(status).toLowerCase();
+    // Processing = orange
+    if (st === 'pending') return '#DB7B2B';
+    // Sent statuses - color by inspection result
+    if (st === 'approved') return '#00A651';
+    if (st === 'inspect' || st === 'inspected') return '#2196F3';
+    if (st === 'refused') return '#B00020';
+    return '#121212';
 };
 
 const styles = StyleSheet.create({

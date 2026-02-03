@@ -197,20 +197,23 @@ const DonationDetails = ({ route, navigation }) => {
             const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
             XLSX.utils.book_append_sheet(wb, summarySheet, 'Summary');
 
-            // For each non-empty box, fetch its data and create a sheet
+            // Collect all packets from all boxes into a single sheet
+            const allPacketsData = [
+                ['Box Name', '#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Last Updated']
+            ];
+
+            let globalIndex = 1;
             for (const box of nonEmptyBoxes) {
                 try {
                     const response = await axios.get(`https://apiv2.medleb.org/batchserial/byBox/${box.BoxId}`, { headers });
                     const batchLots = response.data.data || [];
+                    const boxName = box.DisplayLabel || box.BoxLabel || `Box ${box.BoxId}`;
 
-                    // Prepare data for this box (without Status column)
-                    const dataForExcel = [
-                        ['Donor Name', 'Recipient Name', 'Donation Title', 'Box Label'],
-                        [donation.DonorName, donation.RecipientName, donation.DonationTitle, box.DisplayLabel || box.BoxLabel],
-                        [],
-                        ['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Last Updated'],
-                        ...batchLots.map((lot, index) => [
-                            index + 1,
+                    // Add all packets from this box to the combined data
+                    batchLots.forEach((lot) => {
+                        allPacketsData.push([
+                            boxName,
+                            globalIndex++,
                             lot.DrugName || 'N/A',
                             lot.Presentation || 'N/A',
                             lot.Form || 'N/A',
@@ -221,20 +224,17 @@ const DonationDetails = ({ route, navigation }) => {
                             lot.ExpiryDate || 'N/A',
                             lot.SerialNumber || 'N/A',
                             formatDate(lot.lastUpdated)
-                        ])
-                    ];
-
-                    // Create worksheet for this box
-                    const ws = XLSX.utils.aoa_to_sheet(dataForExcel);
-                    
-                    // Use DisplayLabel as sheet name (e.g., "Box 1", "Box 2")
-                    const sheetName = (box.DisplayLabel || box.BoxLabel || `Box ${box.BoxId}`).substring(0, 31); // Excel sheet names max 31 chars
-                    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                        ]);
+                    });
                 } catch (error) {
                     console.warn(`Failed to fetch data for box ${box.BoxId}:`, error);
                     // Continue with other boxes even if one fails
                 }
             }
+
+            // Create the Packets sheet
+            const packetsSheet = XLSX.utils.aoa_to_sheet(allPacketsData);
+            XLSX.utils.book_append_sheet(wb, packetsSheet, 'Packets');
 
             // Write workbook to file
             const wbout = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
@@ -285,6 +285,7 @@ const DonationDetails = ({ route, navigation }) => {
                 <TextInput
                     style={styles.searchInput}
                     placeholder="Search by brand name in boxes..."
+                    placeholderTextColor="#888"
                     value={searchQuery}
                     onChangeText={setSearchQuery}
                 />
@@ -304,7 +305,7 @@ const DonationDetails = ({ route, navigation }) => {
                     {/* Show "Add More Items" button for donors when boxes exist */}
                     {userRole !== 'Admin' && boxes.filter(box => box.NumberOfPacks > 0).length > 0 && (
                         <TouchableOpacity style={styles.addMoreButton} onPress={handleStartDonation}>
-                            <Text style={styles.addMoreButtonText}>Add More Items</Text>
+                            <Text style={styles.addMoreButtonText}>Add More Boxes</Text>
                         </TouchableOpacity>
                     )}
 

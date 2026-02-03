@@ -77,7 +77,7 @@ const DonorAgreement = () => {
     useFocusEffect(
         React.useCallback(() => {
             const onBackPress = () => {
-                navigation.navigate('DonorLanding');
+                navigation.goBack();
                 return true; // Prevent default back behavior
             };
 

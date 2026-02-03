@@ -97,7 +97,7 @@ const Validate = () => {
                 setShowDonorPicker(false);
                 return true;
             }
-            navigation.navigate('Landing'); // Navigate to "Landing" when back button is pressed
+            navigation.goBack(); // Go back to previous screen
             return true; // Prevent default back button behavior
         };
 

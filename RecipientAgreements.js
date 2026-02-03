@@ -74,7 +74,7 @@ const RecipientAgreements = () => {
     useFocusEffect(
         React.useCallback(() => {
             const onBackPress = () => {
-                navigation.navigate('RecipientLanding');
+                navigation.goBack();
                 return true; // Prevent default back behavior
             };
 

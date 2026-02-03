@@ -23,7 +23,9 @@ const RecipientList = () => {
     const navigation = useNavigation();
     const [isFontLoaded, setIsFontLoaded] = useState(false);
     const [status, setStatus] = useState('All');
+    const [inspectionStatus, setInspectionStatus] = useState('All');
     const [showStatusPicker, setShowStatusPicker] = useState(false);
+    const [showInspectionStatusPicker, setShowInspectionStatusPicker] = useState(false);
     const [sortAsc, setSortAsc] = useState(true);
 
     // Debug function to check auth state
@@ -287,9 +289,28 @@ const RecipientList = () => {
                 }
 
                 if (status && status !== 'All') {
-                    filteredDonations = filteredDonations.filter(donation =>
-                        (donation.status || '').toLowerCase() === status.toLowerCase()
-                    );
+                    const st = status.toLowerCase();
+                    if (st === 'processing') {
+                        // Processing = backend "pending"
+                        filteredDonations = filteredDonations.filter(donation =>
+                            (donation.status || '').toLowerCase() === 'pending'
+                        );
+                    } else if (st === 'sent') {
+                        // Sent = any inspection status, filtered by inspectionStatus if specified
+                        const ist = (inspectionStatus || 'All').toLowerCase();
+                        filteredDonations = filteredDonations.filter(donation => {
+                            const ds = (donation.status || '').toLowerCase();
+                            const isSent = ds === 'approved' || ds === 'inspect' || ds === 'inspected' || ds === 'refused';
+                            if (!isSent) return false;
+                            if (ist === 'all') return true;
+                            return ds === ist;
+                        });
+                    } else {
+                        // Direct backend status match (for backward compatibility)
+                        filteredDonations = filteredDonations.filter(donation =>
+                            (donation.status || '').toLowerCase() === st
+                        );
+                    }
                 }
 
                 setDonations(filteredDonations);
@@ -409,17 +430,40 @@ const RecipientList = () => {
         );
     };
 
-    const getStatusColor = (status) => {
-        switch (status.toLowerCase()) {
-            case 'pending':
-                return 'orange';
-            case 'approved':
-                return 'green';
-            case 'inspect':
-                return 'red';
-            default:
-                return 'black';
+    // Helper to get primary display status (Processing or Sent)
+    const getPrimaryStatus = (backendStatus) => {
+        if (!backendStatus) return 'Unknown';
+        const status = backendStatus.toLowerCase();
+        if (status === 'pending') {
+            return 'Processing';
         }
+        // approved, inspect, inspected, refused are all "Sent"
+        return 'Sent';
+    };
+
+    // Helper to get inspection substatus when status is "Sent"
+    const getInspectionStatus = (backendStatus) => {
+        if (!backendStatus) return null;
+        const status = backendStatus.toLowerCase();
+        if (status === 'pending') return null; // No inspection status for Processing
+        // Map backend status to inspection display
+        if (status === 'approved') return 'Approved';
+        if (status === 'inspect') return 'Inspected';
+        if (status === 'inspected') return 'Inspected';
+        if (status === 'refused') return 'Refused';
+        return null;
+    };
+
+    const getStatusColor = (status) => {
+        if (!status) return 'black';
+        const st = status.toLowerCase();
+        // Processing = orange
+        if (st === 'pending') return 'orange';
+        // Sent statuses - color by inspection result
+        if (st === 'approved') return 'green';
+        if (st === 'inspect' || st === 'inspected') return 'blue';
+        if (st === 'refused') return 'red';
+        return 'black';
     };
 
     return (
@@ -459,8 +503,12 @@ const RecipientList = () => {
                         {showStatusPicker && (
                             <View style={styles.dropdown}>
                                 <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
-                                    {['All', 'Pending', 'Approved', 'Inspect'].map((s) => (
-                                        <TouchableOpacity key={s} onPress={() => { setStatus(s); setShowStatusPicker(false); }}>
+                                    {['All', 'Processing', 'Sent'].map((s) => (
+                                        <TouchableOpacity key={s} onPress={() => { 
+                                            setStatus(s); 
+                                            setShowStatusPicker(false);
+                                            if (s !== 'Sent') setInspectionStatus('All'); // Reset inspection status if not Sent
+                                        }}>
                                             <Text style={styles.dropdownText}>{s}</Text>
                                         </TouchableOpacity>
                                     ))}
@@ -468,6 +516,28 @@ const RecipientList = () => {
                             </View>
                         )}
                     </View>
+                    {status === 'Sent' && (
+                        <View style={styles.filterColumnInline}>
+                            <Text style={styles.filterLabel}>Inspection</Text>
+                            <TouchableOpacity onPress={() => setShowInspectionStatusPicker(!showInspectionStatusPicker)} style={styles.filterButton}>
+                                <View style={styles.pickerContent}>
+                                    <Text style={styles.filterText} numberOfLines={1} ellipsizeMode="tail">{inspectionStatus}</Text>
+                                    <MaterialCommunityIcons name={showInspectionStatusPicker ? 'chevron-up' : 'chevron-down'} size={20} color="#000000ff" />
+                                </View>
+                            </TouchableOpacity>
+                            {showInspectionStatusPicker && (
+                                <View style={styles.dropdown}>
+                                    <ScrollView nestedScrollEnabled style={styles.dropdownScroll}>
+                                        {['All', 'Approved', 'Inspected', 'Refused'].map((s) => (
+                                            <TouchableOpacity key={s} onPress={() => { setInspectionStatus(s); setShowInspectionStatusPicker(false); }}>
+                                                <Text style={styles.dropdownText}>{s}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                </View>
+                            )}
+                        </View>
+                    )}
                     <View style={styles.filterColumnInline}>
                         <Text style={styles.filterLabel}>Search</Text>
                         <TouchableOpacity style={styles.searchButton} onPress={fetchDonations}>
@@ -504,7 +574,10 @@ const RecipientList = () => {
                                     onPress={() => navigation.navigate('DonationDetails', { donation })}
                                 >
                                     <View style={styles.cardHeader}>
-                                        <Text style={[styles.statusText, { color: getStatusColor(donation.status) }]}>{donation.status}</Text>
+                                        <Text style={[styles.statusText, { color: getStatusColor(donation.status) }]}>
+                                            {getPrimaryStatus(donation.status)}
+                                            {getInspectionStatus(donation.status) && ` - ${getInspectionStatus(donation.status)}`}
+                                        </Text>
                                     </View>
 
                                     <View style={styles.cardContent}>
