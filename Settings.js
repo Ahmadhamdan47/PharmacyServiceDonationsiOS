@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     StyleSheet,
     View,
@@ -15,7 +15,7 @@ import {
     Platform,
     Keyboard,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { CountryPicker } from 'react-native-country-codes-picker';
@@ -67,6 +67,15 @@ const Settings = () => {
             loadSubAccounts();
         }
     }, [isMainAccount, userRole]);
+
+    // Reload subaccounts when screen comes into focus (e.g., returning from EditSubAccount)
+    useFocusEffect(
+        useCallback(() => {
+            if (isMainAccount && userRole === 'Donor') {
+                loadSubAccounts();
+            }
+        }, [isMainAccount, userRole])
+    );
 
     const loadUserData = async () => {
         try {
@@ -355,10 +364,26 @@ const Settings = () => {
             console.log('Sub-accounts data:', subAccountsData);
             
             // Ensure each sub-account has a Permissions array
-            const processedSubAccounts = subAccountsData.map(account => ({
-                ...account,
-                Permissions: Array.isArray(account.Permissions) ? account.Permissions : []
-            }));
+            const processedSubAccounts = subAccountsData.map(account => {
+                let permissions = [];
+                
+                // Parse permissions if it's a JSON string
+                if (typeof account.Permissions === 'string') {
+                    try {
+                        permissions = JSON.parse(account.Permissions);
+                    } catch (error) {
+                        console.error('Error parsing permissions for user:', account.Username, error);
+                        permissions = [];
+                    }
+                } else if (Array.isArray(account.Permissions)) {
+                    permissions = account.Permissions;
+                }
+                
+                return {
+                    ...account,
+                    Permissions: permissions
+                };
+            });
             
             setSubAccounts(processedSubAccounts);
         } catch (error) {
@@ -399,6 +424,7 @@ const Settings = () => {
                 return;
             }
 
+            // Send Permissions as array (API returns it as JSON string but expects array on create/update)
             await axios.post('https://apiv2.medleb.org/users/donor-subaccounts', newSubAccount, {
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -424,10 +450,23 @@ const Settings = () => {
             console.error('Error creating sub-account:', error);
             let errorMessage = 'Failed to create sub-account. Please try again.';
             
-            if (error.response?.data?.error) {
-                errorMessage = error.response.data.error;
-            } else if (error.response?.status === 400) {
-                errorMessage = 'Invalid data provided. Please check all fields.';
+            // Check for error message in different places
+            const serverError = (error.response?.data?.error || error.response?.data?.message || error.response?.data || '').toString().toLowerCase();
+            
+            if (serverError) {
+                // Check if the error is about email already existing or validation error
+                if (serverError.includes('email') && (serverError.includes('exist') || serverError.includes('duplicate') || serverError.includes('already') || serverError.includes('use'))) {
+                    errorMessage = 'This email address is already in use. Please use a different email.';
+                } else if (serverError.includes('validation') && serverError.includes('email')) {
+                    errorMessage = 'This email address is already in use. Please use a different email.';
+                } else if (serverError.includes('validation error')) {
+                    // Generic validation error - likely duplicate email
+                    errorMessage = 'This email address is already in use. Please use a different email.';
+                } else if (error.response?.data?.error || error.response?.data?.message) {
+                    errorMessage = error.response.data.error || error.response.data.message;
+                } else if (error.response?.status === 400) {
+                    errorMessage = 'Invalid data provided. Please check all fields.';
+                }
             } else if (error.response?.status === 401) {
                 errorMessage = 'Authentication required. Please sign in again.';
             } else if (error.response?.status === 403) {
@@ -494,16 +533,23 @@ const Settings = () => {
                                     'Authorization': `Bearer ${token}`
                                 }
                             });
-                            Alert.alert('Success', 'Sub-account deactivated successfully!');
+                            
+                            Alert.alert('Success', 'Sub-account deleted successfully!');
                             loadSubAccounts();
                         } catch (error) {
                             console.error('Error deactivating sub-account:', error);
-                            let errorMessage = 'Failed to deactivate sub-account. Please try again.';
+                            let errorMessage = 'Failed to delete sub-account. Please try again.';
                             
-                            if (error.response?.status === 401) {
+                            if (error.response?.data?.error) {
+                                errorMessage = error.response.data.error;
+                            } else if (error.response?.data?.message) {
+                                errorMessage = error.response.data.message;
+                            } else if (error.response?.status === 401) {
                                 errorMessage = 'Authentication required. Please sign in again.';
                             } else if (error.response?.status === 403) {
-                                errorMessage = 'Only main accounts can deactivate sub-accounts.';
+                                errorMessage = 'Only main accounts can delete sub-accounts.';
+                            } else if (error.response?.status === 404) {
+                                errorMessage = 'Sub-account not found.';
                             }
                             
                             Alert.alert('Error', errorMessage);
@@ -1088,6 +1134,7 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         height: 50,
         backgroundColor: '#f9f9f9',
+        color: '#000',
     },
     placeholder: {
         color: '#A9A9A9',

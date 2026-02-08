@@ -305,7 +305,7 @@ const Donate = ({ route }) => {
     })
   }, [navigation, isCameraOpen]) // Add isCameraOpen to dependencies
 
-  const { donorId, recipientId, donationPurpose, donationId } = route.params || {}
+  const { donorId, recipientId, donationPurpose, donationId, existingBoxId, addToExistingBox, existingBoxLabel } = route.params || {}
   const navigation = useNavigation()
   const scrollViewRef = useRef(null)
   const batchLotRefs = useRef([])
@@ -320,10 +320,10 @@ const Donate = ({ route }) => {
   const [scrollPosition, setScrollPosition] = useState(0)
   const [validationErrors, setValidationErrors] = useState([])
   const [isFormValid, setIsFormValid] = useState(false)
-  const [currentBox, setCurrentBox] = useState(null)
+  const [currentBox, setCurrentBox] = useState(existingBoxId || null)
   const [packCount, setPackCount] = useState(0)
   const [boxLabelCounter, setBoxLabelCounter] = useState(1)
-  const [customBoxLabel, setCustomBoxLabel] = useState('') // Custom box name
+  const [customBoxLabel, setCustomBoxLabel] = useState(existingBoxLabel || '') // Custom box name
   const [packCounter, setPackCounter] = useState(1) // Initialize packCounter with 1
   const [finishModalVisible, setFinishModalVisible] = useState(false)
   const [newPackCount, setNewPackCount] = useState(0)
@@ -472,6 +472,11 @@ const Donate = ({ route }) => {
     const fetchExistingBoxes = async () => {
       if (!donationId) return;
       
+      // Skip fetching if we're adding to an existing box
+      if (addToExistingBox && existingBoxId) {
+        return;
+      }
+      
       try {
         const token = await AsyncStorage.getItem('token');
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
@@ -502,7 +507,7 @@ const Donate = ({ route }) => {
     };
     
     fetchExistingBoxes();
-  }, [donationId]);
+  }, [donationId, addToExistingBox, existingBoxId]);
 
   // Calculate filled packs count
   const getFilledPacksCount = () => {
@@ -1448,6 +1453,11 @@ const Donate = ({ route }) => {
       
       // Ensure we have a box created for this donation before submitting packs
       const ensureCurrentBox = async () => {
+        // If we're adding to an existing box, use that box ID
+        if (addToExistingBox && existingBoxId) {
+          return existingBoxId;
+        }
+        
         if (currentBox) return currentBox
         // Compute next unique label from server state
         const boxesResp = await axios.get(`https://apiv2.medleb.org/boxes/byDonation/${donationId}`, { headers })
@@ -1671,36 +1681,41 @@ const Donate = ({ route }) => {
         >
           <View style={styles.originalFormContainer}>
             <View style={styles.boxInfoContainer}>
-              <Text style={styles.boxTitleText}>Box {boxLabelCounter}</Text>
+              <Text style={styles.boxTitleText}>{addToExistingBox ? existingBoxLabel : `Box ${boxLabelCounter}`}</Text>
               
-              {/* Custom Box Name Input */}
-              <View style={styles.boxNameInputContainer}>
-                <Text style={styles.boxNameLabel}>Box Name:</Text>
-                <TextInput
-                  style={styles.boxNameInput}
-                  value={customBoxLabel}
-                  onChangeText={setCustomBoxLabel}
-                  placeholder={`Box ${boxLabelCounter}`}
-                  placeholderTextColor="#999"
-                />
-              </View>
+              {/* Custom Box Name Input - only show if not adding to existing box */}
+              {!addToExistingBox && (
+                <View style={styles.boxNameInputContainer}>
+                  <Text style={styles.boxNameLabel}>Box Name:</Text>
+                  <TextInput
+                    style={styles.boxNameInput}
+                    value={customBoxLabel}
+                    onChangeText={setCustomBoxLabel}
+                    placeholder={`Box ${boxLabelCounter}`}
+                    placeholderTextColor="#999"
+                  />
+                </View>
+              )}
               
-              <View style={styles.datePickerContainer}>
-                <Text style={styles.dateLabel}>Box Created Date:</Text>
-                <TouchableOpacity
-                  style={styles.dateButton}
-                  onPress={() => setShowDatePicker(true)}
-                >
-                  <Text style={styles.dateButtonText}>
-                    {boxCreatedDate.toLocaleDateString('en-GB', {
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit'
-                    })}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              {showDatePicker && (
+              {/* Date picker - only show if not adding to existing box */}
+              {!addToExistingBox && (
+                <View style={styles.datePickerContainer}>
+                  <Text style={styles.dateLabel}>Box Created Date:</Text>
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => setShowDatePicker(true)}
+                  >
+                    <Text style={styles.dateButtonText}>
+                      {boxCreatedDate.toLocaleDateString('en-GB', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit'
+                      })}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {showDatePicker && !addToExistingBox && (
                 <DateTimePicker
                   value={boxCreatedDate}
                   mode="date"
@@ -1910,29 +1925,45 @@ const Donate = ({ route }) => {
               <Text style={styles.modalCloseText}>✕</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>{newPackCount} Packs in this box</Text>
-            <Text style={styles.modalSubtitle}>{`"${customBoxLabel || `Box ${boxLabelCounter - 1}`}"`}</Text>
+            <Text style={styles.modalSubtitle}>{`"${customBoxLabel || existingBoxLabel || `Box ${boxLabelCounter - 1}`}"`}</Text>
 
             <View style={styles.modalButtonContainer}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.addBoxButton]}
-                onPress={() => {
-                  setFinishModalVisible(false)
-                  handleAddAnotherBox()
-                  setPackCount(0) // Reset pack count
-                }}
-              >
-                <Text style={styles.AddBoxButtonText}>Add More Boxes</Text>
-              </TouchableOpacity>
+              {/* If adding to existing box, show "Done" button. Otherwise show "Add More Boxes" */}
+              {addToExistingBox ? (
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.finishButton, { flex: 1 }]}
+                  onPress={() => {
+                    setFinishModalVisible(false);
+                    // Navigate back to BoxDetails
+                    navigation.goBack();
+                  }}
+                >
+                  <Text style={styles.modalButtonText}>Done</Text>
+                </TouchableOpacity>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.addBoxButton]}
+                    onPress={() => {
+                      setFinishModalVisible(false)
+                      handleAddAnotherBox()
+                      setPackCount(0) // Reset pack count
+                    }}
+                  >
+                    <Text style={styles.AddBoxButtonText}>Add More Boxes</Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.modalButton, styles.finishButton]}
-                onPress={() => {
-                  setFinishModalVisible(false)
-                  handleFinishDonation()
-                }}
-              >
-                <Text style={styles.modalButtonText}>Finish</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.finishButton]}
+                    onPress={() => {
+                      setFinishModalVisible(false)
+                      handleFinishDonation()
+                    }}
+                  >
+                    <Text style={styles.modalButtonText}>Finish</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </View>
         </View>

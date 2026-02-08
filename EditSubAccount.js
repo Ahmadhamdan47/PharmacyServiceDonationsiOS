@@ -24,10 +24,10 @@ const EditSubAccount = ({ route }) => {
     const [loading, setLoading] = useState(false);
     const [isFontLoaded, setIsFontLoaded] = useState(false);
     const [formData, setFormData] = useState({
-        Username: subAccount?.Username || '',
-        Email: subAccount?.Email || '',
+        Username: '',
+        Email: '',
         Password: '', // Optional - only if user wants to change password
-        Permissions: subAccount?.Permissions || []
+        Permissions: []
     });
 
     const availablePermissions = [
@@ -39,6 +39,33 @@ const EditSubAccount = ({ route }) => {
     useEffect(() => {
         fetchFonts();
     }, []);
+
+    // Initialize form data when subAccount is available
+    useEffect(() => {
+        if (subAccount) {
+            console.log('Initializing EditSubAccount with data:', subAccount);
+            
+            // Parse permissions if it's a JSON string
+            let permissions = [];
+            if (typeof subAccount.Permissions === 'string') {
+                try {
+                    permissions = JSON.parse(subAccount.Permissions);
+                } catch (error) {
+                    console.error('Error parsing permissions:', error);
+                    permissions = [];
+                }
+            } else if (Array.isArray(subAccount.Permissions)) {
+                permissions = subAccount.Permissions;
+            }
+            
+            setFormData({
+                Username: subAccount.Username || '',
+                Email: subAccount.Email || '',
+                Password: '',
+                Permissions: permissions
+            });
+        }
+    }, [subAccount]);
 
     useEffect(() => {
         navigation.setOptions({
@@ -132,16 +159,14 @@ const EditSubAccount = ({ route }) => {
             const payload = {
                 username: formData.Username.trim(),
                 email: formData.Email.trim(),
-                permissions: formData.Permissions
+                permissions: formData.Permissions // Send as array with lowercase key
             };
 
-            // Only include password if user entered one
-            if (formData.Password && formData.Password.trim() !== '') {
-                payload.password = formData.Password.trim();
-            }
+            console.log('Updating sub-account:', subAccount.UserId);
+            console.log('Payload:', JSON.stringify(payload, null, 2));
+            console.log('Permissions type:', typeof payload.permissions, 'isArray:', Array.isArray(payload.permissions));
 
-            console.log('Updating sub-account:', subAccount.UserId, payload);
-
+            // Update main account details (username, email, permissions)
             const response = await axios.put(
                 `https://apiv2.medleb.org/users/donor-subaccounts/${subAccount.UserId}`,
                 payload,
@@ -149,6 +174,30 @@ const EditSubAccount = ({ route }) => {
             );
 
             console.log('Sub-account update response:', response.data);
+
+            // Update password separately if provided
+            if (formData.Password && formData.Password.trim() !== '') {
+                console.log('Updating password separately...');
+                try {
+                    const passwordResponse = await axios.patch(
+                        `https://apiv2.medleb.org/users/donor-subaccounts/${subAccount.UserId}/password`,
+                        { newPassword: formData.Password.trim() },
+                        { headers }
+                    );
+                    console.log('Password update response:', passwordResponse.data);
+                } catch (passwordError) {
+                    console.error('Error updating password:', passwordError);
+                    console.error('Password error response:', passwordError.response?.data);
+                    
+                    // Show error but don't block the success message for other updates
+                    Alert.alert(
+                        'Partial Success',
+                        'Account details updated successfully, but password update failed. Please try updating the password again.',
+                        [{ text: 'OK', onPress: () => navigation.goBack() }]
+                    );
+                    return;
+                }
+            }
 
             Alert.alert(
                 'Success',
@@ -227,10 +276,10 @@ const EditSubAccount = ({ route }) => {
 
                     <Text style={styles.label}>Password (Leave blank to keep current)</Text>
                     <TextInput
-                        style={styles.input}
+                        style={[styles.input, styles.passwordInput]}
                         value={formData.Password}
                         onChangeText={(value) => handleInputChange('Password', value)}
-                        placeholder="Enter new password"
+                        placeholder="Enter new password (optional)"
                         placeholderTextColor="#A9A9A9"
                         secureTextEntry
                         autoCapitalize="none"
@@ -336,6 +385,10 @@ const styles = StyleSheet.create({
         fontSize: 14,
         backgroundColor: '#fff',
         fontFamily: 'RobotoCondensed-Regular',
+        color: '#000',
+    },
+    passwordInput: {
+        color: '#000',
     },
     permissionHint: {
         fontSize: 12,

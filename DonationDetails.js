@@ -145,7 +145,11 @@ const DonationDetails = ({ route, navigation }) => {
                     DisplayLabel: displayLabel,
                     DonorName: donation.DonorName,
                     RecipientName: donation.RecipientName,
-                    DonationTitle: donation.DonationTitle
+                    DonationTitle: donation.DonationTitle,
+                    DonationId: donation.DonationId,
+                    DonorId: donation.DonorId,
+                    RecipientId: donation.RecipientId,
+                    DonationPurpose: donation.DonationPurpose
                 }
             });
         }
