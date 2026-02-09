@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, StatusBar, BackHandler } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, StatusBar, BackHandler, Modal, Alert } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -24,6 +24,10 @@ const DonorAgreement = () => {
     const [donationTitles, setDonationTitles] = useState({});
     // Map of AgreementId -> donation status (hasStarted, donationId)
     const [donationStatuses, setDonationStatuses] = useState({});
+    // Delete functionality states
+    const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+    const [confirmDeleteModalVisible, setConfirmDeleteModalVisible] = useState(false);
+    const [selectedAgreementForDeletion, setSelectedAgreementForDeletion] = useState(null);
 
     const fetchFonts = async () => {
         await Font.loadAsync({
@@ -243,6 +247,97 @@ const DonorAgreement = () => {
         return donationTitles[agreement.DonationId] || agreement?.Donation?.DonationTitle || 'N/A';
     };
 
+    // Handle long-press on agreement card
+    const handleLongPressAgreement = (agreement) => {
+        const status = (agreement.Agreed_Upon || '').toLowerCase();
+        
+        // Only allow deletion of pending and refused agreements
+        if (status === 'agreed') {
+            Alert.alert(
+                'Cannot Delete',
+                'Agreed agreements cannot be deleted as they may have active donations.',
+                [{ text: 'OK' }]
+            );
+            return;
+        }
+        
+        // Allow deletion for pending and refused agreements
+        setSelectedAgreementForDeletion(agreement);
+        setDeleteModalVisible(true);
+    };
+
+    // Handle delete agreement
+    const handleDeleteAgreement = async () => {
+        if (!selectedAgreementForDeletion) return;
+        
+        try {
+            const token = await AsyncStorage.getItem('token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            
+            const agreementId = selectedAgreementForDeletion.AgreementId;
+            console.log('Deleting agreement:', agreementId);
+            
+            // Delete using the correct endpoint
+            const deleteUrl = `https://apiv2.medleb.org/RecipientAgreements/${agreementId}`;
+            console.log(`DELETE ${deleteUrl}`);
+            
+            await axios.delete(deleteUrl, { headers });
+            
+            // Instantly remove the deleted agreement from UI for immediate feedback
+            const deletedAgreementId = selectedAgreementForDeletion.AgreementId;
+            setAgreements(prevAgreements => 
+                prevAgreements.filter(agreement => agreement.AgreementId !== deletedAgreementId)
+            );
+            
+            // Close both modals
+            setConfirmDeleteModalVisible(false);
+            setDeleteModalVisible(false);
+            setSelectedAgreementForDeletion(null);
+            
+            // Show success message
+            Alert.alert('Success', 'Agreement deleted successfully.');
+            
+            // Refresh agreements list in background to ensure data consistency
+            fetchAgreements().catch(err => console.warn('Background refresh failed:', err));
+        } catch (error) {
+            console.error('Error deleting agreement:', error);
+            console.error('Error details:', error.response?.data);
+            console.error('Status code:', error.response?.status);
+            
+            // Handle authentication errors
+            if (error.response?.status === 401) {
+                Alert.alert(
+                    'Authentication Error',
+                    'Your session has expired. Please sign in again.',
+                    [
+                        {
+                            text: 'Sign In',
+                            onPress: () => {
+                                AsyncStorage.clear();
+                                navigation.reset({
+                                    index: 0,
+                                    routes: [{ name: 'SignIn' }],
+                                });
+                            }
+                        }
+                    ]
+                );
+            } else if (error.response?.status === 404) {
+                Alert.alert(
+                    'Error', 
+                    `Agreement not found or endpoint incorrect.\nAgreement ID: ${selectedAgreementForDeletion?.AgreementId}\n\nPlease check the API endpoint configuration.`
+                );
+            } else {
+                Alert.alert('Error', 'Failed to delete agreement. Please try again.');
+            }
+            
+            // Close modals on error
+            setConfirmDeleteModalVisible(false);
+            setDeleteModalVisible(false);
+            setSelectedAgreementForDeletion(null);
+        }
+    };
+
     // Apply status filtering only
     const filteredAgreements = (agreements || []).filter(a => {
         if (!statusFilter || statusFilter === 'All') return true;
@@ -321,10 +416,14 @@ const DonorAgreement = () => {
                 {/* Agreements List */}
                 <ScrollView>
                     {sortedAgreements.map((agreement, index) => (
-                        <View key={index} style={styles.card}>
-                            <TouchableOpacity
-                                onPress={() => navigation.navigate('AgreementDetails', { agreement })}
-                            >
+                        <TouchableOpacity
+                            key={agreement.AgreementId || index}
+                            style={styles.card}
+                            onPress={() => navigation.navigate('AgreementDetails', { agreement })}
+                            onLongPress={() => handleLongPressAgreement(agreement)}
+                            activeOpacity={0.7}
+                        >
+                            <View>
                                 <View style={styles.cardHeader}>
                                     <Text style={[styles.statusText, { color: getAgreedUponColor(agreement.Agreed_Upon) }]}>
                                         {getAgreedUponText(agreement.Agreed_Upon)}
@@ -352,7 +451,7 @@ const DonorAgreement = () => {
                                         </View>
                                     </View>
                                 </View>
-                            </TouchableOpacity>
+                            </View>
                             
                             {/* Start Donation Process Button - Only show for agreed agreements */}
                             {agreement.Agreed_Upon === 'agreed' && (
@@ -363,13 +462,116 @@ const DonorAgreement = () => {
                                     <Text style={styles.startDonationButtonText}>{getButtonText(agreement)}</Text>
                                 </TouchableOpacity>
                             )}
-                        </View>
+                        </TouchableOpacity>
                     ))}
                 </ScrollView>
             </ScrollView>
 
             {/* Bottom Navigation Bar */}
             <BottomNavBar currentScreen="DonorAgreement" />
+
+            {/* Delete Agreement Modal - First Stage */}
+            <Modal
+                animationType="fade"
+                transparent={true}
+                visible={deleteModalVisible}
+                onRequestClose={() => setDeleteModalVisible(false)}
+            >
+                <View style={styles.modalBackground}>
+                    <View style={styles.modalContainer}>
+                        <TouchableOpacity
+                            style={styles.modalCloseButton}
+                            onPress={() => setDeleteModalVisible(false)}
+                        >
+                            <Text style={styles.modalCloseText}>✕</Text>
+                        </TouchableOpacity>
+                        
+                        <Text style={styles.modalTitle}>Delete Agreement</Text>
+                        
+                        {selectedAgreementForDeletion && (
+                            <View style={styles.modalDetailsContainer}>
+                                <Text style={styles.modalDetailLabel}>Donation Title:</Text>
+                                <Text style={styles.modalDetailText}>
+                                    {getDonationTitle(selectedAgreementForDeletion)}
+                                </Text>
+                                
+                                <Text style={styles.modalDetailLabel}>Recipient:</Text>
+                                <Text style={styles.modalDetailText}>
+                                    {selectedAgreementForDeletion.Recipient?.RecipientName || 'N/A'}
+                                </Text>
+                                
+                                <Text style={styles.modalDetailLabel}>Status:</Text>
+                                <Text style={[styles.modalDetailText, { color: getAgreedUponColor(selectedAgreementForDeletion.Agreed_Upon) }]}>
+                                    {getAgreedUponText(selectedAgreementForDeletion.Agreed_Upon)}
+                                </Text>
+                                
+                                <Text style={styles.modalWarning}>
+                                    ⚠️ This will permanently delete this agreement.
+                                </Text>
+                            </View>
+                        )}
+                        
+                        <View style={styles.modalButtonContainer}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.cancelButton]}
+                                onPress={() => setDeleteModalVisible(false)}
+                            >
+                                <Text style={styles.cancelButtonText}>Cancel</Text>
+                            </TouchableOpacity>
+                            
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.deleteButton]}
+                                onPress={() => {
+                                    setDeleteModalVisible(false);
+                                    setConfirmDeleteModalVisible(true);
+                                }}
+                            >
+                                <Text style={styles.deleteButtonText}>Delete</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Delete Agreement Modal - Second Stage (Confirmation) */}
+            <Modal
+                animationType="fade"
+                transparent={true}
+                visible={confirmDeleteModalVisible}
+                onRequestClose={() => setConfirmDeleteModalVisible(false)}
+            >
+                <View style={styles.modalBackground}>
+                    <View style={styles.modalContainer}>
+                        <TouchableOpacity
+                            style={styles.modalCloseButton}
+                            onPress={() => setConfirmDeleteModalVisible(false)}
+                        >
+                            <Text style={styles.modalCloseText}>✕</Text>
+                        </TouchableOpacity>
+                        
+                        <Text style={styles.modalTitle}>Are You Sure?</Text>
+                        <Text style={styles.modalMessage}>
+                            This action cannot be undone.
+                        </Text>
+                        
+                        <View style={styles.modalButtonContainer}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.cancelButton]}
+                                onPress={() => setConfirmDeleteModalVisible(false)}
+                            >
+                                <Text style={styles.cancelButtonText}>Go Back</Text>
+                            </TouchableOpacity>
+                            
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.deleteButton]}
+                                onPress={handleDeleteAgreement}
+                            >
+                                <Text style={styles.deleteButtonText}>Yes, Delete</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
@@ -603,6 +805,100 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontFamily: 'RobotoCondensed-Bold',
         fontWeight: 'bold',
+    },
+    // Modal styles
+    modalBackground: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalContainer: {
+        backgroundColor: '#fff',
+        borderRadius: 10,
+        padding: 20,
+        width: '85%',
+        maxWidth: 400,
+        alignItems: 'center',
+    },
+    modalCloseButton: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        zIndex: 1,
+    },
+    modalCloseText: {
+        fontSize: 24,
+        color: '#666',
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontFamily: 'RobotoCondensed-Bold',
+        color: '#333',
+        marginBottom: 15,
+        marginTop: 10,
+    },
+    modalMessage: {
+        fontSize: 14,
+        fontFamily: 'RobotoCondensed-Regular',
+        color: '#666',
+        textAlign: 'center',
+        marginBottom: 20,
+    },
+    modalDetailsContainer: {
+        width: '100%',
+        marginBottom: 20,
+    },
+    modalDetailLabel: {
+        fontSize: 12,
+        fontFamily: 'RobotoCondensed-Bold',
+        color: '#666',
+        marginTop: 10,
+    },
+    modalDetailText: {
+        fontSize: 14,
+        fontFamily: 'RobotoCondensed-Regular',
+        color: '#333',
+        marginBottom: 5,
+    },
+    modalWarning: {
+        fontSize: 13,
+        fontFamily: 'RobotoCondensed-Medium',
+        color: '#FF6B6B',
+        textAlign: 'center',
+        marginTop: 15,
+        padding: 10,
+        backgroundColor: '#FFF5F5',
+        borderRadius: 8,
+    },
+    modalButtonContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        width: '100%',
+        marginTop: 10,
+    },
+    modalButton: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 8,
+        marginHorizontal: 5,
+        alignItems: 'center',
+    },
+    cancelButton: {
+        backgroundColor: '#E0E0E0',
+    },
+    cancelButtonText: {
+        color: '#333',
+        fontSize: 14,
+        fontFamily: 'RobotoCondensed-Bold',
+    },
+    deleteButton: {
+        backgroundColor: '#FF4444',
+    },
+    deleteButtonText: {
+        color: '#fff',
+        fontSize: 14,
+        fontFamily: 'RobotoCondensed-Bold',
     },
 });
 
