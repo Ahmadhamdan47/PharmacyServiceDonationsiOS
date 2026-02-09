@@ -150,6 +150,13 @@ const BoxDetails = ({ route, navigation }) => {
             return;
         }
         
+        // Check if nothing has changed
+        if (newBoxLabel.trim() === currentBoxLabel.trim()) {
+            Alert.alert('No Changes', 'You didn\'t make any changes to the box name.');
+            setEditNameModalVisible(false);
+            return;
+        }
+        
         try {
             const token = await AsyncStorage.getItem('token');
             const headers = token ? { Authorization: `Bearer ${token}` } : {};
