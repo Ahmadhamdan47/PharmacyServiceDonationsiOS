@@ -71,15 +71,14 @@ const BoxDetails = ({ route, navigation }) => {
         }, [])
     );
 
-    // Auto-regenerate Excel file when batchLots data changes
-    useFocusEffect(
-        useCallback(() => {
-            if (batchLots.length > 0 && !loading) {
-                // Regenerate file when data changes (after manual edits)
-                uploadExcelFile();
-            }
-        }, [batchLots])
-    );
+    // Auto-regenerate Excel file when batchLots data changes (e.g. after manual pack edits)
+    // Note: on initial load, fetchSerialNumbers calls uploadExcelFile directly with fresh data.
+    // This effect handles subsequent in-session mutations to batchLots.
+    useEffect(() => {
+        if (batchLots.length > 0 && !loading) {
+            uploadExcelFile(batchLots);
+        }
+    }, [batchLots]);
 
     useEffect(() => {
         navigation.setOptions({
@@ -128,14 +127,39 @@ const BoxDetails = ({ route, navigation }) => {
         try {
             const token = await AsyncStorage.getItem('token');
             const headers = token ? { Authorization: `Bearer ${token}` } : {};
-            
-            const response = await axios.get(`https://apiv2.medleb.org/batchserial/byBox/${box.BoxId}`, { headers });
-            const data = response.data.data;
-            console.log(data);
-            if (Array.isArray(data)) {
-                setBatchLots(data);
-            } else {
-                setBatchLots([]);
+
+            // Paginate to fetch ALL packs regardless of how many there are
+            const PAGE_SIZE = 100;
+            let page = 1;
+            let allData = [];
+            let hasMore = true;
+
+            while (hasMore) {
+                const response = await axios.get(
+                    `https://apiv2.medleb.org/batchserial/byBox/${box.BoxId}`,
+                    { headers, params: { page, limit: PAGE_SIZE } }
+                );
+
+                const raw = response.data;
+                // Support both { data: [...] } and plain array responses
+                const pageData = Array.isArray(raw) ? raw : (Array.isArray(raw?.data) ? raw.data : []);
+
+                allData = allData.concat(pageData);
+
+                // If the page returned fewer items than PAGE_SIZE, we've reached the last page
+                if (pageData.length < PAGE_SIZE) {
+                    hasMore = false;
+                } else {
+                    page++;
+                }
+            }
+
+            console.log(`Fetched ${allData.length} packs for box ${box.BoxId}`);
+            setBatchLots(allData);
+
+            // Upload Excel immediately with the fresh data to avoid stale-state race condition
+            if (allData.length > 0) {
+                await uploadExcelFile(allData);
             }
         } catch (error) {
             console.error('Error fetching serial numbers:', error);
@@ -294,7 +318,9 @@ const BoxDetails = ({ route, navigation }) => {
         }
     };
 
-    const uploadExcelFile = async () => {
+    const uploadExcelFile = async (lotsData) => {
+        // Use the explicitly passed data when available to avoid stale closure over batchLots state
+        const packsToExport = Array.isArray(lotsData) ? lotsData : batchLots;
         try {
             setIsUploadingFile(true);
             
@@ -304,7 +330,7 @@ const BoxDetails = ({ route, navigation }) => {
                 [box.DonorName, box.RecipientName, box.DonationTitle, currentBoxLabel],
                 [],
                 ['#', 'Brand Name', 'Presentation', 'Form', 'Laboratory', 'Country', 'GTIN', 'LOT Nb', 'Expiry Date', 'Serial Nb', 'Last Updated'],
-                ...batchLots.map((lot, index) => [
+                ...packsToExport.map((lot, index) => [
                     index + 1,
                     lot.DrugName || 'N/A',
                     lot.Presentation || 'N/A',
@@ -346,7 +372,7 @@ const BoxDetails = ({ route, navigation }) => {
                 boxLabel: currentBoxLabel || box.DisplayLabel,
                 donorName: box.DonorName,
                 recipientName: box.RecipientName,
-                numberOfPacks: batchLots.length,
+                numberOfPacks: packsToExport.length,
                 purpose: 'box_export'
             };
             

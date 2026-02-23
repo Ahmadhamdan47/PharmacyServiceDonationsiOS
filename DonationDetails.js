@@ -49,7 +49,7 @@ const DonationDetails = ({ route, navigation }) => {
         navigation.setOptions({
             headerTitle: 'List',
             headerLeft: () => (
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButtonContainer}>
+                <TouchableOpacity onPress={() => navigation.navigate('DonorList')} style={styles.backButtonContainer}>
                     <Image source={require("./assets/back.png")} style={styles.backButtonImage} />
                 </TouchableOpacity>
             ),
@@ -265,7 +265,8 @@ const DonationDetails = ({ route, navigation }) => {
         const selectedRecipientName = donation.RecipientName;
         const donationDate = new Date().toISOString().replace(/:/g, '-');
         
-        navigation.navigate('Donate', {
+        // Use push to always create a fresh Donate screen (avoid reusing a screen with pre-filled forms)
+        navigation.push('Donate', {
             donorId: donation.DonorId,
             recipientId: donation.RecipientId,
             donorName: donation.DonorName,

@@ -328,6 +328,7 @@ const Donate = ({ route }) => {
   const [finishModalVisible, setFinishModalVisible] = useState(false)
   const [newPackCount, setNewPackCount] = useState(0)
   const [confirmModalVisible, setConfirmModalVisible] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [isFontLoaded, setIsFontLoaded] = useState(false)
   const [boxCreatedDate, setBoxCreatedDate] = useState(new Date())
   const [showDatePicker, setShowDatePicker] = useState(false)
@@ -403,6 +404,11 @@ const Donate = ({ route }) => {
         }
       } catch (e) {
         console.error("BDPM fetch (presentations -> CIS -> specialite) failed:", e?.message)
+        // Only show alert for non-404 errors (404 means drug not found, which is handled elsewhere)
+        if (e.response?.status && e.response.status !== 404) {
+          // Network or server error
+          console.warn("Drug database temporarily unavailable");
+        }
       }
     }
     return null
@@ -427,20 +433,15 @@ const Donate = ({ route }) => {
     }
 
     if (isTeva(titulaire)) {
-      Alert.alert(
-        "Not Allowed", 
-        "This drug is not allowed to be donated (TEVA manufacturer blocked)",
+      showAlertWithScrollPreservation(
+        "Manufacturer Not Allowed", 
+        `${denomination || 'This drug'} by TEVA cannot be donated per organizational policy.\n\nPack #${index + 1} will be removed.`,
         [
           {
             text: "OK",
             onPress: () => {
-              if (index === 0) {
-                // Main pack form - just clear fields
-                clearPackForm(index);
-              } else {
-                // Additional pack form - remove entirely
-                removePack(index);
-              }
+              // INTENTIONAL CLEARING: Policy enforcement - TEVA products are blocked
+              removePackSilently(index);
             }
           }
         ]
@@ -557,13 +558,38 @@ const Donate = ({ route }) => {
     }
   }, [isCameraOpen])
 
+  // Helper function to show alerts without losing scroll position
+  const showAlertWithScrollPreservation = (title, message, buttons) => {
+    // Save current scroll position
+    const savedScrollPosition = scrollPosition;
+    
+    // Wrap button callbacks to restore scroll position
+    const wrappedButtons = buttons.map(button => ({
+      ...button,
+      onPress: () => {
+        // Call original onPress if it exists
+        if (button.onPress) {
+          button.onPress();
+        }
+        // Restore scroll position after a short delay
+        setTimeout(() => {
+          if (scrollViewRef.current) {
+            scrollViewRef.current.scrollTo({ y: savedScrollPosition, animated: false });
+          }
+        }, 100);
+      }
+    }));
+    
+    Alert.alert(title, message, wrappedButtons);
+  };
+
   const showExitConfirmation = () => {
     Alert.alert(
       "Confirm Exit",
-      "Do you want to discard changes or go back to the donation?",
+      "Do you want to discard changes or continue editing?",
       [
         {
-          text: "Discard",
+          text: "Go Back",
           style: "destructive",
           onPress: () => {
             // Navigate back to DonationDetails page if we have donation params
@@ -586,29 +612,14 @@ const Donate = ({ route }) => {
           },
         },
         {
-          text: "Back",
+          text: "Cancel",
+          style: "cancel",
           onPress: () => {
-            // Navigate back to DonationDetails page if we have donation params
-            if (donationId) {
-              navigation.navigate('DonationDetails', {
-                donation: {
-                  DonationId: donationId,
-                  DonorId: donorId,
-                  RecipientId: recipientId,
-                  DonorName: route.params?.donorName || '',
-                  RecipientName: route.params?.recipientName || '',
-                  DonationPurpose: donationPurpose || '',
-                  DonationTitle: route.params?.donationTitle || '',
-                  DonationDate: route.params?.donationDate || new Date().toISOString(),
-                }
-              });
-            } else {
-              navigation.goBack();
-            }
+            // Just close the alert and stay on current page
           },
         },
       ],
-      { cancelable: false },
+      { cancelable: true },
     )
   }
   const generateUniqueSerialNumber = () => {
@@ -664,19 +675,10 @@ const Donate = ({ route }) => {
               
               return { index, valid: true };
             } catch (error) {
-              // If the API call fails (e.g., 404 meaning not found), consider it valid
-              if (error.response?.status === 404) {
-                return { index, valid: true };
-              }
-              console.error('Error validating serial number:', error);
-              return { 
-                index, 
-                valid: false,
-                isDuplicate: false,
-                isGenerated: batchLot.isSerialNumberGenerated,
-                message: 'Error validating serial number',
-                serialNumber: batchLot.serialNumber
-              };
+              // If the API call fails for any reason (404 = not found, server error, or network error),
+              // treat the serial number as valid so the user is never blocked by a backend issue.
+              console.error('Error validating serial number – skipping check:', error);
+              return { index, valid: true };
             }
           })
         );
@@ -704,11 +706,13 @@ const Donate = ({ route }) => {
           const messages = [];
           
           if (scannedDuplicates.length > 0) {
-            messages.push('❌ This drug has already been donated in this donation or a previous one:');
+            messages.push('❌ Duplicate Serial Numbers Detected:');
+            messages.push('This drug has already been donated in this donation or a previous one:');
             scannedDuplicates.forEach(r => {
-              messages.push(`  Pack ${r.index + 1}: ${r.message}`);
-              messages.push(`  Serial Number: ${r.serialNumber}`);
+              messages.push(`\n  Pack ${r.index + 1}: ${r.message}`);
+              messages.push(`  Serial: ${r.serialNumber}`);
             });
+            messages.push('\nThese packs will be removed. Please re-scan them to continue.');
           }
           
           if (errors.length > 0) {
@@ -718,24 +722,18 @@ const Donate = ({ route }) => {
             });
           }
           
-          Alert.alert(
+          showAlertWithScrollPreservation(
             'Cannot Submit Donation',
             messages.join('\n'),
             [{ 
               text: 'OK',
               onPress: () => {
-                // Clear or remove problematic packs
+                // INTENTIONAL CLEARING: Remove packs with scanned duplicates that couldn't be auto-regenerated
                 const problematicIndices = [...scannedDuplicates, ...errors].map(r => r.index);
                 problematicIndices.sort((a, b) => b - a); // Sort in descending order to avoid index issues
                 
                 problematicIndices.forEach(idx => {
-                  if (idx === 0) {
-                    // Main pack form - just clear fields
-                    clearPackForm(idx);
-                  } else {
-                    // Additional pack form - remove entirely
-                    removePack(idx);
-                  }
+                  removePackSilently(idx);
                 });
               }
             }]
@@ -773,13 +771,10 @@ const Donate = ({ route }) => {
       return false;
       
     } catch (error) {
-      console.error('Error during serial number validation:', error);
-      Alert.alert(
-        'Validation Error',
-        'Unable to validate serial numbers. Please try again.',
-        [{ text: 'OK' }]
-      );
-      return false;
+      // If the whole validation block throws unexpectedly, log it and allow submission
+      // rather than blocking the user with a misleading error.
+      console.error('Error during serial number validation – allowing submission:', error);
+      return true;
     }
   };
 
@@ -824,17 +819,18 @@ const Donate = ({ route }) => {
       const found = items.find((d) => !isTeva(d?.owner)) || items[0]
       if (!found) return
       if (isTeva(found.owner)) {
-        // Show styled TEVA message; block auto-fill
-        setBatchLots((prev) => {
-          const updated = [...prev]
-          if (!updated[index]) return prev
-          updated[index].drugValid = false
-          updated[index].drugValidationMessage = "This product is not accepted in Lebanese territory (TEVA)."
-          return updated
-        })
-        Alert.alert(
-          "Not allowed",
-          "The selected manufacturer (TEVA) is not accepted in Lebanese territory. Please choose a different product.",
+        showAlertWithScrollPreservation(
+          "Manufacturer Not Allowed",
+          `${found.name || 'This drug'} by TEVA cannot be donated per organizational policy.\n\nPack #${index + 1} will be removed.`,
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                // INTENTIONAL CLEARING: Policy enforcement - TEVA products are blocked
+                removePackSilently(index);
+              }
+            }
+          ]
         )
         return
       }
@@ -872,6 +868,113 @@ const Donate = ({ route }) => {
       const gtinTrimmed = String(response.gtin || "").trim();
       const serialTrimmed = String(response.sn || "").trim();
 
+      // CHECK FOR DATE OUT OF BOUNDS: If barcode has expiry AI (17) but parsing failed
+      const hasExpiryAI = data.match(/(?:^|\u001d)17(\d{6})/);
+      if (hasExpiryAI && !response.exp) {
+        setIsProcessingScan(false);
+        setTimeout(() => {
+          showAlertWithScrollPreservation(
+            "Invalid Expiry Date",
+            `The expiry date in the barcode is out of bounds or invalid.\n\nBarcode value: ${hasExpiryAI[1]}\n\nPlease enter the expiry date manually or scan a different pack.`,
+            [
+              {
+                text: "Enter Manually",
+                onPress: () => {
+                  // Populate the data we could read
+                  const updatedBatchLots = [...batchLots];
+                  updatedBatchLots[cameraIndex] = {
+                    ...updatedBatchLots[cameraIndex],
+                    gtin: response.gtin || updatedBatchLots[cameraIndex].gtin,
+                    lotNumber: response.lot || updatedBatchLots[cameraIndex].lotNumber,
+                    serialNumber: response.sn?.trim() || updatedBatchLots[cameraIndex].serialNumber,
+                  };
+                  setBatchLots(updatedBatchLots);
+                  
+                  // Scroll to the form
+                  setTimeout(() => {
+                    const currentRef = batchLotRefs.current[cameraIndex];
+                    if (currentRef) {
+                      currentRef.measureLayout(scrollViewRef.current, (x, y) => {
+                        scrollViewRef.current.scrollTo({ y, animated: true });
+                      });
+                    }
+                  }, 100);
+                },
+              },
+              {
+                text: "Scan Another Pack",
+                onPress: () => {
+                  // Give alert time to dismiss before opening camera
+                  setTimeout(() => {
+                    handleOpenCamera(cameraIndex);
+                  }, 300);
+                },
+              },
+            ]
+          );
+        }, 100);
+        return; // Stop processing
+      }
+
+      // DETECT PARTIAL BARCODE SCAN: Check if essential data is missing
+      const hasGtin = !!gtinTrimmed;
+      const hasLot = !!(response.lot && String(response.lot).trim());
+      const hasExpiry = !!response.exp;
+      
+      if (!hasGtin || !hasLot || !hasExpiry) {
+        setIsProcessingScan(false);
+        
+        // Populate whatever data we got from the scan
+        const updatedBatchLots = [...batchLots];
+        const partialData = {
+          ...updatedBatchLots[cameraIndex],
+          gtin: response.gtin || updatedBatchLots[cameraIndex].gtin,
+          lotNumber: response.lot || updatedBatchLots[cameraIndex].lotNumber,
+          expiryDate: response.exp ? response.exp.toISOString().split("T")[0] : updatedBatchLots[cameraIndex].expiryDate,
+          serialNumber: response.sn?.trim() || updatedBatchLots[cameraIndex].serialNumber,
+        };
+        updatedBatchLots[cameraIndex] = partialData;
+        setBatchLots(updatedBatchLots);
+        
+        const missingFields = [];
+        if (!hasGtin) missingFields.push('GTIN');
+        if (!hasLot) missingFields.push('Lot Number');
+        if (!hasExpiry) missingFields.push('Expiry Date');
+        
+        setTimeout(() => {
+          showAlertWithScrollPreservation(
+            "Partial Scan Detected",
+            `Some data couldn't be read from the barcode.\n\nMissing: ${missingFields.join(', ')}\n\nWould you like to scan again or fill in the missing fields manually?`,
+            [
+              {
+                text: "Rescan",
+                onPress: () => {
+                  // Give alert time to dismiss before opening camera
+                  setTimeout(() => {
+                    handleOpenCamera(cameraIndex);
+                  }, 300);
+                },
+              },
+              {
+                text: "Continue Manually",
+                onPress: () => {
+                  // Scroll to the form to let user fill manually
+                  setTimeout(() => {
+                    const currentRef = batchLotRefs.current[cameraIndex];
+                    if (currentRef) {
+                      currentRef.measureLayout(scrollViewRef.current, (x, y) => {
+                        scrollViewRef.current.scrollTo({ y, animated: true });
+                      });
+                    }
+                  }, 100);
+                },
+              },
+            ]
+          );
+        }, 100);
+        return; // Stop processing this scan
+      }
+
       // FIRST: Check for duplicates in forms above the current one
       if (gtinTrimmed && serialTrimmed) {
         const duplicateIndex = batchLots.findIndex((lot, idx) => {
@@ -882,12 +985,18 @@ const Donate = ({ route }) => {
 
         if (duplicateIndex !== -1) {
           // Found duplicate in forms above - prevent scan
-          setIsProcessingScan(false)
+          setIsProcessingScan(false);
           setTimeout(() => {
-            Alert.alert(
-              "Duplicate Pack Detected",
-              `This pack has already been scanned in Pack ${duplicateIndex + 1} above.\n\nGTIN: ${gtinTrimmed}\nSerial Number: ${serialTrimmed}\n\nPlease scan a different pack.`,
-              [{ text: "OK" }]
+            showAlertWithScrollPreservation(
+              "Duplicate in Current Session",
+              `Pack #${cameraIndex + 1} has the same GTIN + Serial Number as Pack #${duplicateIndex + 1} above.\n\nGTIN: ${gtinTrimmed}\nSerial: ${serialTrimmed}\n\nPack #${cameraIndex + 1} will be cleared. Please scan a different pack.`,
+              [{ 
+                text: "OK",
+                onPress: () => {
+                  // INTENTIONAL CLEARING: Prevent duplicate entries in same session
+                  removePackSilently(cameraIndex);
+                }
+              }]
             );
           }, 100);
           return; // Stop processing
@@ -895,37 +1004,73 @@ const Donate = ({ route }) => {
       }
 
       // SECOND: Check the database for already donated packs
-      const donationStatusResponse = await axios.post("https://apiv2.medleb.org/batchserial/checkDonationStatus", {
-        GTIN: response.gtin,
-        BatchNumber: response.lot,
-        SerialNumber: response.sn,
-        ExpiryDate: response.exp ? response.exp.toISOString().split("T")[0] : "",
-      }, { headers })
+      let isDonated = false;
+      try {
+        const donationStatusResponse = await axios.post("https://apiv2.medleb.org/batchserial/checkDonationStatus", {
+          GTIN: response.gtin,
+          BatchNumber: response.lot,
+          SerialNumber: response.sn,
+          ExpiryDate: response.exp ? response.exp.toISOString().split("T")[0] : "",
+        }, { headers });
 
-      const { isValid, isDonated, messageEN } = donationStatusResponse.data
+        const { isValid, isDonated: apiDonated, messageEN } = donationStatusResponse.data;
+        isDonated = apiDonated;
 
-      if (isDonated) {
-        setIsProcessingScan(false)
-        setTimeout(() => {
+        if (isDonated) {
+          setIsProcessingScan(false);
+          setTimeout(() => {
+            showAlertWithScrollPreservation(
+              "Drug Already Donated",
+              `${messageEN}\n\nGTIN: ${gtinTrimmed}\nSerial: ${serialTrimmed}\n\nPlease scan a different pack.`,
+              [{ 
+                text: "OK",
+                onPress: () => {
+                  // INTENTIONAL CLEARING: Security measure to prevent duplicate donations
+                  removePackSilently(cameraIndex);
+                }
+              }]
+            );
+          }, 100);
+
+          setIsFormValid(false);
+          return;
+        }
+      } catch (donationStatusError) {
+        // Handle network/API errors - skip the check and proceed with warning
+        if (donationStatusError.response?.status === 401) {
+          // Auth errors should still be handled
+          setIsProcessingScan(false);
           Alert.alert(
-            "Drug Already Donated",
-            `${messageEN}\n\nPlease scan a different pack.`, // Display the message from the API response
-            [{ 
-              text: "OK",
-              onPress: () => {
-                // Clear form if it's the initial one, or remove if it's a dynamic form
-                if (cameraIndex === 0) {
-                  clearPackForm(cameraIndex);
-                } else {
-                  removePack(cameraIndex);
+            "Authentication Error", 
+            "Your session has expired. Please sign in again.",
+            [
+              { 
+                text: "Sign In", 
+                onPress: () => {
+                  AsyncStorage.clear();
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'SignIn' }],
+                  });
                 }
               }
-            }]
-          )
-        }, 100)
-
-        setIsFormValid(false) // Disable form submission
-        return
+            ]
+          );
+          return;
+        }
+        
+        // For other errors, skip the database check and continue silently
+        console.error("Couldn't check donation status - proceeding without check:", donationStatusError);
+        // Only alert the user when there is truly no network response (offline / DNS failure).
+        // Server-side errors (5xx, etc.) should not surface as a "Network Error" to the user.
+        if (!donationStatusError.response) {
+          showAlertWithScrollPreservation(
+            "Network Error",
+            "Couldn't verify if this drug was previously donated. The pack will proceed without this check.\n\nPlease ensure you have a stable connection for best results.",
+            [{ text: "Continue" }]
+          );
+        }
+        // Continue processing below (don't return)
       }
 
       // If the drug is found but not donated, continue with the donation process
@@ -981,14 +1126,14 @@ const Donate = ({ route }) => {
           // Hide loading animation
           setIsProcessingScan(false)
           
-          Alert.alert(
-            "Not Found in Database",
-            "This GTIN was not found in the French database. Please scan again.",
+          showAlertWithScrollPreservation(
+            "Drug Not Found",
+            `GTIN ${codeForLookup} is not in our database.\n\nPlease verify the barcode and scan again, or contact support if this drug should be accepted.`,
             [
               {
                 text: "Scan Again",
                 onPress: () => {
-                  // Clear the not found flag and re-open camera
+                  // INTENTIONAL CLEARING: Ensure data consistency - unrecognized drugs must be rescanned
                   setBatchLots((prev) => {
                     const updated = [...prev]
                     if (updated[cameraIndex]) {
@@ -996,17 +1141,17 @@ const Donate = ({ route }) => {
                     }
                     return updated
                   })
+                  removePackSilently(cameraIndex);
                   handleOpenCamera(cameraIndex)
                 },
               },
-            ],
-            { cancelable: false }
+            ]
           )
         }
       }
     } catch (error) {
       setIsProcessingScan(false)
-      console.error("Error checking donation status or parsing scanned data:", error)
+      console.error("Error in barcode scan processing:", error)
       
       // Handle authentication errors specifically
       if (error.response?.status === 401) {
@@ -1027,34 +1172,40 @@ const Donate = ({ route }) => {
           ]
         )
       } else {
-        Alert.alert("Error", "Failed to check donation status. Please try again.")
+        // Generic error in barcode processing (shouldn't normally reach here)
+        const errorMessage = error.message || "Unknown error occurred";
+        showAlertWithScrollPreservation(
+          "Scan Error", 
+          `Failed to process barcode scan: ${errorMessage}\n\nYour previously entered packs are preserved. Please try scanning again.`,
+          [{ text: "OK" }]
+        )
       }
     }
   }
 
   const extractDataMatrix = (code) => {
     const response = { gtin: "", lot: "", sn: "", exp: null }
-    let responseCode = code
+    let remaining = code
 
-    const prefixes = [
-      { prefix: "01", key: "gtin", length: 14 },
-      { prefix: "17", key: "exp", length: 6 },
-    ]
+    // Extract GTIN (AI 01) - always 14 digits, must match at start or after GS
+    const gtinMatch = remaining.match(/(?:^|\u001d)01(\d{14})/)
+    if (gtinMatch) {
+      response.gtin = gtinMatch[1]
+      remaining = remaining.replace(gtinMatch[0], gtinMatch[0].startsWith('\u001d') ? '\u001d' : '')
+    }
 
-    prefixes.forEach(({ prefix, key, length }) => {
-      const position = responseCode.indexOf(prefix)
-
-      if (position !== -1) {
-        const start = position + prefix.length
-        const end = start + length
-
-        response[key] =
-          key === "exp" ? parseExpiryDate(responseCode.substring(start, end)) : responseCode.substring(start, end)
-        responseCode = responseCode.slice(0, position) + responseCode.slice(end)
+    // Extract Expiry Date (AI 17) - always 6 digits (YYMMDD), must match at start or after GS
+    const expMatch = remaining.match(/(?:^|\u001d)17(\d{6})/)
+    if (expMatch) {
+      const expDate = parseExpiryDate(expMatch[1])
+      if (expDate) {
+        response.exp = expDate
       }
-    })
+      remaining = remaining.replace(expMatch[0], expMatch[0].startsWith('\u001d') ? '\u001d' : '')
+    }
 
-    const lotAndSn = extractLotAndSn(responseCode)
+    // Extract Lot and Serial from remaining
+    const lotAndSn = extractLotAndSn(remaining)
     response.lot = lotAndSn.lot
     response.sn = lotAndSn.sn
 
@@ -1089,10 +1240,56 @@ const Donate = ({ route }) => {
   }
 
   const parseExpiryDate = (expDateString) => {
-    const year = Number.parseInt(expDateString.substring(0, 2)) + 2000
-    const month = Number.parseInt(expDateString.substring(2, 4)) - 1
-    const day = Number.parseInt(expDateString.substring(4, 6))
-    return new Date(year, month, day)
+    try {
+      if (!expDateString || expDateString.length < 6) {
+        console.error(`Invalid expiry date string: ${expDateString}`)
+        return null
+      }
+
+      const year = Number.parseInt(expDateString.substring(0, 2)) + 2000
+      const month = Number.parseInt(expDateString.substring(2, 4)) - 1
+      let day = Number.parseInt(expDateString.substring(4, 6))
+
+      // Validate the parsed values
+      if (isNaN(year) || isNaN(month) || isNaN(day)) {
+        console.error(`Invalid date components from "${expDateString}": year=${year}, month=${month}, day=${day}`)
+        return null
+      }
+
+      // Month must be 0-11 (JavaScript uses 0-indexed months)
+      if (month < 0 || month > 11) {
+        console.error(`Month out of range (${month}) from expiry date: ${expDateString}`)
+        return null
+      }
+
+      // Handle day=0 (common in pharma when only year/month are known)
+      // Use the last day of the month for day=0
+      if (day === 0) {
+        // Create date with first day of next month, then subtract 1 day
+        const lastDay = new Date(year, month + 1, 0)
+        day = lastDay.getDate()
+        console.log(`Day was 0 in expiry date ${expDateString}, using last day of month: ${day}`)
+      }
+
+      // Day must be 1-31
+      if (day < 1 || day > 31) {
+        console.error(`Day out of range (${day}) from expiry date: ${expDateString}`)
+        return null
+      }
+
+      const date = new Date(year, month, day)
+
+      // Check if the date is valid (JavaScript will create invalid dates that roll over)
+      if (isNaN(date.getTime())) {
+        console.error(`Invalid date created from ${expDateString}: ${year}-${month + 1}-${day}`)
+        return null
+      }
+
+      return date
+    } catch (error) {
+      console.error('Error parsing expiry date:', error)
+      return null
+    }
   }
 
   const handleOpenCamera = async (index) => {
@@ -1203,7 +1400,7 @@ const Donate = ({ route }) => {
 
     if (duplicateIndex !== -1) {
       // Found duplicate in forms above
-      Alert.alert(
+      showAlertWithScrollPreservation(
         "Duplicate Pack Detected",
         `This pack has already been scanned in Pack ${duplicateIndex + 1} above.\n\nGTIN: ${gtinTrimmed}\nSerial Number: ${serialTrimmed}\n\nWould you like to clear this duplicate entry?`,
         [
@@ -1214,11 +1411,7 @@ const Donate = ({ route }) => {
           {
             text: "Clear Data",
             onPress: () => {
-              if (index === 0) {
-                clearPackForm(index);
-              } else {
-                removePack(index);
-              }
+              removePackSilently(index);
             }
           }
         ]
@@ -1245,7 +1438,7 @@ const Donate = ({ route }) => {
       const { isDonated, messageEN } = response.data;
 
       if (isDonated) {
-        Alert.alert(
+        showAlertWithScrollPreservation(
           "Drug Already Donated",
           `${messageEN || "This pack has already been donated."}\n\nGTIN: ${gtinTrimmed}\nSerial Number: ${serialTrimmed}\n\nWould you like to clear this entry?`,
           [
@@ -1256,11 +1449,7 @@ const Donate = ({ route }) => {
             {
               text: "Clear Data",
               onPress: () => {
-                if (index === 0) {
-                  clearPackForm(index);
-                } else {
-                  removePack(index);
-                }
+                removePackSilently(index);
               }
             }
           ]
@@ -1312,9 +1501,15 @@ const Donate = ({ route }) => {
   }, [batchLots])
 
   const addBatchLotForm = () => {
-    setBatchLots([...batchLots, createEmptyBatchLot()])
-    setPackCounter(packCounter + 1) // Increment packCounter on adding more batch lots
-    console.log(packCounter)
+    const newIndex = batchLots.length;
+    setBatchLots([...batchLots, createEmptyBatchLot()]);
+    setPackCounter(packCounter + 1); // Increment packCounter on adding more batch lots
+    console.log(packCounter);
+    
+    // Automatically open camera for the new pack
+    setTimeout(() => {
+      handleOpenCamera(newIndex);
+    }, 300); // Small delay to ensure the new form is rendered
   }
 
   // Clear pack form (for main pack or any pack)
@@ -1332,13 +1527,25 @@ const Donate = ({ route }) => {
     });
   };
 
-  // Remove pack form (for additional packs only)
+  // Silently remove a pack without confirmation — used for automatic system removals (errors, duplicates, TEVA, etc.)
+  const removePackSilently = (index) => {
+    if (index === 0) {
+      clearPackForm(0);
+      return;
+    }
+    setBatchLots((prev) => prev.filter((_, i) => i !== index));
+    setValidationErrors((prev) => prev.filter((_, i) => i !== index));
+    setPackCounter((prev) => Math.max(1, prev - 1));
+    batchLotRefs.current = batchLotRefs.current.filter((_, i) => i !== index);
+  };
+
+  // Remove pack form (for additional packs only) — shows confirmation dialog for manual user action
   const removePack = (index) => {
     if (index === 0) return; // Never remove the first pack
-    
+
     Alert.alert(
       "Remove Pack",
-      "Are you sure you want to remove this pack form?",
+      "Are you sure you want to remove this pack?",
       [
         {
           text: "Cancel",
@@ -1350,13 +1557,12 @@ const Donate = ({ route }) => {
           onPress: () => {
             setBatchLots((prev) => prev.filter((_, i) => i !== index));
             setValidationErrors((prev) => prev.filter((_, i) => i !== index));
-            setPackCounter(prev => Math.max(1, prev - 1));
-            // Update refs array
+            setPackCounter((prev) => Math.max(1, prev - 1));
             batchLotRefs.current = batchLotRefs.current.filter((_, i) => i !== index);
           },
         },
       ],
-      { cancelable: false }
+      { cancelable: true }
     );
   };
 
@@ -1402,6 +1608,7 @@ const Donate = ({ route }) => {
   // ...existing code...
 
   const submitBatchLot = async () => {
+    if (isSubmitting) return
     if (!validateFields()) {
       return
     }
@@ -1433,23 +1640,13 @@ const Donate = ({ route }) => {
       gtinSignatureMap.set(gtin, signature)
     }
 
+    setIsSubmitting(true)
     try {
       console.log("Submitting batch lots...")
       
       // Get the authentication token
       const token = await AsyncStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      
-      // CRITICAL: Validate all serial numbers before submission to prevent duplicates
-      console.log('Validating serial numbers before submission...');
-      const isValid = await validateSerialNumbers(batchLots);
-      
-      if (!isValid) {
-        console.log('Serial number validation failed. Aborting submission.');
-        return; // Stop submission if validation fails
-      }
-      
-      console.log('Serial number validation passed. Proceeding with submission.');
       
       // Ensure we have a box created for this donation before submitting packs
       const ensureCurrentBox = async () => {
@@ -1460,7 +1657,7 @@ const Donate = ({ route }) => {
         
         if (currentBox) return currentBox
         // Compute next unique label from server state
-        const boxesResp = await axios.get(`https://apiv2.medleb.org/boxes/byDonation/${donationId}`, { headers })
+        const boxesResp = await axios.get(`https://apiv2.medleb.org/boxes/byDonation/${donationId}`, { headers, timeout: 60000 })
         const existing = Array.isArray(boxesResp.data) ? boxesResp.data : []
         let nextNumber = 1
         existing.forEach(b => {
@@ -1475,7 +1672,7 @@ const Donate = ({ route }) => {
           DonationId: donationId,
           BoxLabel: label,
           CreatedDate: boxCreatedDate.toISOString(),
-        }, { headers })
+        }, { headers, timeout: 60000 })
         if (createResp.status === 201) {
           setCurrentBox(createResp.data.BoxId)
           setBoxLabelCounter(nextNumber + 1)
@@ -1503,7 +1700,7 @@ const Donate = ({ route }) => {
             SerialNumber: batchLot.serialNumber,
             DonationDate: batchLot.donationDate,
             BoxId: boxIdToUse,
-          }, { headers }),
+          }, { headers, timeout: 60000 }),
         ),
       )
 
@@ -1511,11 +1708,11 @@ const Donate = ({ route }) => {
         console.log("Batch lots submitted successfully.")
         
         // Query the database to get the actual total count of packs in this box
-        const packsResponse = await axios.get(`https://apiv2.medleb.org/batchserial/byBox/${boxIdToUse}`, { headers });
+        const packsResponse = await axios.get(`https://apiv2.medleb.org/batchserial/byBox/${boxIdToUse}`, { headers, timeout: 60000 });
         const actualPackCount = Array.isArray(packsResponse.data?.data) ? packsResponse.data.data.length : 0;
         
         // Update the box with the actual count from the database
-        await axios.put(`https://apiv2.medleb.org/boxes/${boxIdToUse}`, { NumberOfPacks: actualPackCount }, { headers })
+        await axios.put(`https://apiv2.medleb.org/boxes/${boxIdToUse}`, { NumberOfPacks: actualPackCount }, { headers, timeout: 60000 })
         console.log(`Box updated with actual pack count: ${actualPackCount}`)
 
         setPackCount(actualPackCount) // Update local state with actual count
@@ -1547,8 +1744,29 @@ const Donate = ({ route }) => {
           ]
         )
       } else {
-        Alert.alert("Warning", "Make sure you scanned the barcode and entered all of the fields correctly")
+        // Extract specific error message if available
+        const errorMessage = error.response?.data?.message || 
+                            error.response?.data?.error ||
+                            error.message || 
+                            "Please check your connection and try again.";
+        
+        Alert.alert(
+          "Submission Failed", 
+          `${errorMessage}\n\nYour entered data has been preserved.`,
+          [
+            {
+              text: "Retry",
+              onPress: () => submitBatchLot()
+            },
+            {
+              text: "Cancel",
+              style: "cancel"
+            }
+          ]
+        )
       }
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -1678,6 +1896,11 @@ const Donate = ({ route }) => {
           scrollEventThrottle={16}
           contentContainerStyle={{ flexGrow: 1, justifyContent: "space-between" }}
           scrollEnabled={scrollEnabled}
+          keyboardShouldPersistTaps="handled"
+          maintainVisibleContentPosition={{
+            minIndexForVisible: 0,
+            autoscrollToTopThreshold: 10
+          }}
         >
           <View style={styles.originalFormContainer}>
             <View style={styles.boxInfoContainer}>
@@ -1900,10 +2123,15 @@ const Donate = ({ route }) => {
               <Text style={[styles.addMoreButtonText, !isFormValid && styles.disabledAddMoreButtonText]}>Add More Packs</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.button, !isFormValid ? { backgroundColor: "grey" } : {}]}
+              style={[styles.button, (!isFormValid || isSubmitting) ? { backgroundColor: "grey" } : {}]}
               onPress={() => (isFormValid ? submitBatchLot() : validateFields())}
+              disabled={isSubmitting}
             >
-              <Text style={styles.buttonText}>Submit</Text>
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Submit</Text>
+              )}
             </TouchableOpacity>
           </View>
         </ScrollView>
